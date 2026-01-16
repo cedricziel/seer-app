@@ -277,64 +277,6 @@ public final class AppState: ObservableObject {
         isAuthenticated = false
     }
 
-    // MARK: - Migration
-
-    /// Migrate legacy single-server credentials to multi-server format
-    public func migrateLegacyCredentials() {
-        let keychain = KeychainManager.shared
-
-        guard keychain.hasLegacyCredentials(),
-              let urlString = keychain.getString(for: .jellyfinServerURL),
-              let jellyfinURL = URL(string: urlString)
-        else {
-            return
-        }
-
-        // Check if this server already exists
-        if servers.contains(where: { $0.jellyfinURL == jellyfinURL }) {
-            // Already migrated, just clean up legacy keys
-            keychain.deleteAll()
-            return
-        }
-
-        // Create new server configuration
-        let userID = keychain.getString(for: .jellyfinUserID)
-        var jellyseerrURL: URL?
-        if let jellyseerrURLString = keychain.getString(for: .jellyseerrServerURL) {
-            jellyseerrURL = URL(string: jellyseerrURLString)
-        }
-
-        let config = ServerConfiguration(
-            name: jellyfinURL.host ?? "My Server",
-            emoji: "🏠",
-            jellyfinURL: jellyfinURL,
-            jellyseerrURL: jellyseerrURL,
-            jellyfinUserID: userID,
-            lastUsed: Date(),
-            createdAt: Date(),
-            isActive: true
-        )
-
-        addServer(config)
-
-        // Migrate credentials
-        if let accessToken = keychain.getString(for: .jellyfinAccessToken) {
-            keychain.saveCredential(accessToken, for: config.id, key: .jellyfinAccessToken)
-        }
-        if let deviceID = keychain.getString(for: .jellyfinDeviceID) {
-            keychain.saveCredential(deviceID, for: config.id, key: .jellyfinDeviceID)
-        }
-        if let apiKey = keychain.getString(for: .jellyseerrAPIKey) {
-            keychain.saveCredential(apiKey, for: config.id, key: .jellyseerrAPIKey)
-        }
-
-        // Clean up legacy keys
-        keychain.deleteAll()
-
-        // Update authentication state
-        updateAuthenticationState()
-    }
-
     // MARK: - Error Handling
 
     /// Show an error message

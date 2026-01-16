@@ -8,15 +8,10 @@ public final class KeychainManager: Sendable {
 
     private let serviceName = "com.cedricziel.seer"
 
-    // MARK: - Legacy Keys (for single-server migration)
+    // MARK: - App-Level Keys (shared across all servers)
 
     public enum KeychainKey: String, Sendable {
-        case jellyfinServerURL = "jellyfin_server_url"
-        case jellyfinAccessToken = "jellyfin_access_token"
-        case jellyfinUserID = "jellyfin_user_id"
         case jellyfinDeviceID = "jellyfin_device_id"
-        case jellyseerrServerURL = "jellyseerr_server_url"
-        case jellyseerrAPIKey = "jellyseerr_api_key"
     }
 
     // MARK: - Server-Specific Credential Keys
@@ -224,58 +219,8 @@ public final class KeychainManager: Sendable {
         return true
     }
 
-    /// Delete all stored legacy credentials
-    public func deleteAll() {
-        for key in [
-            KeychainKey.jellyfinServerURL,
-            KeychainKey.jellyfinAccessToken,
-            KeychainKey.jellyfinUserID,
-            KeychainKey.jellyfinDeviceID,
-            KeychainKey.jellyseerrServerURL,
-            KeychainKey.jellyseerrAPIKey,
-        ] {
-            delete(for: key)
-        }
-    }
-
     /// Check if credentials exist for a given key
     public func hasValue(for key: KeychainKey) -> Bool {
         getString(for: key) != nil
-    }
-
-    /// Migrate existing local keychain items to synced items
-    /// Call this on app launch to ensure old items get synced
-    public func migrateToSyncedKeychain() {
-        for key in [
-            KeychainKey.jellyfinServerURL,
-            KeychainKey.jellyfinAccessToken,
-            KeychainKey.jellyfinUserID,
-            KeychainKey.jellyfinDeviceID,
-            KeychainKey.jellyseerrServerURL,
-            KeychainKey.jellyseerrAPIKey,
-        ] {
-            // Check for local-only item
-            let localQuery: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: serviceName,
-                kSecAttrAccount as String: key.rawValue,
-                kSecAttrSynchronizable as String: false,
-                kSecReturnData as String: true,
-                kSecMatchLimit as String: kSecMatchLimitOne,
-            ]
-
-            var result: AnyObject?
-            let status = SecItemCopyMatching(localQuery as CFDictionary, &result)
-
-            if status == errSecSuccess, let data = result as? Data {
-                // Re-save as synced item (this will delete the local one too)
-                save(data, for: key)
-            }
-        }
-    }
-
-    /// Check if legacy single-server credentials exist (for migration)
-    public func hasLegacyCredentials() -> Bool {
-        getString(for: .jellyfinServerURL) != nil
     }
 }
