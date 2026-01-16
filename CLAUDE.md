@@ -11,7 +11,7 @@ Seer is an iOS app for Jellyfin (media server) and Jellyseerr (media request man
 ```bash
 make setup          # Install dev dependencies (xcodegen, swiftlint, swiftformat)
 make generate       # Generate Xcode project from project.yml
-make build          # Build for iOS Simulator (default: iPhone 16)
+make build          # Build for iOS Simulator (default: iPhone 17)
 make build SIMULATOR="iPhone 15 Pro"  # Build for specific simulator
 make build-release  # Build for release
 make test           # Run tests on simulator
