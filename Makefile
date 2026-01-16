@@ -1,7 +1,7 @@
 .PHONY: generate build build-release lint format clean open test
 
 # Default simulator destination
-SIMULATOR ?= iPhone 16
+SIMULATOR ?= iPhone 17
 
 generate:
 	@echo "Generating Xcode project..."

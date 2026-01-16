@@ -5,11 +5,20 @@ import SwiftUI
 /// View for setting up server connections
 struct ServerSetupView: View {
     @EnvironmentObject private var appState: AppState
+
+    var body: some View {
+        ServerSetupContentView(appState: appState)
+    }
+}
+
+/// Internal view that creates the view model with the correct AppState
+private struct ServerSetupContentView: View {
+    @ObservedObject var appState: AppState
     @StateObject private var viewModel: AuthViewModel
 
-    init() {
-        // Using a dummy init, will be replaced in onAppear
-        _viewModel = StateObject(wrappedValue: AuthViewModel(appState: AppState()))
+    init(appState: AppState) {
+        self.appState = appState
+        _viewModel = StateObject(wrappedValue: AuthViewModel(appState: appState))
     }
 
     var body: some View {
@@ -35,7 +44,7 @@ struct ServerSetupView: View {
             }
         }
         .onAppear {
-            // Reinitialize with the correct appState
+            // Pre-fill with existing URLs if available
             if viewModel.jellyfinServerURL.isEmpty {
                 viewModel.jellyfinServerURL = appState.jellyfinServerURL?.absoluteString ?? ""
                 viewModel.jellyseerrServerURL = appState.jellyseerrServerURL?.absoluteString ?? ""

@@ -12,7 +12,11 @@
       "Bash(xcodebuild:*)",
       "Bash(swiftlint lint:*)",
       "Bash(swiftformat:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "mcp__serena__check_onboarding_performed",
+      "mcp__serena__get_symbols_overview",
+      "Skill(commit)"
     ]
   }
 }
