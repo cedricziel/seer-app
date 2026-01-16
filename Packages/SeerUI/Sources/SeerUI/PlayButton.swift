@@ -54,9 +54,10 @@ public struct PlayButtonOverlay: View {
     public var body: some View {
         Button(action: action) {
             Image(systemName: "play.circle.fill")
-                .font(.title)
+                .font(.largeTitle)
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Play")

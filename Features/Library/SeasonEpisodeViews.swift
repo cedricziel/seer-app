@@ -50,9 +50,9 @@ struct SeasonDisclosureRow: View {
                         Image(systemName: "arrow.down.circle")
                             .font(.title3)
                             .foregroundStyle(.secondary)
+                            .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
-                    .padding(.trailing, 4)
                 }
             }
 
@@ -146,7 +146,7 @@ struct EpisodeRow: View {
                         // Resume indicator
                         if hasProgress {
                             Text("Resume")
-                                .font(.caption2)
+                                .font(.caption)
                                 .foregroundStyle(Color.accentColor)
                         }
 
@@ -176,15 +176,17 @@ struct EpisodeRow: View {
                         Image(systemName: "play.circle.fill")
                             .font(.title2)
                             .foregroundStyle(Color.accentColor)
+                            .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
                 } else if isWatched {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
+                        .frame(width: 44, height: 44)
                 }
             }
             .padding(.vertical, 8)
-            .padding(.leading, 16)
+            .padding(.horizontal, 16)
         }
         .buttonStyle(.plain)
         .disabled(onTap == nil)
@@ -319,7 +321,7 @@ public struct CompactDownloadButton: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
-                    .frame(width: 22, height: 22)
+                    .frame(width: 24, height: 24)
                 case .paused:
                     Image(systemName: "arrow.down.circle.dotted")
                         .foregroundStyle(.orange)
@@ -335,6 +337,7 @@ public struct CompactDownloadButton: View {
                 }
             }
             .font(.title3)
+            .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
         .disabled(state == .completed)
