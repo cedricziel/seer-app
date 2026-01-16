@@ -50,6 +50,7 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: true
         DEVELOPMENT_TEAM: WPW3QSLZ2F
+        CODE_SIGN_ENTITLEMENTS: App/SeerApp/SeerApp.entitlements
     preBuildScripts:
       - name: SwiftLint
         runOnlyWhenInstalling: false

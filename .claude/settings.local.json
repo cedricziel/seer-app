@@ -16,7 +16,9 @@
       "Bash(git commit:*)",
       "mcp__serena__check_onboarding_performed",
       "mcp__serena__get_symbols_overview",
-      "Skill(commit)"
+      "Skill(commit)",
+      "Skill(canvas-design)",
+      "Bash(python3:*)"
     ]
   }
 }
