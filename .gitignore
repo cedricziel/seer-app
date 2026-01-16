@@ -76,3 +76,4 @@ App/SeerApp/SeerApp.entitlements
 # Secrets (if any)
 secrets/
 credentials/
+.claude/settings.local.json
