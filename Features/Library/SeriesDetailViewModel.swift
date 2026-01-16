@@ -1,18 +1,20 @@
 import Foundation
 import JellyfinClient
+import Observation
 import SeerCore
 
 /// ViewModel for managing TV series detail view state including seasons and episodes
 @MainActor
-final class SeriesDetailViewModel: ObservableObject {
-    // MARK: - Published Properties
+@Observable
+final class SeriesDetailViewModel {
+    // MARK: - Observable Properties
 
-    @Published var seasons: [MediaItem] = []
-    @Published var episodesBySeason: [String: [MediaItem]] = [:]
-    @Published var expandedSeasons: Set<String> = []
-    @Published var isLoadingSeasons: Bool = false
-    @Published var isLoadingEpisodes: [String: Bool] = [:]
-    @Published var errorMessage: String?
+    var seasons: [MediaItem] = []
+    var episodesBySeason: [String: [MediaItem]] = [:]
+    var expandedSeasons: Set<String> = []
+    var isLoadingSeasons: Bool = false
+    var isLoadingEpisodes: [String: Bool] = [:]
+    var errorMessage: String?
 
     // MARK: - Private Properties
 
@@ -46,12 +48,14 @@ final class SeriesDetailViewModel: ObservableObject {
 
     /// Loads all seasons for the series
     func loadSeasons() async {
+        isLoadingSeasons = true
+        defer { isLoadingSeasons = false }
+
         guard let service = jellyfinService else {
             errorMessage = "Not connected to Jellyfin"
             return
         }
 
-        isLoadingSeasons = true
         errorMessage = nil
 
         do {
@@ -59,15 +63,14 @@ final class SeriesDetailViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
-
-        isLoadingSeasons = false
     }
 
     /// Loads episodes for a specific season
     func loadEpisodes(for season: MediaItem) async {
-        guard let service = jellyfinService else { return }
-
         isLoadingEpisodes[season.id] = true
+        defer { isLoadingEpisodes[season.id] = false }
+
+        guard let service = jellyfinService else { return }
 
         do {
             let episodes = try await service.getEpisodes(seasonId: season.id)
@@ -75,8 +78,6 @@ final class SeriesDetailViewModel: ObservableObject {
         } catch {
             print("Failed to load episodes for season \(season.name): \(error)")
         }
-
-        isLoadingEpisodes[season.id] = false
     }
 
     /// Toggles the expanded state of a season and loads episodes if needed

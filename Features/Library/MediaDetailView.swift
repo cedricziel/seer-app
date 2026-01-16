@@ -283,7 +283,7 @@ struct MediaDetailView: View {
                                     await viewModel.toggleSeason(season.id)
                                 }
                             },
-                            imageURL: { viewModel.imageURL(for: $0, type: .thumb) },
+                            imageURL: { viewModel.imageURL(for: $0, type: .primary) },
                             onPlayEpisode: { episode in
                                 selectedEpisodeForPlayback = episode
                                 showPlayer = true
