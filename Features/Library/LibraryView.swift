@@ -129,15 +129,17 @@ private struct LibraryContentView: View {
             MediaCard(
                 title: item.name,
                 subtitle: item.seriesName ?? item.formattedRuntime,
-                imageURL: viewModel.imageURL(for: item),
-                contextMenuConfig: contextMenuConfig(for: item, canPlay: true, showDetails: true),
-                contextMenuActions: contextMenuActions(for: item, canPlay: true)
+                imageURL: viewModel.imageURL(for: item)
             )
             .frame(width: 140)
             .overlay(alignment: .bottomTrailing) { playOverlay }
             .overlay(alignment: .bottom) { progressOverlay(for: item) }
         }
         .buttonStyle(.plain)
+        .mediaContextMenu(
+            config: contextMenuConfig(for: item, canPlay: true, showDetails: true),
+            actions: contextMenuActions(for: item, canPlay: true)
+        )
     }
 
     private var playOverlay: some View {
@@ -168,11 +170,14 @@ private struct LibraryContentView: View {
                     MediaCard(
                         title: item.name,
                         subtitle: item.year.map { String($0) },
-                        imageURL: viewModel.imageURL(for: item),
-                        contextMenuConfig: contextMenuConfig(for: item, canPlay: item.isPlayable, showDetails: false),
-                        contextMenuActions: contextMenuActions(for: item, canPlay: item.isPlayable)
+                        imageURL: viewModel.imageURL(for: item)
                     ).frame(width: 140)
-                }.buttonStyle(.plain)
+                }
+                .buttonStyle(.plain)
+                .mediaContextMenu(
+                    config: contextMenuConfig(for: item, canPlay: item.isPlayable, showDetails: false),
+                    actions: contextMenuActions(for: item, canPlay: item.isPlayable)
+                )
             }
         }
     }
