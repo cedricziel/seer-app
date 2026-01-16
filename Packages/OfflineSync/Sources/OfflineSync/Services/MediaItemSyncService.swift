@@ -246,7 +246,7 @@ public final class MediaItemSyncService {
         }
 
         // Remove items from this library that no longer exist on server
-        if let library {
+        if library != nil {
             for existing in existingItems where !serverIds.contains(existing.id) {
                 modelContext.delete(existing)
             }

@@ -395,7 +395,7 @@ public final class PiPPlaybackManager { // swiftlint:disable:this type_body_leng
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard time.isNumeric else { return }
             Task { @MainActor in
-                guard let self else { return }
+                guard self != nil else { return }
                 var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
                 info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = CMTimeGetSeconds(time)
                 info[MPNowPlayingInfoPropertyPlaybackRate] = player.rate

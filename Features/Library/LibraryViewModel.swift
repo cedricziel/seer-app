@@ -98,9 +98,9 @@ public final class LibraryViewModel: ObservableObject {
             guard !Task.isCancelled else { return }
             if libraries.isEmpty { isLoading = true }
             errorMessage = nil
-            async let lib = loadLibraries()
-            async let cont = loadContinueWatching()
-            async let lat = loadLatestItems()
+            async let lib: Void = loadLibraries()
+            async let cont: Void = loadContinueWatching()
+            async let lat: Void = loadLatestItems()
             _ = await (lib, cont, lat)
             guard !Task.isCancelled else { return }
             isLoading = false

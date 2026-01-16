@@ -68,7 +68,6 @@ public actor DownloadQueue {
     }
 
     private func updateNetworkStatus(connected: Bool, wifi: Bool) async {
-        let previousWiFi = isOnWiFi
         isConnected = connected
         isOnWiFi = wifi
 

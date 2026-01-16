@@ -25,7 +25,6 @@ public final class LibrarySyncService {
             predicate: #Predicate { $0.serverConfigurationID == configID }
         )
         let existingLibraries = try modelContext.fetch(descriptor)
-        let existingIds = Set(existingLibraries.map(\.id))
         let serverIds = Set(serverLibraries.map(\.id))
 
         // Remove libraries that no longer exist on server

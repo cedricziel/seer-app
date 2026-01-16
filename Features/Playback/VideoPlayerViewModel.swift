@@ -184,7 +184,7 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
         observePlayer(newPlayer)
 
         // Get duration from file
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         do {
             let durationValue = try await asset.load(.duration)
             if durationValue.seconds.isFinite {
