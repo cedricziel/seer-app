@@ -22,8 +22,14 @@ public actor DownloadQueue {
     /// Whether queue processing is paused
     private var isPaused: Bool = false
 
+    /// Whether WiFi-only downloads is enabled
+    private var wifiOnlyEnabled: Bool = false
+
     /// Callback when a download should start
     public var onShouldStartDownload: (@Sendable (UUID) async -> Void)?
+
+    /// Callback when network status changes (isConnected, isOnWiFi)
+    public var onNetworkStatusChanged: (@Sendable (Bool, Bool) async -> Void)?
 
     /// Set the callback for when a download should start
     public func setOnShouldStartDownload(_ callback: @escaping @Sendable (UUID) async -> Void) {
@@ -33,6 +39,11 @@ public actor DownloadQueue {
     /// Set callback synchronously (for use in init before actor isolation)
     public nonisolated func setOnShouldStartDownloadSync(_ callback: @escaping @Sendable (UUID) async -> Void) {
         Task { await self.setOnShouldStartDownload(callback) }
+    }
+
+    /// Set the callback for network status changes
+    public func setOnNetworkStatusChanged(_ callback: @escaping @Sendable (Bool, Bool) async -> Void) {
+        onNetworkStatusChanged = callback
     }
 
     public init(maxConcurrent: Int = 2) {
@@ -56,14 +67,39 @@ public actor DownloadQueue {
         pathMonitor.start(queue: DispatchQueue.global(qos: .utility))
     }
 
-    private func updateNetworkStatus(connected: Bool, wifi: Bool) {
+    private func updateNetworkStatus(connected: Bool, wifi: Bool) async {
+        let previousWiFi = isOnWiFi
         isConnected = connected
         isOnWiFi = wifi
 
-        // Process queue if network became available
+        // Notify listeners of network change
+        await onNetworkStatusChanged?(connected, wifi)
+
+        // Process queue if network became available and WiFi conditions are met
         if connected, !isPaused {
+            // If WiFi-only is enabled and we just got WiFi, process queue
+            // If WiFi-only is disabled, always process when connected
+            if !wifiOnlyEnabled || wifi {
+                await processQueue()
+            }
+        }
+    }
+
+    // MARK: - WiFi-Only Settings
+
+    /// Enable or disable WiFi-only downloads
+    public func setWiFiOnlyEnabled(_ enabled: Bool) {
+        wifiOnlyEnabled = enabled
+        // If enabling WiFi-only and we're not on WiFi, don't process
+        // If disabling WiFi-only, try to process queue
+        if !enabled {
             Task { await processQueue() }
         }
+    }
+
+    /// Whether WiFi-only mode is enabled
+    public var isWiFiOnlyEnabled: Bool {
+        wifiOnlyEnabled
     }
 
     // MARK: - Public Properties
@@ -91,6 +127,11 @@ public actor DownloadQueue {
     /// Whether queue is paused
     public var queuePaused: Bool {
         isPaused
+    }
+
+    /// Whether downloads are blocked due to WiFi-only setting
+    public var isBlockedByWiFiOnly: Bool {
+        wifiOnlyEnabled && !isOnWiFi
     }
 
     // MARK: - Queue Management
@@ -161,7 +202,13 @@ public actor DownloadQueue {
     // MARK: - Queue Processing
 
     private func processQueue() async {
+        // Don't process if paused or disconnected
         guard !isPaused, isConnected else { return }
+
+        // If WiFi-only is enabled and we're not on WiFi, don't start new downloads
+        if wifiOnlyEnabled, !isOnWiFi {
+            return
+        }
 
         while activeDownloads.count < maxConcurrent, !pendingQueue.isEmpty {
             let downloadID = pendingQueue.removeFirst()

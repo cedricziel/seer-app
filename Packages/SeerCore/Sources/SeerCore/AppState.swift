@@ -39,7 +39,14 @@ public final class AppState: ObservableObject {
     }
 
     public var jellyfinServerURL: URL? {
-        activeServer?.jellyfinURL
+        guard let server = activeServer else { return nil }
+        return ServerURLResolver.shared.resolveJellyfinURL(for: server)
+    }
+
+    /// Whether currently using the internal URL for the active server
+    public var isUsingInternalURL: Bool {
+        guard let server = activeServer else { return false }
+        return ServerURLResolver.shared.isUsingInternalURL(for: server)
     }
 
     public var jellyfinUserID: String? {

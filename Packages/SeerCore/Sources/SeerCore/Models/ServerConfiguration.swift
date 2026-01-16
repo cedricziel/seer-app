@@ -15,6 +15,11 @@ public final class ServerConfiguration {
     public var createdAt: Date = Date()
     public var isActive: Bool = false
 
+    /// Internal URL for local network access (optional)
+    public var internalJellyfinURL: URL?
+    /// WiFi network SSIDs that trigger internal URL usage
+    public var internalNetworkSSIDs: [String] = []
+
     public init(
         id: UUID = UUID(),
         name: String,
@@ -24,7 +29,9 @@ public final class ServerConfiguration {
         jellyfinUserID: String? = nil,
         lastUsed: Date? = nil,
         createdAt: Date = Date(),
-        isActive: Bool = false
+        isActive: Bool = false,
+        internalJellyfinURL: URL? = nil,
+        internalNetworkSSIDs: [String] = []
     ) {
         self.id = id
         self.name = name
@@ -35,11 +42,18 @@ public final class ServerConfiguration {
         self.lastUsed = lastUsed
         self.createdAt = createdAt
         self.isActive = isActive
+        self.internalJellyfinURL = internalJellyfinURL
+        self.internalNetworkSSIDs = internalNetworkSSIDs
     }
 
     /// Whether this server has Jellyseerr configured
     public var hasJellyseerr: Bool {
         jellyseerrURL != nil
+    }
+
+    /// Whether this server has an internal URL configured
+    public var hasInternalURL: Bool {
+        internalJellyfinURL != nil && !internalNetworkSSIDs.isEmpty
     }
 
     /// Human-readable display of the Jellyfin host
@@ -50,6 +64,11 @@ public final class ServerConfiguration {
     /// Human-readable display of the Jellyseerr host (if configured)
     public var jellyseerrHost: String? {
         jellyseerrURL?.host
+    }
+
+    /// Human-readable display of the internal Jellyfin host (if configured)
+    public var internalJellyfinHost: String? {
+        internalJellyfinURL?.host
     }
 }
 

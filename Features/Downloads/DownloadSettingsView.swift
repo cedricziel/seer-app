@@ -34,6 +34,11 @@ struct DownloadSettingsView: View {
                 // Network Section
                 Section {
                     Toggle("WiFi Only", isOn: $wifiOnlyDownloads)
+                        .onChange(of: wifiOnlyDownloads) { _, newValue in
+                            Task {
+                                await downloadManager?.setWiFiOnlyEnabled(newValue)
+                            }
+                        }
                 } header: {
                     Text("Network")
                 } footer: {
@@ -119,6 +124,8 @@ struct DownloadSettingsView: View {
             }
             .task {
                 await loadStorageInfo()
+                // Sync WiFi-only setting with download manager on load
+                await downloadManager?.setWiFiOnlyEnabled(wifiOnlyDownloads)
             }
         }
     }

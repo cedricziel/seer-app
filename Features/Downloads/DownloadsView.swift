@@ -41,6 +41,7 @@ struct DownloadsView: View {
         } else {
             List {
                 activeDownloadsSection(manager: manager)
+                waitingForWiFiSection(manager: manager)
                 pendingDownloadsSection(manager: manager)
                 pausedDownloadsSection(manager: manager)
                 completedDownloadsSection(manager: manager)
@@ -72,6 +73,21 @@ struct DownloadsView: View {
                 ForEach(pendingDownloads, id: \.id) { download in
                     DownloadRow(download: download, manager: manager)
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func waitingForWiFiSection(manager: DownloadManager) -> some View {
+        if !manager.waitingForWiFiDownloads.isEmpty {
+            Section {
+                ForEach(manager.waitingForWiFiDownloads, id: \.id) { download in
+                    DownloadRow(download: download, manager: manager)
+                }
+            } header: {
+                Label("Waiting for WiFi", systemImage: "wifi.exclamationmark")
+            } footer: {
+                Text("These downloads will resume when connected to WiFi.")
             }
         }
     }
@@ -279,8 +295,9 @@ struct DownloadRow: View {
             }
         }
 
-        // Cancel (pending, downloading, or paused)
-        if download.state == .pending || download.state == .downloading || download.state == .paused {
+        // Cancel (pending, downloading, paused, or waiting for WiFi)
+        if download.state == .pending || download.state == .downloading || download.state == .paused || download
+            .state == .waitingForWiFi {
             Button(role: .destructive) {
                 Task {
                     try? await manager.deleteDownload(download.id)
@@ -321,6 +338,8 @@ struct DownloadRow: View {
             .downloading(progress: download.progress)
         case .paused:
             .paused
+        case .waitingForWiFi:
+            .waitingForWiFi
         case .completed:
             .completed
         case .failed:
@@ -332,6 +351,8 @@ struct DownloadRow: View {
         switch download.state {
         case .pending, .downloading, .paused:
             .secondary
+        case .waitingForWiFi:
+            .orange
         case .completed:
             .green
         case .failed:

@@ -93,6 +93,8 @@ extension MediaDetailView {
                 downloadState = .downloading(progress: download.progress)
             case .paused:
                 downloadState = .paused
+            case .waitingForWiFi:
+                downloadState = .waitingForWiFi
             case .completed:
                 downloadState = .completed
             case .failed:
@@ -140,6 +142,8 @@ extension MediaDetailView {
                     episodeDownloadStates[episode.id] = .downloading(progress: download.progress)
                 case .paused:
                     episodeDownloadStates[episode.id] = .paused
+                case .waitingForWiFi:
+                    episodeDownloadStates[episode.id] = .waitingForWiFi
                 case .completed:
                     episodeDownloadStates[episode.id] = .completed
                 case .failed:
@@ -168,6 +172,7 @@ extension MediaDetailView {
         case .pending: return .pending
         case .downloading: return .downloading(progress: download.progress)
         case .paused: return .paused
+        case .waitingForWiFi: return .waitingForWiFi
         case .completed: return .completed
         case .failed: return .failed
         }

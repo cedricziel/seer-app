@@ -6,6 +6,7 @@ public enum DownloadButtonState: Sendable, Equatable {
     case pending
     case downloading(progress: Double)
     case paused
+    case waitingForWiFi
     case completed
     case failed
 }
@@ -47,7 +48,7 @@ public struct DownloadButton: View {
             .foregroundStyle(foregroundColor)
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .disabled(state == .pending)
+        .disabled(state == .pending || state == .waitingForWiFi)
         .contextMenu {
             contextMenuItems
         }
@@ -57,7 +58,7 @@ public struct DownloadButton: View {
         switch state {
         case .notDownloaded:
             onDownload
-        case .pending:
+        case .pending, .waitingForWiFi:
             {} // Disabled
         case .downloading:
             onPause
@@ -91,6 +92,8 @@ public struct DownloadButton: View {
             .frame(width: 20, height: 20)
         case .paused:
             Image(systemName: "pause.circle")
+        case .waitingForWiFi:
+            Image(systemName: "wifi.exclamationmark")
         case .completed:
             Image(systemName: "checkmark.circle.fill")
         case .failed:
@@ -108,6 +111,8 @@ public struct DownloadButton: View {
             "\(Int(progress * 100))%"
         case .paused:
             "Paused"
+        case .waitingForWiFi:
+            "Waiting for WiFi"
         case .completed:
             "Downloaded"
         case .failed:
@@ -121,6 +126,8 @@ public struct DownloadButton: View {
             .accentColor
         case .pending, .downloading, .paused:
             .secondary.opacity(0.2)
+        case .waitingForWiFi:
+            .orange.opacity(0.2)
         case .completed:
             .green.opacity(0.2)
         case .failed:
@@ -134,6 +141,8 @@ public struct DownloadButton: View {
             .white
         case .pending, .downloading, .paused:
             .primary
+        case .waitingForWiFi:
+            .orange
         case .completed:
             .green
         case .failed:
@@ -146,7 +155,7 @@ public struct DownloadButton: View {
         switch state {
         case .notDownloaded:
             EmptyView()
-        case .pending:
+        case .pending, .waitingForWiFi:
             Button("Cancel", role: .destructive, action: onCancel)
         case .downloading:
             Button("Pause", action: onPause)
@@ -166,24 +175,36 @@ public struct DownloadButton: View {
 /// A compact download button for use in list rows
 public struct CompactDownloadButton: View {
     public let state: DownloadButtonState
-    public let onTap: () -> Void
+    public let onDownload: () -> Void
+    public let onCancel: () -> Void
 
     public init(
         state: DownloadButtonState,
         onTap: @escaping () -> Void
     ) {
         self.state = state
-        self.onTap = onTap
+        onDownload = onTap
+        onCancel = {}
+    }
+
+    public init(
+        state: DownloadButtonState,
+        onDownload: @escaping () -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.state = state
+        self.onDownload = onDownload
+        self.onCancel = onCancel
     }
 
     public var body: some View {
-        Button(action: onTap) {
+        Button(action: onDownload) {
             stateIcon
                 .font(.title2)
                 .foregroundStyle(iconColor)
         }
         .buttonStyle(.plain)
-        .disabled(state == .pending)
+        .disabled(state == .pending || state == .waitingForWiFi)
     }
 
     @ViewBuilder
@@ -209,6 +230,8 @@ public struct CompactDownloadButton: View {
             }
         case .paused:
             Image(systemName: "pause.circle.fill")
+        case .waitingForWiFi:
+            Image(systemName: "wifi.exclamationmark.circle.fill")
         case .completed:
             Image(systemName: "checkmark.circle.fill")
         case .failed:
@@ -222,6 +245,8 @@ public struct CompactDownloadButton: View {
             .accentColor
         case .pending, .downloading, .paused:
             .secondary
+        case .waitingForWiFi:
+            .orange
         case .completed:
             .green
         case .failed:
@@ -242,10 +267,11 @@ public struct CompactDownloadButton: View {
         Divider()
 
         HStack(spacing: 30) {
-            CompactDownloadButton(state: .notDownloaded, onTap: {})
-            CompactDownloadButton(state: .downloading(progress: 0.6), onTap: {})
-            CompactDownloadButton(state: .completed, onTap: {})
-            CompactDownloadButton(state: .failed, onTap: {})
+            CompactDownloadButton(state: .notDownloaded, onDownload: {}, onCancel: {})
+            CompactDownloadButton(state: .downloading(progress: 0.6), onDownload: {}, onCancel: {})
+            CompactDownloadButton(state: .waitingForWiFi, onDownload: {}, onCancel: {})
+            CompactDownloadButton(state: .completed, onDownload: {}, onCancel: {})
+            CompactDownloadButton(state: .failed, onDownload: {}, onCancel: {})
         }
     }
     .padding()

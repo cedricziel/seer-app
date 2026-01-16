@@ -70,6 +70,25 @@ struct ServerEditView: View {
 
                 Section {
                     NavigationLink {
+                        InternalURLSettingsView(config: config)
+                    } label: {
+                        HStack {
+                            Label("Internal URL", systemImage: "house.circle")
+                            Spacer()
+                            if config.hasInternalURL {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Network")
+                } footer: {
+                    Text("Configure an internal URL to use when connected to your home WiFi network.")
+                }
+
+                Section {
+                    NavigationLink {
                         ReauthenticateView(config: config)
                     } label: {
                         Label("Re-authenticate", systemImage: "key")

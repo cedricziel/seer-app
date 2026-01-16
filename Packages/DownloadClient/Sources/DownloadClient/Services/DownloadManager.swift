@@ -33,12 +33,12 @@ public final class DownloadManager {
     /// Last error message
     public private(set) var lastError: String?
 
-    // MARK: - Private State
+    // MARK: - Internal State (accessible to extensions)
 
-    private let store: DownloadStore
+    let store: DownloadStore
     private let storage: DownloadStorage
-    private let queue: DownloadQueue
-    private let sessionManager: BackgroundSessionManager
+    let queue: DownloadQueue
+    let sessionManager: BackgroundSessionManager
     private let modelContainer: ModelContainer
 
     // Server credentials (set when authenticated)
@@ -46,6 +46,9 @@ public final class DownloadManager {
     private var accessToken: String?
     private var userID: String?
     private var deviceID: String?
+
+    // WiFi-only downloads setting
+    var wifiOnlyEnabled: Bool = true
 
     // MARK: - Initialization
 
@@ -61,6 +64,15 @@ public final class DownloadManager {
         queue.setOnShouldStartDownloadSync { [weak self] downloadID in
             Task { @MainActor [weak self] in
                 await self?.startDownloadTask(downloadID: downloadID)
+            }
+        }
+
+        // Set up network status change callback
+        Task { [weak self] in
+            await self?.queue.setOnNetworkStatusChanged { [weak self] isConnected, isOnWiFi in
+                Task { @MainActor [weak self] in
+                    await self?.handleNetworkStatusChanged(isConnected: isConnected, isOnWiFi: isOnWiFi)
+                }
             }
         }
 

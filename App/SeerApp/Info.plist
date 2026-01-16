@@ -72,5 +72,9 @@
     <array>
         <string>com.cedricziel.seer.autodownload</string>
     </array>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Seer needs location access to detect your WiFi network name so it can switch to your internal server URL when you're on your home network.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Seer needs location access to detect your WiFi network name so it can automatically switch to your internal server URL and manage WiFi-only downloads, even in the background.</string>
 </dict>
 </plist>

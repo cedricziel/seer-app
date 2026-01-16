@@ -11,6 +11,9 @@ public enum DownloadState: String, Codable, Sendable {
     /// Download is paused (can be resumed)
     case paused
 
+    /// Download is waiting for WiFi connection (WiFi-only mode enabled)
+    case waitingForWiFi
+
     /// Download completed successfully
     case completed
 
@@ -26,6 +29,8 @@ public enum DownloadState: String, Codable, Sendable {
             "Downloading"
         case .paused:
             "Paused"
+        case .waitingForWiFi:
+            "Waiting for WiFi"
         case .completed:
             "Downloaded"
         case .failed:
@@ -42,6 +47,8 @@ public enum DownloadState: String, Codable, Sendable {
             "arrow.down.circle"
         case .paused:
             "pause.circle"
+        case .waitingForWiFi:
+            "wifi.exclamationmark"
         case .completed:
             "checkmark.circle.fill"
         case .failed:
