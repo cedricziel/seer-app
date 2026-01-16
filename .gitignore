@@ -71,6 +71,7 @@ playground.xcworkspace
 
 # Generated files
 *.generated.swift
+App/SeerApp/SeerApp.entitlements
 
 # Secrets (if any)
 secrets/

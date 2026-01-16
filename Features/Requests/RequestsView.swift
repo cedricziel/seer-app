@@ -47,6 +47,10 @@ private struct RequestsContentView: View {
             }
             .navigationTitle("Requests")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ServerSwitcherButton()
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     filterMenu
                 }
@@ -68,6 +72,11 @@ private struct RequestsContentView: View {
         .task {
             if viewModel.isJellyseerrConfigured {
                 await viewModel.loadRequests()
+            }
+        }
+        .onChange(of: appState.activeServerID) {
+            Task {
+                await viewModel.refresh()
             }
         }
     }

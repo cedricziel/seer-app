@@ -43,6 +43,11 @@ private struct SearchContentView: View {
                     await viewModel.search()
                 }
             }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ServerSwitcherButton()
+                }
+            }
             .alert("Request Submitted", isPresented: $showRequestSuccess) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -68,6 +73,9 @@ private struct SearchContentView: View {
                 )
                 .presentationDetents([.medium, .large])
             }
+        }
+        .onChange(of: appState.activeServerID) {
+            viewModel.serverChanged()
         }
     }
 

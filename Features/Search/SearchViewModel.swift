@@ -119,6 +119,11 @@ public final class SearchViewModel: ObservableObject {
         errorMessage = nil
     }
 
+    func serverChanged() {
+        setupService()
+        clearSearch()
+    }
+
     // MARK: - Request Media
 
     func requestMedia(_ result: SearchResult) async throws {

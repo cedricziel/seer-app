@@ -38,6 +38,11 @@ targets:
       - target: JellyfinClient
       - target: JellyseerrClient
       - target: SeerUI
+    entitlements:
+      path: App/SeerApp/SeerApp.entitlements
+      properties:
+        keychain-access-groups: ["$(AppIdentifierPrefix)com.cedricziel.seer"]
+        com.apple.developer.ubiquity-kvstore-identifier: "$(TeamIdentifierPrefix)com.cedricziel.seer"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer
@@ -50,7 +55,6 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: true
         DEVELOPMENT_TEAM: WPW3QSLZ2F
-        CODE_SIGN_ENTITLEMENTS: App/SeerApp/SeerApp.entitlements
     preBuildScripts:
       - name: SwiftLint
         runOnlyWhenInstalling: false

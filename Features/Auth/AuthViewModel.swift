@@ -36,6 +36,7 @@ public final class AuthViewModel: ObservableObject {
     private var jellyfinService: JellyfinService?
     private var jellyseerrService: JellyseerrService?
     private let appState: AppState
+    private var serverConfig: ServerConfiguration?
 
     // MARK: - Initialization
 
@@ -66,12 +67,27 @@ public final class AuthViewModel: ObservableObject {
                 password: jellyfinPassword
             )
 
+            // Create server configuration
+            let config = ServerConfiguration(
+                name: url.host ?? "Server",
+                emoji: "🏠",
+                jellyfinURL: url,
+                jellyfinUserID: response.user.id,
+                lastUsed: Date(),
+                createdAt: Date()
+            )
+
+            // Add to app state
+            appState.addServer(config)
+            serverConfig = config
+
             // Save credentials
-            await appState.saveJellyfinCredentials(
-                serverURL: url,
+            let deviceID = await service.getDeviceID()
+            appState.saveJellyfinCredentials(
+                serverID: config.id,
                 accessToken: response.accessToken,
                 userID: response.user.id,
-                deviceID: service.getDeviceID()
+                deviceID: deviceID
             )
 
             jellyfinService = service
@@ -99,6 +115,11 @@ public final class AuthViewModel: ObservableObject {
             return
         }
 
+        guard var config = serverConfig else {
+            showErrorMessage("Server configuration not found")
+            return
+        }
+
         isLoading = true
         errorMessage = nil
 
@@ -106,8 +127,13 @@ public final class AuthViewModel: ObservableObject {
             let service = JellyseerrService(serverURL: url, apiKey: jellyseerrAPIKey)
             _ = try await service.verifyAuth()
 
-            // Save credentials
-            appState.saveJellyseerrCredentials(serverURL: url, apiKey: jellyseerrAPIKey)
+            // Update server configuration with Jellyseerr URL
+            config.jellyseerrURL = url
+            appState.updateServer(config)
+            serverConfig = config
+
+            // Save Jellyseerr credentials
+            appState.saveJellyseerrCredentials(serverID: config.id, apiKey: jellyseerrAPIKey)
 
             jellyseerrService = service
             jellyseerrConnected = true
@@ -126,6 +152,10 @@ public final class AuthViewModel: ObservableObject {
     }
 
     func completeSetup() {
+        // Switch to the newly configured server
+        if let config = serverConfig {
+            appState.switchServer(to: config.id)
+        }
         appState.isAuthenticated = true
     }
 
