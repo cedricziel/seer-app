@@ -1,4 +1,4 @@
-.PHONY: generate build build-release lint format clean open test
+.PHONY: generate build build-release lint format clean open test bump-build bump-patch bump-minor bump-major version
 
 # Default simulator destination
 SIMULATOR ?= iPhone 17
@@ -54,3 +54,19 @@ setup:
 resolve: generate
 	@echo "Resolving packages..."
 	xcodebuild -resolvePackageDependencies -scheme SeerApp
+
+# Version management
+bump-build:
+	@./scripts/bump-build.sh
+
+bump-patch:
+	@./scripts/bump-version.sh --patch
+
+bump-minor:
+	@./scripts/bump-version.sh --minor
+
+bump-major:
+	@./scripts/bump-version.sh --major
+
+version:
+	@echo "Version: $$(grep -E '^\s+MARKETING_VERSION:' project.yml | head -1 | sed 's/.*MARKETING_VERSION:\s*//' | tr -d ' \"') (Build $$(grep -E '^\s+CURRENT_PROJECT_VERSION:' project.yml | head -1 | sed 's/.*CURRENT_PROJECT_VERSION:\s*//' | tr -d ' '))"
