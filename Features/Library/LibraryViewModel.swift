@@ -43,6 +43,10 @@ public final class LibraryViewModel: ObservableObject {
     private let pageSize: Int = 50
     private var hasMoreItems: Bool = true
 
+    // Task tracking for cancellation
+    private var loadTask: Task<Void, Never>?
+    private var refreshTask: Task<Void, Never>?
+
     // MARK: - Initialization
 
     public init(appState: AppState) {
@@ -70,52 +74,79 @@ public final class LibraryViewModel: ObservableObject {
     // MARK: - Public Methods
 
     func loadInitialData() async {
+        // Cancel any existing load task
+        loadTask?.cancel()
+
         guard jellyfinService != nil else {
             errorMessage = "Not connected to Jellyfin"
             return
         }
 
-        isLoading = true
-        errorMessage = nil
+        loadTask = Task {
+            guard !Task.isCancelled else { return }
 
-        // Load data in parallel
-        async let librariesTask = loadLibraries()
-        async let continueTask = loadContinueWatching()
-        async let latestTask = loadLatestItems()
+            isLoading = true
+            errorMessage = nil
 
-        _ = await (librariesTask, continueTask, latestTask)
+            // Load data in parallel
+            async let librariesTask = loadLibraries()
+            async let continueTask = loadContinueWatching()
+            async let latestTask = loadLatestItems()
 
-        isLoading = false
+            _ = await (librariesTask, continueTask, latestTask)
+
+            guard !Task.isCancelled else { return }
+
+            isLoading = false
+        }
+
+        await loadTask?.value
     }
 
     func loadLibraries() async {
         guard let service = jellyfinService else { return }
+        guard !Task.isCancelled else { return }
 
         do {
-            libraries = try await service.getLibraries()
+            let result = try await service.getLibraries()
+            guard !Task.isCancelled else { return }
+            libraries = result
         } catch {
-            errorMessage = error.localizedDescription
+            if !Task.isCancelled {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
     func loadContinueWatching() async {
         guard let service = jellyfinService else { return }
+        guard !Task.isCancelled else { return }
 
         do {
-            continueWatching = try await service.getContinueWatching(limit: 10)
+            let result = try await service.getContinueWatching(limit: 10)
+            guard !Task.isCancelled else { return }
+            continueWatching = result
         } catch {
-            // Not critical if this fails
-            print("Failed to load continue watching: \(error)")
+            // Not critical if this fails, but suppress cancellation errors
+            if !Task.isCancelled {
+                print("Failed to load continue watching: \(error)")
+            }
         }
     }
 
     func loadLatestItems() async {
         guard let service = jellyfinService else { return }
+        guard !Task.isCancelled else { return }
 
         do {
-            latestItems = try await service.getLatestItems(limit: 20)
+            let result = try await service.getLatestItems(limit: 20)
+            guard !Task.isCancelled else { return }
+            latestItems = result
         } catch {
-            print("Failed to load latest items: \(error)")
+            // Suppress cancellation errors
+            if !Task.isCancelled {
+                print("Failed to load latest items: \(error)")
+            }
         }
     }
 
@@ -130,6 +161,7 @@ public final class LibraryViewModel: ObservableObject {
 
     func loadMediaItems() async {
         guard let service = jellyfinService else { return }
+        guard !Task.isCancelled else { return }
 
         isLoading = mediaItems.isEmpty
         errorMessage = nil
@@ -142,10 +174,14 @@ public final class LibraryViewModel: ObservableObject {
                 startIndex: currentPage * pageSize
             )
 
+            guard !Task.isCancelled else { return }
+
             mediaItems = response.items
             hasMoreItems = mediaItems.count < response.totalRecordCount
         } catch {
-            errorMessage = error.localizedDescription
+            if !Task.isCancelled {
+                errorMessage = error.localizedDescription
+            }
         }
 
         isLoading = false
@@ -170,6 +206,7 @@ public final class LibraryViewModel: ObservableObject {
         else {
             return
         }
+        guard !Task.isCancelled else { return }
 
         isLoadingMore = true
         currentPage += 1
@@ -182,11 +219,19 @@ public final class LibraryViewModel: ObservableObject {
                 startIndex: currentPage * pageSize
             )
 
+            guard !Task.isCancelled else {
+                currentPage -= 1
+                isLoadingMore = false
+                return
+            }
+
             mediaItems.append(contentsOf: response.items)
             hasMoreItems = mediaItems.count < response.totalRecordCount
         } catch {
             currentPage -= 1
-            print("Failed to load more items: \(error)")
+            if !Task.isCancelled {
+                print("Failed to load more items: \(error)")
+            }
         }
 
         isLoadingMore = false
@@ -200,12 +245,26 @@ public final class LibraryViewModel: ObservableObject {
     }
 
     func refresh() async {
-        currentPage = 0
-        hasMoreItems = true
-        await loadInitialData()
-        if selectedLibrary != nil {
-            await loadMediaItems()
+        // Cancel any existing tasks
+        loadTask?.cancel()
+        refreshTask?.cancel()
+
+        refreshTask = Task {
+            guard !Task.isCancelled else { return }
+
+            currentPage = 0
+            hasMoreItems = true
+
+            await loadInitialData()
+
+            guard !Task.isCancelled else { return }
+
+            if selectedLibrary != nil {
+                await loadMediaItems()
+            }
         }
+
+        await refreshTask?.value
     }
 
     // MARK: - Image URLs
@@ -224,5 +283,14 @@ public final class LibraryViewModel: ObservableObject {
     func imageURL(for library: Library) -> URL? {
         guard let serverURL else { return nil }
         return serverURL.appendingPathComponent("Items/\(library.id)/Images/Primary")
+    }
+
+    // MARK: - Task Management
+
+    func cancelAllTasks() {
+        loadTask?.cancel()
+        refreshTask?.cancel()
+        loadTask = nil
+        refreshTask = nil
     }
 }

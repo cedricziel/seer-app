@@ -42,6 +42,10 @@ private struct LibraryContentView: View {
                 MediaDetailView(item: item, viewModel: viewModel)
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ServerSwitcherButton()
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         ForEach(LibraryViewModel.MediaTypeFilter.allCases, id: \.self) { filter in
@@ -80,6 +84,16 @@ private struct LibraryContentView: View {
         }
         .task {
             await viewModel.loadInitialData()
+        }
+        .onDisappear {
+            viewModel.cancelAllTasks()
+        }
+        .onChange(of: appState.activeServerID) {
+            // Cancel existing tasks before refreshing for new server
+            viewModel.cancelAllTasks()
+            Task {
+                await viewModel.refresh()
+            }
         }
     }
 
