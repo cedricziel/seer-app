@@ -10,10 +10,61 @@ struct ServerManagementView: View {
     @State private var serverToEdit: ServerConfiguration?
     @State private var showingAddServer = false
     @State private var serverToDelete: ServerConfiguration?
+    @StateObject private var cloudKitStatus = CloudKitStatus()
 
     var body: some View {
         NavigationStack {
             List {
+                // CloudKit Sync Status Section
+                Section {
+                    HStack {
+                        Image(systemName: cloudKitStatus.statusIcon)
+                            .foregroundStyle(cloudKitStatus.isSyncAvailable ? .green : .orange)
+                            .font(.title2)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("iCloud Sync")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+
+                            if cloudKitStatus.isChecking {
+                                Text("Checking...")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text(cloudKitStatus.statusDescription)
+                                    .font(.caption)
+                                    .foregroundStyle(cloudKitStatus.isSyncAvailable ? .green : .orange)
+                            }
+
+                            if let error = cloudKitStatus.errorMessage {
+                                Text(error)
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+
+                        Spacer()
+
+                        if !cloudKitStatus.isSyncAvailable && !cloudKitStatus.isChecking {
+                            Button {
+                                Task { await cloudKitStatus.checkStatus() }
+                            } label: {
+                                Image(systemName: "arrow.clockwise")
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                } header: {
+                    Text("Sync Status")
+                } footer: {
+                    if !cloudKitStatus.isSyncAvailable && !cloudKitStatus.isChecking {
+                        Text("Servers won't sync. Check Settings → Apple Account → iCloud → Apps Using iCloud.")
+                    } else if cloudKitStatus.isSyncAvailable {
+                        Text("\(appState.sortedConfigurations.count) server(s) synced via iCloud")
+                    }
+                }
+
                 ForEach(appState.sortedConfigurations) { config in
                     ServerManagementRow(
                         config: config,
@@ -74,6 +125,9 @@ struct ServerManagementView: View {
                 if let server = serverToDelete {
                     Text("Are you sure you want to delete \"\(server.name)\"? This will remove all stored credentials.")
                 }
+            }
+            .task {
+                await cloudKitStatus.checkStatus()
             }
         }
     }

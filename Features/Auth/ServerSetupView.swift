@@ -15,6 +15,7 @@ struct ServerSetupView: View {
 private struct ServerSetupContentView: View {
     @ObservedObject var appState: AppState
     @StateObject private var viewModel: AuthViewModel
+    @StateObject private var cloudKitStatus = CloudKitStatus()
 
     init(appState: AppState) {
         self.appState = appState
@@ -43,6 +44,9 @@ private struct ServerSetupContentView: View {
                 Text(viewModel.errorMessage ?? "An unknown error occurred")
             }
         }
+        .task {
+            await cloudKitStatus.checkStatus()
+        }
         .onAppear {
             // Pre-fill with existing URLs if available
             if viewModel.jellyfinServerURL.isEmpty {
@@ -56,6 +60,52 @@ private struct ServerSetupContentView: View {
 
     private var jellyfinSetupView: some View {
         Form {
+            // Show synced servers if any exist (helps debug CloudKit sync issues)
+            if !appState.servers.isEmpty {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(.orange)
+                            Text("Synced Servers Found")
+                                .fontWeight(.medium)
+                        }
+                        Text("These servers synced via iCloud but need re-authentication.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    ForEach(appState.servers) { server in
+                        Button {
+                            viewModel.jellyfinServerURL = server.jellyfinURL.absoluteString
+                            if let jellyseerrURL = server.jellyseerrURL {
+                                viewModel.jellyseerrServerURL = jellyseerrURL.absoluteString
+                            }
+                        } label: {
+                            HStack {
+                                ServerAvatar(emoji: server.emoji, size: 32)
+                                VStack(alignment: .leading) {
+                                    Text(server.name)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                    Text(server.jellyfinHost)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+                    }
+                } header: {
+                    Text("iCloud Sync")
+                } footer: {
+                    cloudKitStatusFooter
+                }
+            }
+
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Connect to Jellyfin")
@@ -242,6 +292,20 @@ private struct ServerSetupContentView: View {
                 .font(.subheadline)
                 .foregroundStyle(isConnected ? .green : .secondary)
         }
+    }
+
+    @ViewBuilder
+    private var cloudKitStatusFooter: some View {
+        HStack(spacing: 4) {
+            Image(systemName: cloudKitStatus.statusIcon)
+                .font(.caption)
+            Text("iCloud: \(cloudKitStatus.statusDescription)")
+            if let error = cloudKitStatus.errorMessage {
+                Text("- \(error)")
+            }
+        }
+        .font(.caption)
+        .foregroundColor(cloudKitStatus.isSyncAvailable ? .secondary : .orange)
     }
 }
 
