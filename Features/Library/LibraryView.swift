@@ -54,14 +54,14 @@ private struct LibraryContentView: View {
                                 Task {
                                     await viewModel.filterChanged()
                                 }
-                            }) {
+                            }, label: {
                                 HStack {
                                     Text(filter.rawValue)
                                     if viewModel.selectedMediaType == filter {
                                         Image(systemName: "checkmark")
                                     }
                                 }
-                            }
+                            })
                         }
                     } label: {
                         Image(systemName: "line.3.horizontal.decrease.circle")
@@ -73,13 +73,10 @@ private struct LibraryContentView: View {
                         Task {
                             await viewModel.refresh()
                         }
-                    }) {
+                    }, label: {
                         Image(systemName: "arrow.clockwise")
-                    }
+                    })
                 }
-            }
-            .refreshable {
-                await viewModel.refresh()
             }
         }
         .task {
@@ -124,6 +121,9 @@ private struct LibraryContentView: View {
                 }
             }
             .padding(.vertical)
+        }
+        .refreshable {
+            await viewModel.refresh()
         }
     }
 
@@ -179,9 +179,9 @@ private struct LibraryContentView: View {
                             Task {
                                 await viewModel.selectLibrary(library)
                             }
-                        }) {
+                        }, label: {
                             libraryCard(library)
-                        }
+                        })
                         .buttonStyle(.plain)
                     }
                 }
@@ -241,7 +241,7 @@ private struct LibraryContentView: View {
             .padding(.horizontal)
 
             LazyVGrid(columns: [
-                GridItem(.adaptive(minimum: 140), spacing: 16),
+                GridItem(.adaptive(minimum: 140), spacing: 16)
             ], spacing: 16) {
                 ForEach(viewModel.mediaItems) { item in
                     NavigationLink(value: item) {
