@@ -17,7 +17,7 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
     public static let sessionIdentifier = "com.cedricziel.seer.download"
 
     /// The background URLSession
-    public let session: URLSession
+    public private(set) var session: URLSession
 
     /// Delegate for download events (thread-safe access via lock)
     private weak var _delegate: BackgroundSessionDelegate?
@@ -79,23 +79,13 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
         config.timeoutIntervalForResource = 7 * 24 * 60 * 60 // 7 days
         config.httpMaximumConnectionsPerHost = 2
 
-        // Create session with a temporary delegate
-        let tempSession = URLSession(configuration: config)
-        session = tempSession
+        // Create temporary session (required before super.init())
+        session = URLSession(configuration: config)
 
         super.init()
 
-        // Now set self as delegate
-        let finalConfig = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
-        finalConfig.isDiscretionary = false
-        finalConfig.sessionSendsLaunchEvents = true
-        finalConfig.allowsCellularAccess = true
-        finalConfig.waitsForConnectivity = true
-        finalConfig.timeoutIntervalForResource = 7 * 24 * 60 * 60
-        finalConfig.httpMaximumConnectionsPerHost = 2
-
-        // Note: We can't reassign session since it's let
-        // The session delegate will be set up via the session's delegate property
+        // Now create the real session with self as delegate
+        session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }
 
     /// Create a properly configured background session
