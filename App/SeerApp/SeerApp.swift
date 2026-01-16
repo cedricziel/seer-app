@@ -72,8 +72,30 @@ struct SeerApp: App {
                 .task {
                     await setupDownloadManager()
                 }
+                .onChange(of: appState.isAuthenticated) { _, isAuthenticated in
+                    if isAuthenticated {
+                        configureDownloadManagerCredentials()
+                    }
+                }
+                .onChange(of: appState.activeServerID) { _, _ in
+                    configureDownloadManagerCredentials()
+                }
                 .environment(downloadManager)
         }
+    }
+
+    @MainActor
+    private func configureDownloadManagerCredentials() {
+        guard let manager = downloadManager,
+              let credentials = appState.jellyfinCredentials
+        else { return }
+
+        manager.configure(
+            serverURL: credentials.serverURL,
+            accessToken: credentials.accessToken,
+            userID: credentials.userId,
+            deviceID: credentials.deviceId
+        )
     }
 
     @MainActor
