@@ -39,6 +39,7 @@ targets:
       - target: JellyseerrClient
       - target: SeerUI
       - target: PlaybackClient
+      - target: OfflineSync
     entitlements:
       path: App/SeerApp/SeerApp.entitlements
       properties:
@@ -153,6 +154,25 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.playbackclient
+        SKIP_INSTALL: true
+        BUILD_LIBRARY_FOR_DISTRIBUTION: false
+        DEFINES_MODULE: true
+        GENERATE_INFOPLIST_FILE: true
+
+  OfflineSync:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Packages/OfflineSync/Sources/OfflineSync
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: SeerCore
+      - target: JellyfinClient
+      - package: Kingfisher
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.offlinesync
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
         DEFINES_MODULE: true

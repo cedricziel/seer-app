@@ -1,9 +1,11 @@
 import Foundation
 import JellyfinClient
 import Observation
+import OfflineSync
 import SeerCore
+import SwiftData
 
-/// ViewModel for managing TV series detail view state including seasons and episodes
+/// ViewModel for managing TV series detail view state including seasons and episodes with offline support
 @MainActor
 @Observable
 final class SeriesDetailViewModel {
@@ -16,16 +18,27 @@ final class SeriesDetailViewModel {
     var isLoadingEpisodes: [String: Bool] = [:]
     var errorMessage: String?
 
+    /// Indicates if the view is showing cached data
+    var isShowingCachedData: Bool = false
+
     // MARK: - Private Properties
 
     let series: MediaItem
     private let jellyfinService: JellyfinService?
     private var serverURL: URL?
+    private let appState: AppState
+
+    // Offline sync components
+    private var modelContext: ModelContext?
+    private var mediaItemSyncService: MediaItemSyncService?
+    private var serverConfigurationID: UUID?
+    private weak var networkMonitor: NetworkMonitor?
 
     // MARK: - Initialization
 
     init(series: MediaItem, appState: AppState) {
         self.series = series
+        self.appState = appState
 
         guard let serverURL = appState.jellyfinServerURL,
               let accessToken = appState.jellyfinAccessToken,
@@ -44,6 +57,20 @@ final class SeriesDetailViewModel {
         )
     }
 
+    /// Sets up offline sync with model context and network monitor
+    func setupOfflineSync(
+        modelContext: ModelContext,
+        networkMonitor: NetworkMonitor
+    ) {
+        self.modelContext = modelContext
+        self.networkMonitor = networkMonitor
+        mediaItemSyncService = MediaItemSyncService(modelContext: modelContext)
+
+        if let activeServer = appState.activeServer {
+            serverConfigurationID = activeServer.id
+        }
+    }
+
     // MARK: - Public Methods
 
     /// Loads all seasons for the series
@@ -51,8 +78,19 @@ final class SeriesDetailViewModel {
         isLoadingSeasons = true
         defer { isLoadingSeasons = false }
 
+        // Load cached seasons first
+        await loadCachedSeasons()
+
         guard let service = jellyfinService else {
-            errorMessage = "Not connected to Jellyfin"
+            if seasons.isEmpty {
+                errorMessage = "Not connected to Jellyfin"
+            }
+            return
+        }
+
+        // Check if we're offline
+        guard networkMonitor?.isConnected ?? true else {
+            isShowingCachedData = !seasons.isEmpty
             return
         }
 
@@ -60,8 +98,35 @@ final class SeriesDetailViewModel {
 
         do {
             seasons = try await service.getSeasons(seriesId: series.id)
+            isShowingCachedData = false
+
+            // Sync to cache
+            if let serverConfig = appState.activeServer {
+                try? await mediaItemSyncService?.syncSeriesDetails(
+                    seriesId: series.id,
+                    serverConfig: serverConfig,
+                    service: service
+                )
+            }
         } catch {
-            errorMessage = error.localizedDescription
+            if seasons.isEmpty {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    /// Loads cached seasons from SwiftData
+    private func loadCachedSeasons() async {
+        guard let mediaItemSyncService else { return }
+
+        do {
+            let cachedSeasons = try mediaItemSyncService.getCachedSeasons(seriesId: series.id)
+            if !cachedSeasons.isEmpty {
+                seasons = cachedSeasons.map { convertCachedToMediaItem($0) }
+                isShowingCachedData = true
+            }
+        } catch {
+            print("Failed to load cached seasons: \(error)")
         }
     }
 
@@ -70,13 +135,34 @@ final class SeriesDetailViewModel {
         isLoadingEpisodes[season.id] = true
         defer { isLoadingEpisodes[season.id] = false }
 
-        guard let service = jellyfinService else { return }
+        // Load cached episodes first
+        await loadCachedEpisodes(for: season)
+
+        guard let service = jellyfinService,
+              networkMonitor?.isConnected ?? true
+        else {
+            return
+        }
 
         do {
             let episodes = try await service.getEpisodes(seasonId: season.id)
             episodesBySeason[season.id] = episodes
         } catch {
             print("Failed to load episodes for season \(season.name): \(error)")
+        }
+    }
+
+    /// Loads cached episodes from SwiftData
+    private func loadCachedEpisodes(for season: MediaItem) async {
+        guard let mediaItemSyncService else { return }
+
+        do {
+            let cachedEpisodes = try mediaItemSyncService.getCachedEpisodes(seasonId: season.id)
+            if !cachedEpisodes.isEmpty {
+                episodesBySeason[season.id] = cachedEpisodes.map { convertCachedToMediaItem($0) }
+            }
+        } catch {
+            print("Failed to load cached episodes: \(error)")
         }
     }
 
@@ -107,5 +193,14 @@ final class SeriesDetailViewModel {
     func imageURL(for item: MediaItem, type: ImageType = .primary) -> URL? {
         guard let serverURL else { return nil }
         return serverURL.appendingPathComponent("Items/\(item.id)/Images/\(type.rawValue)")
+    }
+
+    // MARK: - Private Helpers
+
+    private let dataConverter = CachedDataConverter()
+
+    /// Converts a CachedMediaItem to MediaItem for display
+    private func convertCachedToMediaItem(_ cached: CachedMediaItem) -> MediaItem {
+        dataConverter.convertToMediaItem(cached)
     }
 }

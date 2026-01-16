@@ -1,19 +1,18 @@
 import Foundation
 import JellyfinClient
+import OfflineSync
 import SeerCore
+import SwiftData
 import SwiftUI
 
-/// View model for the library browsing feature
+/// View model for the library browsing feature with offline support
 @MainActor
 public final class LibraryViewModel: ObservableObject {
-    // MARK: - Published Properties
-
     @Published var libraries: [Library] = []
     @Published var selectedLibrary: Library?
     @Published var mediaItems: [MediaItem] = []
     @Published var continueWatching: [MediaItem] = []
     @Published var latestItems: [MediaItem] = []
-
     @Published var isLoading: Bool = false
     @Published var isLoadingMore: Bool = false
     @Published var isLoadingLatestItems: Bool = false
@@ -21,14 +20,12 @@ public final class LibraryViewModel: ObservableObject {
     @Published var hasLoadedLatestItems: Bool = false
     @Published var hasLoadedContinueWatching: Bool = false
     @Published var errorMessage: String?
-
     @Published var selectedMediaType: MediaTypeFilter = .all
+    @Published var isShowingCachedData: Bool = false
+    @Published var lastSyncDate: Date?
 
     enum MediaTypeFilter: String, CaseIterable {
-        case all = "All"
-        case movies = "Movies"
-        case shows = "TV Shows"
-
+        case all = "All", movies = "Movies", shows = "TV Shows"
         var jellyfinTypes: [MediaItem.MediaType]? {
             switch self {
             case .all: nil
@@ -36,9 +33,15 @@ public final class LibraryViewModel: ObservableObject {
             case .shows: [.series]
             }
         }
-    }
 
-    // MARK: - Private Properties
+        var cachedMediaTypes: [String]? {
+            switch self {
+            case .all: nil
+            case .movies: ["Movie"]
+            case .shows: ["Series"]
+            }
+        }
+    }
 
     private var jellyfinService: JellyfinService?
     private var serverURL: URL?
@@ -46,120 +49,122 @@ public final class LibraryViewModel: ObservableObject {
     private var currentPage: Int = 0
     private let pageSize: Int = 50
     private var hasMoreItems: Bool = true
-
-    // Task tracking for cancellation
     private var loadTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
-
-    // MARK: - Initialization
+    private var modelContext: ModelContext?
+    private var mediaItemSyncService: MediaItemSyncService?
+    private var librarySyncService: LibrarySyncService?
+    private var serverConfigurationID: UUID?
+    private weak var networkMonitor: NetworkMonitor?
+    private let dataConverter = CachedDataConverter()
 
     public init(appState: AppState) {
         self.appState = appState
         setupService()
     }
 
+    public func setupOfflineSync(modelContext: ModelContext, networkMonitor: NetworkMonitor) {
+        self.modelContext = modelContext
+        self.networkMonitor = networkMonitor
+        mediaItemSyncService = MediaItemSyncService(modelContext: modelContext)
+        librarySyncService = LibrarySyncService(modelContext: modelContext)
+        serverConfigurationID = appState.activeServer?.id
+    }
+
     private func setupService() {
         guard let serverURL = appState.jellyfinServerURL,
               let accessToken = appState.jellyfinAccessToken,
-              let userID = appState.jellyfinUserID
-        else {
-            return
-        }
-
+              let userID = appState.jellyfinUserID else { return }
         self.serverURL = serverURL
         jellyfinService = JellyfinService(
-            serverURL: serverURL,
-            accessToken: accessToken,
-            userID: userID,
-            deviceID: appState.jellyfinDeviceID
+            serverURL: serverURL, accessToken: accessToken,
+            userID: userID, deviceID: appState.jellyfinDeviceID
         )
     }
 
-    // MARK: - Public Methods
-
     func loadInitialData() async {
-        // Cancel any existing load task
         loadTask?.cancel()
-
+        await loadCachedDataIfAvailable()
         guard jellyfinService != nil else {
-            errorMessage = "Not connected to Jellyfin"
+            if libraries.isEmpty { errorMessage = "Not connected to Jellyfin" }
             return
         }
-
+        guard networkMonitor?.isConnected ?? true else {
+            isShowingCachedData = true
+            isLoading = false
+            return
+        }
         loadTask = Task {
             guard !Task.isCancelled else { return }
-
-            isLoading = true
+            if libraries.isEmpty { isLoading = true }
             errorMessage = nil
-
-            // Load data in parallel
-            async let librariesTask = loadLibraries()
-            async let continueTask = loadContinueWatching()
-            async let latestTask = loadLatestItems()
-
-            _ = await (librariesTask, continueTask, latestTask)
-
+            async let lib = loadLibraries()
+            async let cont = loadContinueWatching()
+            async let lat = loadLatestItems()
+            _ = await (lib, cont, lat)
             guard !Task.isCancelled else { return }
-
             isLoading = false
+            isShowingCachedData = false
+            lastSyncDate = Date()
         }
-
         await loadTask?.value
     }
 
-    func loadLibraries() async {
-        guard let service = jellyfinService else { return }
-        guard !Task.isCancelled else { return }
+    private func loadCachedDataIfAvailable() async {
+        guard let id = serverConfigurationID, let libSync = librarySyncService,
+              let itemSync = mediaItemSyncService else { return }
+        do {
+            let cachedLibs = try libSync.getCachedLibraries(for: id)
+            if !cachedLibs.isEmpty {
+                libraries = cachedLibs.compactMap { dataConverter.convertToLibrary($0) }
+                isShowingCachedData = true
+            }
+            let cachedCW = try itemSync.getCachedContinueWatching(serverConfigurationID: id)
+            if !cachedCW.isEmpty {
+                continueWatching = cachedCW.map { dataConverter.convertToMediaItem($0) }
+                hasLoadedContinueWatching = true
+            }
+        } catch { print("Failed to load cached data: \(error)") }
+    }
 
+    func loadLibraries() async {
+        guard let service = jellyfinService, !Task.isCancelled else { return }
         do {
             let result = try await service.getLibraries()
             guard !Task.isCancelled else { return }
             libraries = result
-        } catch {
-            if !Task.isCancelled {
-                errorMessage = error.localizedDescription
+            if let cfg = appState.activeServer {
+                try? await librarySyncService?.syncLibraries(serverConfig: cfg, service: service)
             }
-        }
+        } catch { if !Task.isCancelled, libraries.isEmpty { errorMessage = error.localizedDescription } }
     }
 
     func loadContinueWatching() async {
-        guard let service = jellyfinService else { return }
-        guard !Task.isCancelled else { return }
-
+        guard let service = jellyfinService, !Task.isCancelled else { return }
         isLoadingContinueWatching = true
-
         do {
             let result = try await service.getContinueWatching(limit: 10)
             guard !Task.isCancelled else { return }
             continueWatching = result
-        } catch {
-            // Not critical if this fails, but suppress cancellation errors
-            if !Task.isCancelled {
-                print("Failed to load continue watching: \(error)")
+            if let cfg = appState.activeServer {
+                try? await mediaItemSyncService?.syncContinueWatching(serverConfig: cfg, service: service)
             }
-        }
-
+        } catch { if !Task.isCancelled { print("Failed to load continue watching: \(error)") } }
         hasLoadedContinueWatching = true
         isLoadingContinueWatching = false
     }
 
     func loadLatestItems() async {
-        guard let service = jellyfinService else { return }
-        guard !Task.isCancelled else { return }
-
+        guard let service = jellyfinService, !Task.isCancelled else { return }
         isLoadingLatestItems = true
-
         do {
             let result = try await service.getLatestItems(limit: 20)
             guard !Task.isCancelled else { return }
             latestItems = result
-        } catch {
-            // Suppress cancellation errors
-            if !Task.isCancelled {
-                print("Failed to load latest items: \(error)")
+            if let cfg = appState.activeServer {
+                try? await mediaItemSyncService?.syncLatestItems(serverConfig: cfg, service: service)
             }
-        }
-
+        } catch { if !Task.isCancelled { print("Failed to load latest items: \(error)") } }
         hasLoadedLatestItems = true
         isLoadingLatestItems = false
     }
@@ -169,85 +174,69 @@ public final class LibraryViewModel: ObservableObject {
         currentPage = 0
         hasMoreItems = true
         mediaItems = []
-
+        await loadCachedLibraryItems()
         await loadMediaItems()
     }
 
-    func loadMediaItems() async {
-        guard let service = jellyfinService else { return }
-        guard !Task.isCancelled else { return }
+    private func loadCachedLibraryItems() async {
+        guard let id = serverConfigurationID, let sync = mediaItemSyncService else { return }
+        do {
+            var items = try sync.getCachedItems(for: selectedLibrary?.id, serverConfigurationID: id)
+            if let types = selectedMediaType.cachedMediaTypes {
+                items = items.filter { types.contains($0.mediaType) }
+            }
+            if !items.isEmpty {
+                mediaItems = items.map { dataConverter.convertToMediaItem($0) }
+                isShowingCachedData = true
+            }
+        } catch { print("Failed to load cached library items: \(error)") }
+    }
 
+    func loadMediaItems() async {
+        guard let service = jellyfinService, !Task.isCancelled else { return }
+        guard networkMonitor?.isConnected ?? true else { isShowingCachedData = true; return }
         isLoading = mediaItems.isEmpty
         errorMessage = nil
-
         do {
             let response = try await service.getItems(
-                parentID: selectedLibrary?.id,
-                includeItemTypes: selectedMediaType.jellyfinTypes,
-                limit: pageSize,
-                startIndex: currentPage * pageSize
+                parentID: selectedLibrary?.id, includeItemTypes: selectedMediaType.jellyfinTypes,
+                limit: pageSize, startIndex: currentPage * pageSize
             )
-
             guard !Task.isCancelled else { return }
-
             mediaItems = response.items
             hasMoreItems = mediaItems.count < response.totalRecordCount
-        } catch {
-            if !Task.isCancelled {
-                errorMessage = error.localizedDescription
+            isShowingCachedData = false
+            if let cfg = appState.activeServer, let lib = selectedLibrary, let ctx = modelContext {
+                let desc = FetchDescriptor<CachedLibrary>(predicate: #Predicate { $0.id == lib.id })
+                if let cachedLib = try? ctx.fetch(desc).first {
+                    try? await mediaItemSyncService?.syncLibraryItems(
+                        library: cachedLib, serverConfig: cfg, service: service
+                    )
+                }
             }
-        }
-
+        } catch { if !Task.isCancelled, mediaItems.isEmpty { errorMessage = error.localizedDescription } }
         isLoading = false
     }
 
     func loadMoreItemsIfNeeded(currentItem: MediaItem) async {
-        guard hasMoreItems,
-              !isLoadingMore,
-              let lastItem = mediaItems.last,
-              currentItem.id == lastItem.id
-        else {
-            return
-        }
-
+        guard hasMoreItems, !isLoadingMore, let last = mediaItems.last, currentItem.id == last.id else { return }
         await loadMoreItems()
     }
 
     func loadMoreItems() async {
-        guard let service = jellyfinService,
-              hasMoreItems,
-              !isLoadingMore
-        else {
-            return
-        }
-        guard !Task.isCancelled else { return }
-
+        guard let service = jellyfinService, hasMoreItems, !isLoadingMore,
+              networkMonitor?.isConnected ?? true, !Task.isCancelled else { return }
         isLoadingMore = true
         currentPage += 1
-
         do {
             let response = try await service.getItems(
-                parentID: selectedLibrary?.id,
-                includeItemTypes: selectedMediaType.jellyfinTypes,
-                limit: pageSize,
-                startIndex: currentPage * pageSize
+                parentID: selectedLibrary?.id, includeItemTypes: selectedMediaType.jellyfinTypes,
+                limit: pageSize, startIndex: currentPage * pageSize
             )
-
-            guard !Task.isCancelled else {
-                currentPage -= 1
-                isLoadingMore = false
-                return
-            }
-
+            guard !Task.isCancelled else { currentPage -= 1; isLoadingMore = false; return }
             mediaItems.append(contentsOf: response.items)
             hasMoreItems = mediaItems.count < response.totalRecordCount
-        } catch {
-            currentPage -= 1
-            if !Task.isCancelled {
-                print("Failed to load more items: \(error)")
-            }
-        }
-
+        } catch { currentPage -= 1; if !Task.isCancelled { print("Failed to load more items: \(error)") } }
         isLoadingMore = false
     }
 
@@ -255,55 +244,35 @@ public final class LibraryViewModel: ObservableObject {
         currentPage = 0
         hasMoreItems = true
         mediaItems = []
+        await loadCachedLibraryItems()
         await loadMediaItems()
     }
 
     func refresh() async {
-        // Cancel any existing tasks
         loadTask?.cancel()
         refreshTask?.cancel()
-
         refreshTask = Task {
             guard !Task.isCancelled else { return }
-
             currentPage = 0
             hasMoreItems = true
-
-            // Reset hasLoaded flags so skeleton states show during refresh
             hasLoadedLatestItems = false
             hasLoadedContinueWatching = false
-
             await loadInitialData()
-
             guard !Task.isCancelled else { return }
-
-            if selectedLibrary != nil {
-                await loadMediaItems()
-            }
+            if selectedLibrary != nil { await loadMediaItems() }
         }
-
         await refreshTask?.value
     }
 
-    // MARK: - Image URLs
-
-    enum ImageType: String {
-        case primary = "Primary"
-        case backdrop = "Backdrop"
-        case thumb = "Thumb"
-    }
+    enum ImageType: String { case primary = "Primary", backdrop = "Backdrop", thumb = "Thumb" }
 
     func imageURL(for item: MediaItem, type: ImageType = .primary) -> URL? {
-        guard let serverURL else { return nil }
-        return serverURL.appendingPathComponent("Items/\(item.id)/Images/\(type.rawValue)")
+        serverURL?.appendingPathComponent("Items/\(item.id)/Images/\(type.rawValue)")
     }
 
     func imageURL(for library: Library) -> URL? {
-        guard let serverURL else { return nil }
-        return serverURL.appendingPathComponent("Items/\(library.id)/Images/Primary")
+        serverURL?.appendingPathComponent("Items/\(library.id)/Images/Primary")
     }
-
-    // MARK: - Task Management
 
     func cancelAllTasks() {
         loadTask?.cancel()

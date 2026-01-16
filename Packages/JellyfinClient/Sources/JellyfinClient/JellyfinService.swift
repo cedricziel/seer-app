@@ -11,9 +11,7 @@ public actor JellyfinService {
     private let session: URLSession
     private let decoder: JSONDecoder
 
-    /// Client name sent to Jellyfin
     private let clientName = "Seer"
-    /// Client version sent to Jellyfin
     private let clientVersion = "1.0.0"
 
     public enum JellyfinError: LocalizedError, Sendable {
@@ -375,7 +373,7 @@ public extension JellyfinService {
 // MARK: - Private Helpers
 
 extension JellyfinService {
-    private func authenticatedRequest(url: URL) throws -> URLRequest {
+    func authenticatedRequest(url: URL) throws -> URLRequest {
         guard accessToken != nil else {
             throw JellyfinError.notAuthenticated
         }
@@ -424,19 +422,68 @@ extension JellyfinService {
 // MARK: - Public Accessors
 
 public extension JellyfinService {
-    func getServerURL() -> URL {
-        serverURL
+    func getServerURL() -> URL { serverURL }
+    func getAccessToken() -> String? { accessToken }
+    func getUserID() -> String? { userID }
+    func getDeviceID() -> String { deviceID }
+}
+
+// MARK: - User Progress
+
+public extension JellyfinService {
+    func reportPlaybackProgress(itemId: String, positionTicks: Int64, isPaused: Bool) async throws {
+        guard userID != nil else { throw JellyfinError.notAuthenticated }
+        guard var components = URLComponents(url: serverURL, resolvingAgainstBaseURL: false),
+              (components.path = "/Sessions/Playing/Progress", true).1,
+              let url = components.url else { throw JellyfinError.invalidURL }
+        var request = try authenticatedRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "ItemId": itemId, "PositionTicks": positionTicks, "IsPaused": isPaused, "PlaySessionId": UUID().uuidString
+        ] as [String: Any])
+        let (_, resp) = try await session.data(for: request)
+        guard let http = resp as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
+            throw JellyfinError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0, nil)
+        }
     }
 
-    func getAccessToken() -> String? {
-        accessToken
+    func setFavorite(itemId: String, isFavorite: Bool) async throws {
+        guard let userID else { throw JellyfinError.notAuthenticated }
+        guard var components = URLComponents(url: serverURL, resolvingAgainstBaseURL: false),
+              (components.path = "/Users/\(userID)/FavoriteItems/\(itemId)", true).1,
+              let url = components.url else { throw JellyfinError.invalidURL }
+        var request = try authenticatedRequest(url: url)
+        request.httpMethod = isFavorite ? "POST" : "DELETE"
+        let (_, resp) = try await session.data(for: request)
+        guard let http = resp as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
+            throw JellyfinError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0, nil)
+        }
     }
 
-    func getUserID() -> String? {
-        userID
+    func markAsPlayed(itemId: String) async throws {
+        guard let userID else { throw JellyfinError.notAuthenticated }
+        guard var components = URLComponents(url: serverURL, resolvingAgainstBaseURL: false),
+              (components.path = "/Users/\(userID)/PlayedItems/\(itemId)", true).1,
+              let url = components.url else { throw JellyfinError.invalidURL }
+        var request = try authenticatedRequest(url: url)
+        request.httpMethod = "POST"
+        let (_, resp) = try await session.data(for: request)
+        guard let http = resp as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
+            throw JellyfinError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0, nil)
+        }
     }
 
-    func getDeviceID() -> String {
-        deviceID
+    func markAsUnplayed(itemId: String) async throws {
+        guard let userID else { throw JellyfinError.notAuthenticated }
+        guard var components = URLComponents(url: serverURL, resolvingAgainstBaseURL: false),
+              (components.path = "/Users/\(userID)/PlayedItems/\(itemId)", true).1,
+              let url = components.url else { throw JellyfinError.invalidURL }
+        var request = try authenticatedRequest(url: url)
+        request.httpMethod = "DELETE"
+        let (_, resp) = try await session.data(for: request)
+        guard let http = resp as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
+            throw JellyfinError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0, nil)
+        }
     }
 }
