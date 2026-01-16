@@ -55,6 +55,7 @@ public final class DownloadManager {
         storage = try DownloadStorage()
         queue = DownloadQueue(maxConcurrent: 2)
         sessionManager = BackgroundSessionManager.shared
+        sessionManager.delegate = self
 
         // Set up queue callback
         Task { [weak self] in
