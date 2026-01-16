@@ -255,12 +255,29 @@ targets:
         TEST_HOST: ""
         BUNDLE_LOADER: ""
 
+  DownloadClientTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/DownloadClientTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: DownloadClient
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.downloadclienttests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
 schemes:
   SeerApp:
     build:
       targets:
         SeerApp: all
         PlaybackClientTests: [test]
+        DownloadClientTests: [test]
     run:
       config: Debug
       environmentVariables:
@@ -274,6 +291,7 @@ schemes:
       config: Debug
       targets:
         - PlaybackClientTests
+        - DownloadClientTests
     profile:
       config: Release
     analyze:

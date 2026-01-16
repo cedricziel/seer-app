@@ -234,12 +234,44 @@ extension BackgroundSessionManager: URLSessionDownloadDelegate {
         didFinishDownloadingTo location: URL
     ) {
         print("[Download] Complete: task \(downloadTask.taskIdentifier)")
+
+        guard let downloadID = downloadID(forTask: downloadTask.taskIdentifier) else {
+            print("[Download] Warning: No download ID found for task \(downloadTask.taskIdentifier)")
+            unregisterTask(downloadTask.taskIdentifier)
+            return
+        }
+
+        // Move file SYNCHRONOUSLY before callback returns
+        // The temp file will be deleted by the system after this method returns
+        let intermediateURL = moveToIntermediateLocation(tempURL: location, downloadID: downloadID)
+
         delegate?.downloadDidComplete(
             taskIdentifier: downloadTask.taskIdentifier,
-            tempFileURL: location
+            tempFileURL: intermediateURL ?? location // Pass intermediate URL if move succeeded
         )
 
         unregisterTask(downloadTask.taskIdentifier)
+    }
+
+    /// Move temp file to a safe intermediate location synchronously
+    /// Returns the new URL if successful, nil if failed
+    private func moveToIntermediateLocation(tempURL: URL, downloadID: UUID) -> URL? {
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory
+        let intermediateURL = tempDir.appendingPathComponent("download-\(downloadID.uuidString).tmp")
+
+        do {
+            // Remove any existing file at intermediate location
+            if fileManager.fileExists(atPath: intermediateURL.path) {
+                try fileManager.removeItem(at: intermediateURL)
+            }
+            try fileManager.moveItem(at: tempURL, to: intermediateURL)
+            print("[Download] Moved temp file to intermediate location: \(intermediateURL.lastPathComponent)")
+            return intermediateURL
+        } catch {
+            print("[Download] Failed to move to intermediate location: \(error.localizedDescription)")
+            return nil
+        }
     }
 
     public func urlSession(

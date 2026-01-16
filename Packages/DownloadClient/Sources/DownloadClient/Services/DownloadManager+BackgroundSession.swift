@@ -28,10 +28,14 @@ extension DownloadManager: BackgroundSessionDelegate {
         Task { @MainActor [weak self] in
             guard let self,
                   let download = try? await self.store.fetchDownload(id: downloadID)
-            else { return }
+            else {
+                // Clean up intermediate file if we can't process the download
+                try? FileManager.default.removeItem(at: tempFileURL)
+                return
+            }
 
             do {
-                // Move file to permanent location
+                // Move file from intermediate location to permanent location
                 let relativePath = try await self.storage.moveDownloadedFile(
                     from: tempFileURL,
                     serverID: download.serverID,
@@ -55,6 +59,9 @@ extension DownloadManager: BackgroundSessionDelegate {
                 await self.queue.markCompleted(downloadID)
                 await self.refresh()
             } catch {
+                // Clean up intermediate file on failure
+                try? FileManager.default.removeItem(at: tempFileURL)
+
                 try? await self.store.updateState(
                     downloadID: downloadID,
                     state: .failed,
