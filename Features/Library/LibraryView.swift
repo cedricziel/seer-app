@@ -39,7 +39,7 @@ private struct LibraryContentView: View {
             }
             .navigationTitle("Library")
             .navigationDestination(for: MediaItem.self) { item in
-                MediaDetailView(item: item, viewModel: viewModel)
+                MediaDetailView(item: item, source: .library, viewModel: viewModel)
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

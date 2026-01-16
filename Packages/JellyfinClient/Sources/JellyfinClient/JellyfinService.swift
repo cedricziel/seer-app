@@ -280,6 +280,32 @@ public extension JellyfinService {
 
         return try decoder.decode([MediaItem].self, from: data)
     }
+
+    /// Get all seasons for a series
+    func getSeasons(seriesId: String) async throws -> [MediaItem] {
+        let response = try await getItems(
+            parentID: seriesId,
+            includeItemTypes: [.season],
+            sortBy: "IndexNumber",
+            sortOrder: "Ascending",
+            limit: 100,
+            recursive: false
+        )
+        return response.items
+    }
+
+    /// Get all episodes for a season
+    func getEpisodes(seasonId: String) async throws -> [MediaItem] {
+        let response = try await getItems(
+            parentID: seasonId,
+            includeItemTypes: [.episode],
+            sortBy: "IndexNumber",
+            sortOrder: "Ascending",
+            limit: 100,
+            recursive: false
+        )
+        return response.items
+    }
 }
 
 // MARK: - Search

@@ -4,15 +4,23 @@ import SeerCore
 import SeerUI
 import SwiftUI
 
+/// Indicates whether a media item came from the library or search results
+enum MediaItemSource {
+    case library // From Jellyfin library (already exists)
+    case search // From Jellyseerr search (requestable)
+}
+
 /// Detail view for a media item
 struct MediaDetailView: View {
     let item: MediaItem
+    let source: MediaItemSource
     @ObservedObject var viewModel: LibraryViewModel
     @EnvironmentObject private var appState: AppState
 
     @State private var isRequestingMedia: Bool = false
     @State private var requestError: String?
     @State private var showRequestSuccess: Bool = false
+    @State private var seriesViewModel: SeriesDetailViewModel?
 
     var body: some View {
         ScrollView {
@@ -40,8 +48,13 @@ struct MediaDetailView: View {
                         castSection(people)
                     }
 
-                    // Request Button (if Jellyseerr is configured)
-                    if appState.jellyseerrServerURL != nil {
+                    // Seasons section for TV series from library
+                    if item.type == .series, source == .library {
+                        seasonsSection
+                    }
+
+                    // Request Button (only for search results, if Jellyseerr is configured)
+                    if source == .search, appState.jellyseerrServerURL != nil {
                         requestSection
                     }
                 }
@@ -49,6 +62,11 @@ struct MediaDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            guard item.type == .series, source == .library else { return }
+            seriesViewModel = SeriesDetailViewModel(series: item, appState: appState)
+            await seriesViewModel?.loadSeasons()
+        }
         .alert("Request Submitted", isPresented: $showRequestSuccess) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -186,6 +204,42 @@ struct MediaDetailView: View {
                             }
                         }
                         .frame(width: 80)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Seasons Section
+
+    private var seasonsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Seasons")
+                .font(.headline)
+
+            if let viewModel = seriesViewModel {
+                if viewModel.isLoadingSeasons {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else if viewModel.seasons.isEmpty {
+                    Text("No seasons available")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(viewModel.seasons) { season in
+                        SeasonDisclosureRow(
+                            season: season,
+                            episodes: viewModel.episodesBySeason[season.id] ?? [],
+                            isExpanded: viewModel.expandedSeasons.contains(season.id),
+                            isLoading: viewModel.isLoadingEpisodes[season.id] ?? false,
+                            onToggle: {
+                                Task {
+                                    await viewModel.toggleSeason(season.id)
+                                }
+                            },
+                            imageURL: { viewModel.imageURL(for: $0, type: .thumb) }
+                        )
                     }
                 }
             }
@@ -346,6 +400,7 @@ struct FlowLayout: Layout {
                 people: nil,
                 providerIds: nil
             ),
+            source: .library,
             viewModel: LibraryViewModel(appState: AppState())
         )
         .environmentObject(AppState())
