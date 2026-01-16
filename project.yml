@@ -135,6 +135,13 @@ schemes:
         SeerApp: all
     run:
       config: Debug
+      environmentVariables:
+        - variable: OS_ACTIVITY_MODE
+          value: disable
+          isEnabled: true
+        - variable: IDEPreferLogStreaming
+          value: "YES"
+          isEnabled: true
     test:
       config: Debug
     profile:
