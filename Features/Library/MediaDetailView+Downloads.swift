@@ -1,6 +1,7 @@
 import DownloadClient
 import JellyfinClient
 import SeerCore
+import SeerUI
 import SwiftUI
 
 // MARK: - Download Methods Extension
@@ -147,6 +148,28 @@ extension MediaDetailView {
             } else {
                 episodeDownloadStates[episode.id] = .notDownloaded
             }
+        }
+    }
+
+    /// Get download state for an episode directly from downloadManager (reactive)
+    func downloadStateFor(episodeID: String) -> DownloadButtonState {
+        guard let manager = downloadManager,
+              let credentials = appState.jellyfinCredentials
+        else { return .notDownloaded }
+
+        let serverID = credentials.serverURL.host ?? "default"
+        guard let download = manager.downloads.first(where: {
+            $0.itemID == episodeID && $0.serverID == serverID
+        }) else {
+            return .notDownloaded
+        }
+
+        switch download.state {
+        case .pending: return .pending
+        case .downloading: return .downloading(progress: download.progress)
+        case .paused: return .paused
+        case .completed: return .completed
+        case .failed: return .failed
         }
     }
 }

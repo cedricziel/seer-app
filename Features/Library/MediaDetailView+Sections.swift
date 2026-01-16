@@ -232,12 +232,9 @@ extension MediaDetailView {
                                 await downloadSeason(episodes: episodes)
                             },
                             downloadStateForEpisode: { episode in
-                                episodeDownloadStates[episode.id] ?? .notDownloaded
+                                downloadStateFor(episodeID: episode.id)
                             }
                         )
-                        .task {
-                            await updateEpisodeDownloadStates(episodes: episodes)
-                        }
                     }
                 }
             }

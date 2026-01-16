@@ -71,6 +71,12 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
     }
 
     override private init() {
+        // Use a temporary shared session for the stored property requirement before super.init()
+        session = URLSession.shared
+
+        super.init()
+
+        // Now create the real background session with self as delegate
         let config = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
         config.isDiscretionary = false
         config.sessionSendsLaunchEvents = true
@@ -79,12 +85,6 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
         config.timeoutIntervalForResource = 7 * 24 * 60 * 60 // 7 days
         config.httpMaximumConnectionsPerHost = 2
 
-        // Create temporary session (required before super.init())
-        session = URLSession(configuration: config)
-
-        super.init()
-
-        // Now create the real session with self as delegate
         session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }
 
@@ -196,6 +196,12 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
             return (downloadTask.taskIdentifier, downloadTask.originalRequest?.url)
         }
     }
+
+    /// Get all currently active task identifiers
+    public func activeTaskIdentifiers() async -> Set<Int> {
+        let tasks = await session.allTasks
+        return Set(tasks.map { $0.taskIdentifier })
+    }
 }
 
 // MARK: - URLSessionDownloadDelegate
@@ -212,6 +218,8 @@ extension BackgroundSessionManager: URLSessionDownloadDelegate {
             ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
             : 0
 
+        // Progress callbacks are too frequent to log
+
         delegate?.downloadDidProgress(
             taskIdentifier: downloadTask.taskIdentifier,
             progress: progress,
@@ -225,6 +233,7 @@ extension BackgroundSessionManager: URLSessionDownloadDelegate {
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
+        print("[Download] Complete: task \(downloadTask.taskIdentifier)")
         delegate?.downloadDidComplete(
             taskIdentifier: downloadTask.taskIdentifier,
             tempFileURL: location
@@ -239,6 +248,7 @@ extension BackgroundSessionManager: URLSessionDownloadDelegate {
         didCompleteWithError error: (any Error)?
     ) {
         guard let error else { return }
+        print("[Download] Failed: task \(task.taskIdentifier) - \(error.localizedDescription)")
 
         var resumeData: Data?
         if let urlError = error as? URLError {

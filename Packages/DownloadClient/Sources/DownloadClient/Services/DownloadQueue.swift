@@ -30,6 +30,11 @@ public actor DownloadQueue {
         onShouldStartDownload = callback
     }
 
+    /// Set callback synchronously (for use in init before actor isolation)
+    public nonisolated func setOnShouldStartDownloadSync(_ callback: @escaping @Sendable (UUID) async -> Void) {
+        Task { await self.setOnShouldStartDownload(callback) }
+    }
+
     public init(maxConcurrent: Int = 2) {
         self.maxConcurrent = maxConcurrent
         Task { [weak self] in
@@ -146,6 +151,13 @@ public actor DownloadQueue {
         activeDownloads.contains(downloadID) || pendingQueue.contains(downloadID)
     }
 
+    /// Mark a download as active without starting it (for recovering background tasks)
+    public func markActive(_ downloadID: UUID) {
+        guard !activeDownloads.contains(downloadID) else { return }
+        pendingQueue.removeAll { $0 == downloadID }
+        activeDownloads.insert(downloadID)
+    }
+
     // MARK: - Queue Processing
 
     private func processQueue() async {
@@ -154,8 +166,6 @@ public actor DownloadQueue {
         while activeDownloads.count < maxConcurrent, !pendingQueue.isEmpty {
             let downloadID = pendingQueue.removeFirst()
             activeDownloads.insert(downloadID)
-
-            // Notify that download should start
             await onShouldStartDownload?(downloadID)
         }
     }

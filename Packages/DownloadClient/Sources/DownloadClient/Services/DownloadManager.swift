@@ -57,20 +57,16 @@ public final class DownloadManager {
         sessionManager = BackgroundSessionManager.shared
         sessionManager.delegate = self
 
-        // Set up queue callback
-        Task { [weak self] in
-            await self?.setupQueueCallback()
+        // Set up queue callback SYNCHRONOUSLY (not in a Task)
+        queue.setOnShouldStartDownloadSync { [weak self] downloadID in
+            Task { @MainActor [weak self] in
+                await self?.startDownloadTask(downloadID: downloadID)
+            }
         }
 
         // Load initial state
         Task { [weak self] in
             await self?.refresh()
-        }
-    }
-
-    private func setupQueueCallback() async {
-        await queue.setOnShouldStartDownload { [weak self] downloadID in
-            await self?.startDownloadTask(downloadID: downloadID)
         }
     }
 
@@ -87,6 +83,11 @@ public final class DownloadManager {
         self.accessToken = accessToken
         self.userID = userID
         self.deviceID = deviceID
+
+        // Process any pending downloads now that we have credentials
+        Task { [weak self] in
+            await self?.requeuePendingDownloads()
+        }
     }
 
     /// Configure from AppState
@@ -102,6 +103,31 @@ public final class DownloadManager {
             userID: userID,
             deviceID: deviceID
         )
+    }
+
+    /// Re-enqueue pending and interrupted downloads to trigger processing
+    private func requeuePendingDownloads() async {
+        guard let downloads = try? await store.fetchAllDownloads() else { return }
+
+        // Get currently active background tasks to avoid duplicates
+        let activeTasks = await sessionManager.activeTaskIdentifiers()
+
+        for download in downloads {
+            if download.state == .pending {
+                await queue.enqueue(download.id)
+            } else if download.state == .downloading {
+                // Check if this download's task is still running in the background
+                if let taskID = download.taskIdentifier, activeTasks.contains(taskID) {
+                    // Task is still running, re-register mapping and mark as active
+                    sessionManager.registerTask(taskID, forDownload: download.id)
+                    await queue.markActive(download.id)
+                } else {
+                    // Task not running, reset to pending and re-enqueue
+                    try? await store.updateState(downloadID: download.id, state: .pending)
+                    await queue.enqueue(download.id)
+                }
+            }
+        }
     }
 
     // MARK: - Public API
@@ -293,56 +319,25 @@ public final class DownloadManager {
             try? await store.updateState(downloadID: downloadID, state: .failed, errorMessage: "Not configured")
             return
         }
-
         guard let download = try? await store.fetchDownload(id: downloadID) else { return }
-
-        // Update state to downloading
         try? await store.updateState(downloadID: downloadID, state: .downloading)
-
         do {
-            // Get stream info from PlaybackService
             let playbackService = PlaybackService(
-                serverURL: serverURL,
-                accessToken: accessToken,
-                userID: userID ?? "",
-                deviceID: deviceID
+                serverURL: serverURL, accessToken: accessToken, userID: userID ?? "", deviceID: deviceID
             )
-
             let streamInfo = try await playbackService.getStreamInfo(itemId: download.itemID)
-
-            // Build download URL
             let downloadURL = buildDownloadURL(
-                itemID: download.itemID,
-                mediaSourceID: streamInfo.mediaSourceId,
-                serverURL: serverURL,
-                accessToken: accessToken,
-                quality: download.quality
+                itemID: download.itemID, mediaSourceID: streamInfo.mediaSourceId,
+                serverURL: serverURL, accessToken: accessToken, quality: download.quality
             )
-
-            // Build auth headers
-            let headers = StreamURLBuilder.buildAuthHeaders(
-                accessToken: accessToken,
-                deviceID: deviceID
-            )
-
-            // Start the download task
-            let task = sessionManager.startDownload(
-                url: downloadURL,
-                downloadID: downloadID,
-                headers: headers
-            )
-
-            // Save task identifier
+            let headers = StreamURLBuilder.buildAuthHeaders(accessToken: accessToken, deviceID: deviceID)
+            let task = sessionManager.startDownload(url: downloadURL, downloadID: downloadID, headers: headers)
             try await store.updateTaskIdentifier(downloadID: downloadID, taskIdentifier: task.taskIdentifier)
-
             await refresh()
-
         } catch {
-            try? await store.updateState(
-                downloadID: downloadID,
-                state: .failed,
-                errorMessage: error.localizedDescription
-            )
+            let msg = error.localizedDescription
+            print("[Download] Failed to start: \(msg)")
+            try? await store.updateState(downloadID: downloadID, state: .failed, errorMessage: msg)
             await queue.markCompleted(downloadID)
             await refresh()
         }
