@@ -4,6 +4,7 @@ import JellyfinClient
 import PlaybackClient
 import SeerCore
 import SwiftUI
+import UIKit
 
 #if os(iOS)
     /// Main video player view for iOS/iPadOS using AVPlayerViewController for PiP support
@@ -141,7 +142,57 @@ import SwiftUI
             controller.canStartPictureInPictureAutomaticallyFromInline = true
             // Pre-warm the context menu to reduce delay when clicking three dots
             _ = controller.contentOverlayView
+
+            // Set up double-tap to seek gesture overlay
+            setupDoubleTapGestures(on: controller, coordinator: context.coordinator)
+
             return controller
+        }
+
+        private func setupDoubleTapGestures(on controller: AVPlayerViewController, coordinator: Coordinator) {
+            guard let overlayView = controller.contentOverlayView else { return }
+
+            // Create left and right tap zones
+            let leftTapView = DoubleTapSeekView(isForward: false)
+            let rightTapView = DoubleTapSeekView(isForward: true)
+
+            leftTapView.translatesAutoresizingMaskIntoConstraints = false
+            rightTapView.translatesAutoresizingMaskIntoConstraints = false
+
+            overlayView.addSubview(leftTapView)
+            overlayView.addSubview(rightTapView)
+
+            NSLayoutConstraint.activate([
+                // Left half of screen
+                leftTapView.leadingAnchor.constraint(equalTo: overlayView.leadingAnchor),
+                leftTapView.topAnchor.constraint(equalTo: overlayView.topAnchor),
+                leftTapView.bottomAnchor.constraint(equalTo: overlayView.bottomAnchor),
+                leftTapView.widthAnchor.constraint(equalTo: overlayView.widthAnchor, multiplier: 0.5),
+                // Right half of screen
+                rightTapView.trailingAnchor.constraint(equalTo: overlayView.trailingAnchor),
+                rightTapView.topAnchor.constraint(equalTo: overlayView.topAnchor),
+                rightTapView.bottomAnchor.constraint(equalTo: overlayView.bottomAnchor),
+                rightTapView.widthAnchor.constraint(equalTo: overlayView.widthAnchor, multiplier: 0.5)
+            ])
+
+            // Set up double-tap gestures
+            let leftDoubleTap = UITapGestureRecognizer(
+                target: coordinator,
+                action: #selector(Coordinator.handleLeftDoubleTap(_:))
+            )
+            leftDoubleTap.numberOfTapsRequired = 2
+            leftTapView.addGestureRecognizer(leftDoubleTap)
+
+            let rightDoubleTap = UITapGestureRecognizer(
+                target: coordinator,
+                action: #selector(Coordinator.handleRightDoubleTap(_:))
+            )
+            rightDoubleTap.numberOfTapsRequired = 2
+            rightTapView.addGestureRecognizer(rightDoubleTap)
+
+            // Store views in coordinator for feedback animation
+            coordinator.leftSeekView = leftTapView
+            coordinator.rightSeekView = rightTapView
         }
 
         func updateUIViewController(_ controller: AVPlayerViewController, context _: Context) {
@@ -169,6 +220,10 @@ import SwiftUI
             let onPiPStart: () -> Void
             let viewModel: VideoPlayerViewModel
 
+            // Double-tap seek views for visual feedback
+            weak var leftSeekView: DoubleTapSeekView?
+            weak var rightSeekView: DoubleTapSeekView?
+
             init(
                 item: MediaItem,
                 onDismiss: @escaping () -> Void,
@@ -179,6 +234,24 @@ import SwiftUI
                 self.onDismiss = onDismiss
                 self.onPiPStart = onPiPStart
                 self.viewModel = viewModel
+            }
+
+            // MARK: - Double-Tap Seek Handlers
+
+            @objc func handleLeftDoubleTap(_ gesture: UITapGestureRecognizer) {
+                guard gesture.state == .ended else { return }
+                leftSeekView?.showFeedback()
+                Task {
+                    await viewModel.skipBackward(seconds: 10)
+                }
+            }
+
+            @objc func handleRightDoubleTap(_ gesture: UITapGestureRecognizer) {
+                guard gesture.state == .ended else { return }
+                rightSeekView?.showFeedback()
+                Task {
+                    await viewModel.skipForward(seconds: 10)
+                }
             }
 
             nonisolated func playerViewController(
@@ -261,6 +334,92 @@ import SwiftUI
                     PiPPlaybackManager.shared.requestRestoreUI(completion: unsafeCompletion)
                 }
             }
+        }
+    }
+#endif
+
+// MARK: - Double-Tap Seek View
+
+#if os(iOS)
+    /// Visual feedback view for double-tap to seek gesture
+    final class DoubleTapSeekView: UIView {
+        private let isForward: Bool
+        private let feedbackLabel: UILabel
+        private let iconImageView: UIImageView
+        private let containerStack: UIStackView
+
+        init(isForward: Bool) {
+            self.isForward = isForward
+
+            // Create icon
+            let iconConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .semibold)
+            let iconName = isForward ? "goforward.10" : "gobackward.10"
+            iconImageView = UIImageView(image: UIImage(systemName: iconName, withConfiguration: iconConfig))
+            iconImageView.tintColor = .white
+            iconImageView.contentMode = .scaleAspectFit
+
+            // Create label
+            feedbackLabel = UILabel()
+            feedbackLabel.text = "10 seconds"
+            feedbackLabel.textColor = .white
+            feedbackLabel.font = .systemFont(ofSize: 13, weight: .medium)
+            feedbackLabel.textAlignment = .center
+
+            // Create container stack
+            containerStack = UIStackView(arrangedSubviews: [iconImageView, feedbackLabel])
+            containerStack.axis = .vertical
+            containerStack.alignment = .center
+            containerStack.spacing = 4
+            containerStack.alpha = 0
+
+            super.init(frame: .zero)
+
+            setupView()
+        }
+
+        @available(*, unavailable)
+        required init?(coder _: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        private func setupView() {
+            // Transparent background - taps pass through to AVPlayerViewController
+            backgroundColor = .clear
+
+            addSubview(containerStack)
+            containerStack.translatesAutoresizingMaskIntoConstraints = false
+
+            NSLayoutConstraint.activate([
+                containerStack.centerYAnchor.constraint(equalTo: centerYAnchor),
+                containerStack.centerXAnchor.constraint(equalTo: centerXAnchor)
+            ])
+
+            // Accessibility
+            isAccessibilityElement = true
+            accessibilityLabel = isForward
+                ? "Double-tap to skip forward 10 seconds"
+                : "Double-tap to skip back 10 seconds"
+            accessibilityTraits = .button
+        }
+
+        func showFeedback() {
+            // Animate feedback appearance
+            UIView.animate(withDuration: 0.15) {
+                self.containerStack.alpha = 1
+                self.containerStack.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
+            } completion: { _ in
+                UIView.animate(withDuration: 0.3, delay: 0.3, options: []) {
+                    self.containerStack.alpha = 0
+                    self.containerStack.transform = .identity
+                }
+            }
+        }
+
+        // Allow taps to pass through when not on interactive elements
+        override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+            let result = super.hitTest(point, with: event)
+            // Only respond to taps on this view, not subviews
+            return result == self ? self : nil
         }
     }
 #endif
