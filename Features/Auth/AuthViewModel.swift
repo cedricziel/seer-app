@@ -125,7 +125,10 @@ public final class AuthViewModel: ObservableObject {
 
         do {
             let service = JellyseerrService(serverURL: url, apiKey: jellyseerrAPIKey)
-            _ = try await service.verifyAuth()
+            let userInfo = try await service.verifyAuth()
+
+            // Set user permissions from Jellyseerr
+            appState.setJellyseerrPermissions(userInfo.permissions)
 
             // Update server configuration with Jellyseerr URL
             config.jellyseerrURL = url

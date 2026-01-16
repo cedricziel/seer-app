@@ -231,6 +231,11 @@ struct RequestRowView: View {
                     statusBadge
                 }
 
+                // Media availability status (downloading, available, etc.)
+                if request.status == .approved {
+                    mediaAvailabilityBadge
+                }
+
                 Text("Requested by \(request.requestedBy.displayName)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -301,7 +306,8 @@ struct RequestRowView: View {
 
     @ViewBuilder
     private var posterView: some View {
-        if let url = posterURL ?? request.media.posterPath.flatMap({ URL(string: "https://image.tmdb.org/t/p/w92\($0)") }) {
+        if let url = posterURL ?? request.media.posterPath
+            .flatMap({ URL(string: "https://image.tmdb.org/t/p/w92\($0)") }) {
             AsyncImage(url: url) { image in
                 image
                     .resizable()
@@ -340,6 +346,31 @@ struct RequestRowView: View {
             case .processing:
                 RequestStatusBadge(status: .processing, style: .full)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var mediaAvailabilityBadge: some View {
+        let availability = request.media.availabilityStatus
+        if availability != .unknown {
+            HStack(spacing: 4) {
+                Image(systemName: availability.iconName)
+                    .font(.caption2)
+                Text(availability.displayName)
+                    .font(.caption2)
+            }
+            .foregroundStyle(availabilityColor(for: availability))
+        }
+    }
+
+    private func availabilityColor(for status: MediaRequest.MediaAvailabilityStatus) -> Color {
+        switch status {
+        case .unknown: .secondary
+        case .pending: .orange
+        case .processing: .blue
+        case .partiallyAvailable: .yellow
+        case .available: .green
+        case .deleted: .red
         }
     }
 

@@ -77,6 +77,43 @@ public struct MediaRequest: Identifiable, Codable, Sendable, Hashable {
         public var displayTitle: String? {
             title ?? name ?? originalTitle
         }
+
+        /// Media availability status
+        public var availabilityStatus: MediaAvailabilityStatus {
+            MediaAvailabilityStatus(rawValue: status ?? 1) ?? .unknown
+        }
+    }
+
+    /// Media availability status from Jellyseerr
+    public enum MediaAvailabilityStatus: Int, Codable, Sendable {
+        case unknown = 1
+        case pending = 2
+        case processing = 3
+        case partiallyAvailable = 4
+        case available = 5
+        case deleted = 6
+
+        public var displayName: String {
+            switch self {
+            case .unknown: "Unknown"
+            case .pending: "Pending"
+            case .processing: "Downloading"
+            case .partiallyAvailable: "Partially Available"
+            case .available: "Available"
+            case .deleted: "Deleted"
+            }
+        }
+
+        public var iconName: String {
+            switch self {
+            case .unknown: "questionmark.circle"
+            case .pending: "clock"
+            case .processing: "arrow.down.circle"
+            case .partiallyAvailable: "circle.lefthalf.filled"
+            case .available: "checkmark.circle.fill"
+            case .deleted: "trash"
+            }
+        }
     }
 
     public struct User: Codable, Sendable, Hashable {

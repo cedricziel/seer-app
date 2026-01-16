@@ -43,6 +43,25 @@ public final class SearchViewModel: ObservableObject {
         }
 
         jellyseerrService = JellyseerrService(serverURL: serverURL, apiKey: apiKey)
+
+        // Load permissions if not already set
+        if appState.jellyseerrUserPermissions == 0 {
+            Task {
+                await loadUserPermissions()
+            }
+        }
+    }
+
+    /// Load user permissions from Jellyseerr
+    private func loadUserPermissions() async {
+        guard let service = jellyseerrService else { return }
+
+        do {
+            let userInfo = try await service.verifyAuth()
+            appState.setJellyseerrPermissions(userInfo.permissions)
+        } catch {
+            print("Failed to load Jellyseerr permissions: \(error)")
+        }
     }
 
     // MARK: - Public Methods
