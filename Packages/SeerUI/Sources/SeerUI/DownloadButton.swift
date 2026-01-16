@@ -52,6 +52,9 @@ public struct DownloadButton: View {
         .contextMenu {
             contextMenuItems
         }
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValue)
+        .accessibilityHint(accessibilityHint)
     }
 
     private var primaryAction: () -> Void {
@@ -170,6 +173,61 @@ public struct DownloadButton: View {
             Button("Dismiss", role: .destructive, action: onCancel)
         }
     }
+
+    private var accessibilityLabel: String {
+        switch state {
+        case .notDownloaded:
+            "Download"
+        case .pending:
+            "Download pending"
+        case .downloading:
+            "Downloading"
+        case .paused:
+            "Download paused"
+        case .waitingForWiFi:
+            "Waiting for WiFi"
+        case .completed:
+            "Downloaded"
+        case .failed:
+            "Download failed"
+        }
+    }
+
+    private var accessibilityValue: String {
+        switch state {
+        case .notDownloaded:
+            "Not downloaded"
+        case .pending:
+            "Waiting to start"
+        case let .downloading(progress):
+            "\(Int(progress * 100)) percent complete"
+        case .paused:
+            "Tap to resume"
+        case .waitingForWiFi:
+            "Will resume on WiFi"
+        case .completed:
+            "Ready to watch offline"
+        case .failed:
+            "Tap to retry"
+        }
+    }
+
+    private var accessibilityHint: String {
+        switch state {
+        case .notDownloaded:
+            "Double tap to start download"
+        case .pending, .waitingForWiFi:
+            "Long press for options"
+        case .downloading:
+            "Double tap to pause, long press for more options"
+        case .paused:
+            "Double tap to resume, long press for more options"
+        case .completed:
+            "Double tap to delete, long press for options"
+        case .failed:
+            "Double tap to retry, long press to dismiss"
+        }
+    }
 }
 
 /// A compact download button for use in list rows
@@ -205,6 +263,9 @@ public struct CompactDownloadButton: View {
         }
         .buttonStyle(.plain)
         .disabled(state == .pending || state == .waitingForWiFi)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(accessibilityValue)
+        .accessibilityHint(accessibilityHint)
     }
 
     @ViewBuilder
@@ -251,6 +312,61 @@ public struct CompactDownloadButton: View {
             .green
         case .failed:
             .red
+        }
+    }
+
+    private var accessibilityLabel: String {
+        switch state {
+        case .notDownloaded:
+            "Download"
+        case .pending:
+            "Download pending"
+        case .downloading:
+            "Downloading"
+        case .paused:
+            "Download paused"
+        case .waitingForWiFi:
+            "Waiting for WiFi"
+        case .completed:
+            "Downloaded"
+        case .failed:
+            "Download failed"
+        }
+    }
+
+    private var accessibilityValue: String {
+        switch state {
+        case .notDownloaded:
+            "Not downloaded"
+        case .pending:
+            "Waiting to start"
+        case let .downloading(progress):
+            "\(Int(progress * 100)) percent complete"
+        case .paused:
+            "Paused"
+        case .waitingForWiFi:
+            "Will resume on WiFi"
+        case .completed:
+            "Ready offline"
+        case .failed:
+            "Failed"
+        }
+    }
+
+    private var accessibilityHint: String {
+        switch state {
+        case .notDownloaded:
+            "Double tap to download"
+        case .pending, .waitingForWiFi:
+            ""
+        case .downloading:
+            "Double tap to pause"
+        case .paused:
+            "Double tap to resume"
+        case .completed:
+            ""
+        case .failed:
+            "Double tap to retry"
         }
     }
 }

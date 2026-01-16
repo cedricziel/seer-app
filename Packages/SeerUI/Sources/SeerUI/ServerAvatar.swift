@@ -18,6 +18,7 @@ public struct ServerAvatar: View {
             .frame(width: size, height: size)
             .background(backgroundColor)
             .clipShape(Circle())
+            .accessibilityLabel("Server icon: \(emoji)")
     }
 }
 
@@ -46,9 +47,28 @@ public struct ServerEmojiPicker: View {
                         .background(emoji == selectedEmoji ? Color.accentColor.opacity(0.2) : Color.clear)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
+                .accessibilityLabel(emojiDescription(for: emoji))
+                .accessibilityAddTraits(emoji == selectedEmoji ? [.isSelected] : [])
             }
         }
         .padding(.vertical, 8)
+        .accessibilityLabel("Server icon picker")
+    }
+
+    private func emojiDescription(for emoji: String) -> String {
+        let descriptions: [String: String] = [
+            "🏠": "Home",
+            "💼": "Work",
+            "☁️": "Cloud",
+            "🖥️": "Desktop computer",
+            "📺": "Television",
+            "🎬": "Movie camera",
+            "🎮": "Game controller",
+            "🌐": "Globe",
+            "⚡": "Lightning bolt",
+            "🔒": "Lock"
+        ]
+        return descriptions[emoji] ?? emoji
     }
 }
 
@@ -77,6 +97,7 @@ public struct ServerRowView: View {
     public var body: some View {
         HStack(spacing: 12) {
             ServerAvatar(emoji: emoji, size: 44)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
@@ -103,9 +124,24 @@ public struct ServerRowView: View {
                 Image(systemName: "checkmark")
                     .foregroundStyle(.tint)
                     .fontWeight(.semibold)
+                    .accessibilityHidden(true)
             }
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(serverAccessibilityLabel)
+        .accessibilityAddTraits(isActive ? [.isSelected] : [])
+    }
+
+    private var serverAccessibilityLabel: String {
+        var label = "\(name), \(jellyfinHost)"
+        if let jellyseerrHost {
+            label += ", with Jellyseerr at \(jellyseerrHost)"
+        }
+        if isActive {
+            label += ", active"
+        }
+        return label
     }
 }
 

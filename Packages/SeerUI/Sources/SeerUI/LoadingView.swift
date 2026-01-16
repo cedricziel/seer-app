@@ -21,6 +21,9 @@ public struct LoadingView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(message ?? "Loading")
+        .accessibilityAddTraits(.updatesFrequently)
     }
 }
 
@@ -39,6 +42,7 @@ public struct ErrorView: View {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
 
             Text(error)
                 .font(.body)
@@ -51,9 +55,12 @@ public struct ErrorView: View {
                     Label("Retry", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityHint("Double tap to try again")
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Error: \(error)")
     }
 }
 
@@ -76,6 +83,16 @@ public struct EmptyContentView: View {
             if let description {
                 Text(description)
             }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(emptyContentAccessibilityLabel)
+    }
+
+    private var emptyContentAccessibilityLabel: String {
+        if let description {
+            "\(title). \(description)"
+        } else {
+            title
         }
     }
 }

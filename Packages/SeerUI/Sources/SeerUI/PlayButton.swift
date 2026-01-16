@@ -38,6 +38,8 @@ public struct PlayButton: View {
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
+        .accessibilityLabel(title)
+        .accessibilityHint("Double tap to start playback")
     }
 }
 
@@ -57,6 +59,8 @@ public struct PlayButtonOverlay: View {
                 .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Play")
+        .accessibilityHint("Double tap to start playback")
     }
 }
 

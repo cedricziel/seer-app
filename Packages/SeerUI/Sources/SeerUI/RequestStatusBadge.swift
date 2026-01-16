@@ -70,6 +70,7 @@ public struct RequestStatusBadge: View {
         Image(systemName: status.iconName)
             .font(.caption)
             .foregroundStyle(status.color)
+            .accessibilityLabel("Status: \(status.label)")
     }
 
     private var fullBadge: some View {
@@ -81,6 +82,7 @@ public struct RequestStatusBadge: View {
             .padding(.vertical, 4)
             .background(status.color.opacity(0.15))
             .clipShape(Capsule())
+            .accessibilityLabel("Status: \(status.label)")
     }
 }
 
@@ -106,6 +108,7 @@ public struct MediaTypeBadge: View {
             .padding(.vertical, 2)
             .background(type == .movie ? Color.blue : Color.purple)
             .clipShape(RoundedRectangle(cornerRadius: 4))
+            .accessibilityLabel("Type: \(type.rawValue)")
     }
 }
 

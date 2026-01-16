@@ -31,6 +31,7 @@ public struct PosterImage: View {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(Color(.systemGray5))
         )
+        .accessibilityHidden(true)
     }
 
     private var placeholderView: some View {
@@ -71,6 +72,7 @@ public struct BackdropImage: View {
                     endPoint: .bottom
                 )
             }
+            .accessibilityHidden(true)
     }
 }
 

@@ -57,6 +57,8 @@ import SwiftUI
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(1.5)
+                        .accessibilityLabel("Loading video")
+                        .accessibilityValue("Please wait")
                 }
 
                 // Error message
@@ -98,6 +100,7 @@ import SwiftUI
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 48))
                     .foregroundStyle(.yellow)
+                    .accessibilityHidden(true)
 
                 Text("Playback Error")
                     .font(.title2)
@@ -114,8 +117,11 @@ import SwiftUI
                 }
                 .buttonStyle(.borderedProminent)
                 .padding(.top)
+                .accessibilityHint("Double tap to close the player")
             }
             .foregroundStyle(.white)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Playback error: \(message)")
         }
     }
 

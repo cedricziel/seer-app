@@ -37,6 +37,10 @@ public struct MediaCard: View {
                 config: contextMenuConfig,
                 actions: contextMenuActions
             ))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityDescription)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Double tap to view details")
     }
 
     private var cardContent: some View {
@@ -58,6 +62,14 @@ public struct MediaCard: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var accessibilityDescription: String {
+        if let subtitle {
+            "\(title), \(subtitle)"
+        } else {
+            title
         }
     }
 }

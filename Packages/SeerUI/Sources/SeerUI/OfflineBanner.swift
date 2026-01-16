@@ -6,6 +6,8 @@ public struct OfflineBanner: View {
     public let lastSyncDate: Date?
     public let onRefresh: (() -> Void)?
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     public init(
         isOffline: Bool,
         lastSyncDate: Date? = nil,
@@ -21,6 +23,7 @@ public struct OfflineBanner: View {
             HStack(spacing: 8) {
                 Image(systemName: "wifi.slash")
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Offline Mode")
@@ -49,6 +52,8 @@ public struct OfflineBanner: View {
                     }
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.capsule)
+                    .accessibilityLabel("Retry connection")
+                    .accessibilityHint("Double tap to attempt reconnection")
                 }
             }
             .padding(.horizontal, 16)
@@ -56,7 +61,19 @@ public struct OfflineBanner: View {
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .padding(.horizontal)
-            .transition(.move(edge: .top).combined(with: .opacity))
+            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(offlineAccessibilityLabel)
+        }
+    }
+
+    private var offlineAccessibilityLabel: String {
+        if let lastSyncDate {
+            let formatter = RelativeDateTimeFormatter()
+            let relativeTime = formatter.localizedString(for: lastSyncDate, relativeTo: Date())
+            return "Offline mode. Last synced \(relativeTime)"
+        } else {
+            return "Offline mode. Showing cached content"
         }
     }
 }
@@ -76,6 +93,7 @@ public struct CachedDataIndicator: View {
             HStack(spacing: 4) {
                 Image(systemName: "arrow.down.circle.fill")
                     .font(.caption2)
+                    .accessibilityHidden(true)
 
                 if let lastSyncDate {
                     Text("Cached \(lastSyncDate, style: .relative) ago")
@@ -90,6 +108,18 @@ public struct CachedDataIndicator: View {
             .padding(.vertical, 4)
             .background(.ultraThinMaterial)
             .clipShape(Capsule())
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(cachedAccessibilityLabel)
+        }
+    }
+
+    private var cachedAccessibilityLabel: String {
+        if let lastSyncDate {
+            let formatter = RelativeDateTimeFormatter()
+            let relativeTime = formatter.localizedString(for: lastSyncDate, relativeTo: Date())
+            return "Showing cached data from \(relativeTime)"
+        } else {
+            return "Showing cached data"
         }
     }
 }
@@ -136,11 +166,13 @@ public struct SyncStatusView: View {
                 if isSyncing {
                     ProgressView()
                         .controlSize(.small)
+                        .accessibilityLabel("Syncing in progress")
                 } else {
                     Button("Sync Now", action: onSyncNow)
                         .buttonStyle(.bordered)
                         .buttonBorderShape(.capsule)
                         .controlSize(.small)
+                        .accessibilityHint("Double tap to start synchronization")
                 }
             }
 
@@ -148,11 +180,16 @@ public struct SyncStatusView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "clock.badge.exclamationmark")
                         .foregroundStyle(.orange)
+                        .accessibilityHidden(true)
 
                     Text("\(pendingChangesCount) pending change\(pendingChangesCount == 1 ? "" : "s")")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(
+                    "\(pendingChangesCount) pending \(pendingChangesCount == 1 ? "change" : "changes") waiting to sync"
+                )
             }
         }
         .padding()

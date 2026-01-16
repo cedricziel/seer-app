@@ -69,6 +69,8 @@ struct PlayerControlsOverlay: View {
                     .fontWeight(.semibold)
             }
             .buttonStyle(PlayerButtonStyle())
+            .accessibilityLabel("Close player")
+            .accessibilityHint("Double tap to close the video player")
 
             // Title
             VStack(alignment: .leading, spacing: 2) {
@@ -84,6 +86,8 @@ struct PlayerControlsOverlay: View {
                 }
             }
             .padding(.leading, 8)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(title)\(subtitle.map { ", \($0)" } ?? "")")
 
             Spacer()
 
@@ -96,6 +100,8 @@ struct PlayerControlsOverlay: View {
                         .font(.title2)
                 }
                 .buttonStyle(PlayerButtonStyle())
+                .accessibilityLabel("Audio and subtitles")
+                .accessibilityHint("Double tap to choose audio track and subtitles")
             }
         }
         .foregroundStyle(.white)
@@ -115,6 +121,7 @@ struct PlayerControlsOverlay: View {
                     .font(.system(size: 32))
             }
             .buttonStyle(PlayerButtonStyle())
+            .accessibilityLabel("Skip back 10 seconds")
 
             // Play/Pause
             Button {
@@ -124,6 +131,8 @@ struct PlayerControlsOverlay: View {
                     .font(.system(size: 48))
             }
             .buttonStyle(PlayerButtonStyle())
+            .accessibilityLabel(viewModel.isPlaying ? "Pause" : "Play")
+            .accessibilityHint(viewModel.isPlaying ? "Double tap to pause playback" : "Double tap to resume playback")
 
             // Skip forward
             Button {
@@ -135,6 +144,7 @@ struct PlayerControlsOverlay: View {
                     .font(.system(size: 32))
             }
             .buttonStyle(PlayerButtonStyle())
+            .accessibilityLabel("Skip forward 10 seconds")
         }
         .foregroundStyle(.white)
     }
@@ -164,12 +174,25 @@ struct PlayerControlsOverlay: View {
             .onAppear {
                 sliderValue = viewModel.currentTime
             }
+            .accessibilityLabel("Playback position")
+            .accessibilityValue(playbackPositionAccessibilityValue)
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment:
+                    Task { await viewModel.skipForward(seconds: 10) }
+                case .decrement:
+                    Task { await viewModel.skipBackward(seconds: 10) }
+                @unknown default:
+                    break
+                }
+            }
 
             // Time labels
             HStack {
                 Text(viewModel.formatTime(isDraggingSlider ? sliderValue : viewModel.currentTime))
                     .font(.caption)
                     .monospacedDigit()
+                    .accessibilityHidden(true)
 
                 Spacer()
 
@@ -177,9 +200,16 @@ struct PlayerControlsOverlay: View {
                 Text("-" + viewModel.formatTime(viewModel.duration - displayTime))
                     .font(.caption)
                     .monospacedDigit()
+                    .accessibilityHidden(true)
             }
             .foregroundStyle(.white.opacity(0.8))
         }
+    }
+
+    private var playbackPositionAccessibilityValue: String {
+        let currentTime = viewModel.formatTime(isDraggingSlider ? sliderValue : viewModel.currentTime)
+        let totalTime = viewModel.formatTime(viewModel.duration)
+        return "\(currentTime) of \(totalTime)"
     }
 }
 
@@ -192,6 +222,7 @@ struct ProgressSlider: View {
     var onEditingChanged: ((Bool) -> Void)?
 
     @State private var dragValue: Double?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { geometry in
@@ -235,7 +266,7 @@ struct ProgressSlider: View {
             )
         }
         .frame(height: 16)
-        .animation(.easeInOut(duration: 0.15), value: isDragging)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: isDragging)
     }
 
     private func progressWidth(in totalWidth: CGFloat) -> CGFloat {
@@ -252,11 +283,13 @@ struct ProgressSlider: View {
 // MARK: - Player Button Style
 
 struct PlayerButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
             .opacity(configuration.isPressed ? 0.7 : 1.0)
-            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
