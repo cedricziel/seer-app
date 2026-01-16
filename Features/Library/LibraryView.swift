@@ -1,4 +1,5 @@
 import JellyfinClient
+import PlaybackClient
 import SeerCore
 import SeerUI
 import SwiftUI
@@ -16,6 +17,7 @@ struct LibraryView: View {
 private struct LibraryContentView: View {
     @ObservedObject var appState: AppState
     @StateObject private var viewModel: LibraryViewModel
+    @State private var selectedItemForPlayback: MediaItem?
 
     init(appState: AppState) {
         self.appState = appState
@@ -92,6 +94,13 @@ private struct LibraryContentView: View {
                 await viewModel.refresh()
             }
         }
+        .fullScreenCover(item: $selectedItemForPlayback) { item in
+            VideoPlayerView(
+                item: item,
+                appState: appState,
+                startPositionTicks: item.userData?.playbackPositionTicks ?? 0
+            )
+        }
     }
 
     // MARK: - Content View
@@ -138,17 +147,52 @@ private struct LibraryContentView: View {
     private var continueWatchingSection: some View {
         MediaCardRow(title: "Continue Watching") {
             ForEach(viewModel.continueWatching) { item in
-                NavigationLink(value: item) {
+                Button {
+                    selectedItemForPlayback = item
+                } label: {
                     MediaCard(
                         title: item.name,
                         subtitle: item.seriesName ?? item.formattedRuntime,
                         imageURL: viewModel.imageURL(for: item)
                     )
                     .frame(width: 140)
+                    .overlay(alignment: .bottomTrailing) {
+                        // Play button overlay
+                        Image(systemName: "play.circle.fill")
+                            .font(.title)
+                            .foregroundStyle(.white)
+                            .shadow(radius: 2)
+                            .padding(8)
+                    }
+                    .overlay(alignment: .bottom) {
+                        // Progress bar
+                        if let percentage = item.playedPercentage ?? progressPercentage(for: item) {
+                            GeometryReader { geometry in
+                                Rectangle()
+                                    .fill(Color.accentColor)
+                                    .frame(
+                                        width: geometry.size.width * (percentage / 100.0),
+                                        height: 3
+                                    )
+                            }
+                            .frame(height: 3)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
             }
         }
+    }
+
+    /// Calculate progress percentage from playback position
+    private func progressPercentage(for item: MediaItem) -> Double? {
+        guard let positionTicks = item.userData?.playbackPositionTicks,
+              let durationTicks = item.runTimeTicks,
+              durationTicks > 0
+        else {
+            return nil
+        }
+        return Double(positionTicks) / Double(durationTicks) * 100.0
     }
 
     // MARK: - Latest Items

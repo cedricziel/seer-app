@@ -1,5 +1,6 @@
 import JellyfinClient
 import JellyseerrClient
+import PlaybackClient
 import SeerCore
 import SeerUI
 import SwiftUI
@@ -21,6 +22,8 @@ struct MediaDetailView: View {
     @State private var requestError: String?
     @State private var showRequestSuccess: Bool = false
     @State private var seriesViewModel: SeriesDetailViewModel?
+    @State private var showPlayer: Bool = false
+    @State private var selectedEpisodeForPlayback: MediaItem?
 
     var body: some View {
         ScrollView {
@@ -32,6 +35,11 @@ struct MediaDetailView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     // Title and metadata
                     headerSection
+
+                    // Play button (for movies and episodes from library)
+                    if source == .library, item.type == .movie || item.type == .episode {
+                        playButton
+                    }
 
                     // Overview
                     if let overview = item.overview {
@@ -79,6 +87,19 @@ struct MediaDetailView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(requestError ?? "An error occurred")
+        }
+        .fullScreenCover(isPresented: $showPlayer) {
+            let playbackItem = selectedEpisodeForPlayback ?? item
+            VideoPlayerView(
+                item: playbackItem,
+                appState: appState,
+                startPositionTicks: playbackItem.userData?.playbackPositionTicks ?? 0
+            )
+        }
+        .onChange(of: showPlayer) { _, isShowing in
+            if !isShowing {
+                selectedEpisodeForPlayback = nil
+            }
         }
     }
 
@@ -138,6 +159,30 @@ struct MediaDetailView: View {
                 MediaTypeBadge(type: item.type == .movie ? .movie : .tvShow)
             }
         }
+    }
+
+    // MARK: - Play Button
+
+    private var playButton: some View {
+        Button {
+            showPlayer = true
+        } label: {
+            HStack {
+                Image(systemName: hasProgress ? "play.fill" : "play.fill")
+                Text(hasProgress ? "Resume" : "Play")
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.accentColor)
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
+    /// Whether the item has playback progress
+    private var hasProgress: Bool {
+        guard let ticks = item.userData?.playbackPositionTicks else { return false }
+        return ticks > 0
     }
 
     // MARK: - Overview Section
@@ -238,7 +283,11 @@ struct MediaDetailView: View {
                                     await viewModel.toggleSeason(season.id)
                                 }
                             },
-                            imageURL: { viewModel.imageURL(for: $0, type: .thumb) }
+                            imageURL: { viewModel.imageURL(for: $0, type: .thumb) },
+                            onPlayEpisode: { episode in
+                                selectedEpisodeForPlayback = episode
+                                showPlayer = true
+                            }
                         )
                     }
                 }
