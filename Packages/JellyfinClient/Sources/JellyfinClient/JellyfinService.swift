@@ -42,6 +42,14 @@ public actor JellyfinService {
         }
     }
 
+    public enum ImageType: String, Sendable {
+        case primary = "Primary"
+        case backdrop = "Backdrop"
+        case thumb = "Thumb"
+        case logo = "Logo"
+        case banner = "Banner"
+    }
+
     public init(serverURL: URL, accessToken: String? = nil, userID: String? = nil, deviceID: String? = nil) {
         self.serverURL = serverURL
         self.accessToken = accessToken
@@ -57,10 +65,21 @@ public actor JellyfinService {
         decoder.dateDecodingStrategy = .iso8601
     }
 
-    // MARK: - Authentication
+    private static func generateDeviceID() -> String {
+        if let storedID = KeychainManager.shared.getString(for: .jellyfinDeviceID) {
+            return storedID
+        }
+        let newID = UUID().uuidString
+        KeychainManager.shared.save(newID, for: .jellyfinDeviceID)
+        return newID
+    }
+}
 
+// MARK: - Authentication
+
+public extension JellyfinService {
     /// Authenticate with username and password
-    public func authenticate(username: String, password: String) async throws -> AuthResponse {
+    func authenticate(username: String, password: String) async throws -> AuthResponse {
         let url = serverURL.appendingPathComponent("Users/AuthenticateByName")
 
         var request = URLRequest(url: url)
@@ -70,7 +89,7 @@ public actor JellyfinService {
 
         let body: [String: String] = [
             "Username": username,
-            "Pw": password,
+            "Pw": password
         ]
         request.httpBody = try JSONEncoder().encode(body)
 
@@ -96,15 +115,17 @@ public actor JellyfinService {
     }
 
     /// Set credentials without authenticating (for restoring session)
-    public func setCredentials(accessToken: String, userID: String) {
+    func setCredentials(accessToken: String, userID: String) {
         self.accessToken = accessToken
         self.userID = userID
     }
+}
 
-    // MARK: - Libraries
+// MARK: - Libraries
 
+public extension JellyfinService {
     /// Get all user libraries
-    public func getLibraries() async throws -> [Library] {
+    func getLibraries() async throws -> [Library] {
         guard let userID else {
             throw JellyfinError.notAuthenticated
         }
@@ -118,11 +139,13 @@ public actor JellyfinService {
         let librariesResponse = try decoder.decode(LibrariesResponse.self, from: data)
         return librariesResponse.items
     }
+}
 
-    // MARK: - Items
+// MARK: - Items
 
+public extension JellyfinService {
     /// Get items from a library or the entire collection
-    public func getItems(
+    func getItems(
         parentID: String? = nil,
         includeItemTypes: [MediaItem.MediaType]? = nil,
         sortBy: String = "SortName",
@@ -135,7 +158,10 @@ public actor JellyfinService {
             throw JellyfinError.notAuthenticated
         }
 
-        var components = URLComponents(url: serverURL.appendingPathComponent("Users/\(userID)/Items"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("Users/\(userID)/Items"),
+            resolvingAgainstBaseURL: false
+        )!
 
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "SortBy", value: sortBy),
@@ -143,7 +169,10 @@ public actor JellyfinService {
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "StartIndex", value: String(startIndex)),
             URLQueryItem(name: "Recursive", value: String(recursive)),
-            URLQueryItem(name: "Fields", value: "Overview,Genres,Studios,People,ProviderIds,CommunityRating,OfficialRating"),
+            URLQueryItem(
+                name: "Fields",
+                value: "Overview,Genres,Studios,People,ProviderIds,CommunityRating,OfficialRating"
+            )
         ]
 
         if let parentID {
@@ -169,7 +198,7 @@ public actor JellyfinService {
     }
 
     /// Get a single item by ID
-    public func getItem(id: String) async throws -> MediaItem {
+    func getItem(id: String) async throws -> MediaItem {
         guard let userID else {
             throw JellyfinError.notAuthenticated
         }
@@ -184,16 +213,19 @@ public actor JellyfinService {
     }
 
     /// Get continue watching items
-    public func getContinueWatching(limit: Int = 10) async throws -> [MediaItem] {
+    func getContinueWatching(limit: Int = 10) async throws -> [MediaItem] {
         guard let userID else {
             throw JellyfinError.notAuthenticated
         }
 
-        var components = URLComponents(url: serverURL.appendingPathComponent("Users/\(userID)/Items/Resume"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("Users/\(userID)/Items/Resume"),
+            resolvingAgainstBaseURL: false
+        )!
         components.queryItems = [
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "Fields", value: "Overview"),
-            URLQueryItem(name: "MediaTypes", value: "Video"),
+            URLQueryItem(name: "MediaTypes", value: "Video")
         ]
 
         guard let url = components.url else {
@@ -209,7 +241,7 @@ public actor JellyfinService {
     }
 
     /// Get latest added items
-    public func getLatestItems(
+    func getLatestItems(
         parentID: String? = nil,
         includeItemTypes: [MediaItem.MediaType]? = nil,
         limit: Int = 20
@@ -218,10 +250,13 @@ public actor JellyfinService {
             throw JellyfinError.notAuthenticated
         }
 
-        var components = URLComponents(url: serverURL.appendingPathComponent("Users/\(userID)/Items/Latest"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("Users/\(userID)/Items/Latest"),
+            resolvingAgainstBaseURL: false
+        )!
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "Limit", value: String(limit)),
-            URLQueryItem(name: "Fields", value: "Overview,Genres"),
+            URLQueryItem(name: "Fields", value: "Overview,Genres")
         ]
 
         if let parentID {
@@ -245,22 +280,27 @@ public actor JellyfinService {
 
         return try decoder.decode([MediaItem].self, from: data)
     }
+}
 
-    // MARK: - Search
+// MARK: - Search
 
+public extension JellyfinService {
     /// Search for items
-    public func search(query: String, limit: Int = 20) async throws -> [MediaItem] {
+    func search(query: String, limit: Int = 20) async throws -> [MediaItem] {
         guard let userID else {
             throw JellyfinError.notAuthenticated
         }
 
-        var components = URLComponents(url: serverURL.appendingPathComponent("Users/\(userID)/Items"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("Users/\(userID)/Items"),
+            resolvingAgainstBaseURL: false
+        )!
         components.queryItems = [
             URLQueryItem(name: "SearchTerm", value: query),
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "Recursive", value: "true"),
             URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series"),
-            URLQueryItem(name: "Fields", value: "Overview,Genres"),
+            URLQueryItem(name: "Fields", value: "Overview,Genres")
         ]
 
         guard let url = components.url else {
@@ -274,12 +314,22 @@ public actor JellyfinService {
         let itemsResponse = try decoder.decode(ItemsResponse.self, from: data)
         return itemsResponse.items
     }
+}
 
-    // MARK: - Images
+// MARK: - Images
 
+public extension JellyfinService {
     /// Get the URL for an item's primary image
-    public func getImageURL(itemID: String, imageType: ImageType = .primary, maxWidth: Int? = nil, maxHeight: Int? = nil) -> URL {
-        var components = URLComponents(url: serverURL.appendingPathComponent("Items/\(itemID)/Images/\(imageType.rawValue)"), resolvingAgainstBaseURL: false)!
+    func getImageURL(
+        itemID: String,
+        imageType: ImageType = .primary,
+        maxWidth: Int? = nil,
+        maxHeight: Int? = nil
+    ) -> URL {
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("Items/\(itemID)/Images/\(imageType.rawValue)"),
+            resolvingAgainstBaseURL: false
+        )!
 
         var queryItems: [URLQueryItem] = []
         if let maxWidth {
@@ -294,17 +344,11 @@ public actor JellyfinService {
 
         return components.url ?? serverURL
     }
+}
 
-    public enum ImageType: String, Sendable {
-        case primary = "Primary"
-        case backdrop = "Backdrop"
-        case thumb = "Thumb"
-        case logo = "Logo"
-        case banner = "Banner"
-    }
+// MARK: - Private Helpers
 
-    // MARK: - Private Helpers
-
+extension JellyfinService {
     private func authenticatedRequest(url: URL) throws -> URLRequest {
         guard accessToken != nil else {
             throw JellyfinError.notAuthenticated
@@ -322,7 +366,7 @@ public actor JellyfinService {
             "Client=\"\(clientName)\"",
             "Device=\"iOS\"",
             "DeviceId=\"\(deviceID)\"",
-            "Version=\"\(clientVersion)\"",
+            "Version=\"\(clientVersion)\""
         ]
 
         if includeToken, let token = accessToken {
@@ -349,31 +393,24 @@ public actor JellyfinService {
             throw JellyfinError.serverError(httpResponse.statusCode, String(data: data, encoding: .utf8))
         }
     }
+}
 
-    private static func generateDeviceID() -> String {
-        if let storedID = KeychainManager.shared.getString(for: .jellyfinDeviceID) {
-            return storedID
-        }
-        let newID = UUID().uuidString
-        KeychainManager.shared.save(newID, for: .jellyfinDeviceID)
-        return newID
-    }
+// MARK: - Public Accessors
 
-    // MARK: - Public Accessors
-
-    public func getServerURL() -> URL {
+public extension JellyfinService {
+    func getServerURL() -> URL {
         serverURL
     }
 
-    public func getAccessToken() -> String? {
+    func getAccessToken() -> String? {
         accessToken
     }
 
-    public func getUserID() -> String? {
+    func getUserID() -> String? {
         userID
     }
 
-    public func getDeviceID() -> String {
+    func getDeviceID() -> String {
         deviceID
     }
 }

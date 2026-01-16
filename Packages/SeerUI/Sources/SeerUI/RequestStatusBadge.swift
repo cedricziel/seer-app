@@ -88,7 +88,7 @@ public struct RequestStatusBadge: View {
 public struct MediaTypeBadge: View {
     public enum MediaType: String, Sendable {
         case movie = "Movie"
-        case tv = "TV Show"
+        case tvShow = "TV Show"
     }
 
     public let type: MediaType
@@ -129,7 +129,7 @@ public struct MediaTypeBadge: View {
 
         HStack {
             MediaTypeBadge(type: .movie)
-            MediaTypeBadge(type: .tv)
+            MediaTypeBadge(type: .tvShow)
         }
     }
     .padding()

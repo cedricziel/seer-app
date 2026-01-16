@@ -94,7 +94,7 @@ private struct ServerSetupContentView: View {
                     Task {
                         await viewModel.connectToJellyfin()
                     }
-                }) {
+                }, label: {
                     HStack {
                         if viewModel.isLoading {
                             ProgressView()
@@ -103,8 +103,9 @@ private struct ServerSetupContentView: View {
                         Text(viewModel.isLoading ? "Connecting..." : "Connect")
                     }
                     .frame(maxWidth: .infinity)
-                }
-                .disabled(viewModel.isLoading || viewModel.jellyfinServerURL.isEmpty || viewModel.jellyfinUsername.isEmpty)
+                })
+                .disabled(viewModel.isLoading || viewModel.jellyfinServerURL.isEmpty || viewModel.jellyfinUsername
+                    .isEmpty)
             }
         }
     }
@@ -160,7 +161,7 @@ private struct ServerSetupContentView: View {
                     Task {
                         await viewModel.connectToJellyseerr()
                     }
-                }) {
+                }, label: {
                     HStack {
                         if viewModel.isLoading {
                             ProgressView()
@@ -169,8 +170,9 @@ private struct ServerSetupContentView: View {
                         Text(viewModel.isLoading ? "Connecting..." : "Connect")
                     }
                     .frame(maxWidth: .infinity)
-                }
-                .disabled(viewModel.isLoading || viewModel.jellyseerrServerURL.isEmpty || viewModel.jellyseerrAPIKey.isEmpty)
+                })
+                .disabled(viewModel.isLoading || viewModel.jellyseerrServerURL.isEmpty || viewModel.jellyseerrAPIKey
+                    .isEmpty)
 
                 Button("Skip for Now") {
                     viewModel.skipJellyseerr()
@@ -212,7 +214,7 @@ private struct ServerSetupContentView: View {
 
             Button(action: {
                 viewModel.completeSetup()
-            }) {
+            }, label: {
                 Text("Get Started")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
@@ -220,7 +222,7 @@ private struct ServerSetupContentView: View {
                     .background(Color.accentColor)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
+            })
             .padding(.horizontal, 24)
             .padding(.bottom, 32)
         }

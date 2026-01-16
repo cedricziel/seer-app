@@ -123,7 +123,7 @@ private struct SearchContentView: View {
     private var searchResultsGrid: some View {
         ScrollView {
             LazyVGrid(columns: [
-                GridItem(.adaptive(minimum: 140), spacing: 16),
+                GridItem(.adaptive(minimum: 140), spacing: 16)
             ], spacing: 16) {
                 ForEach(viewModel.searchResults) { result in
                     SearchResultCard(result: result)
@@ -204,7 +204,7 @@ struct SearchResultCard: View {
                         Text(year)
                     }
 
-                    MediaTypeBadge(type: result.mediaType == .movie ? .movie : .tv)
+                    MediaTypeBadge(type: result.mediaType == .movie ? .movie : .tvShow)
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -241,7 +241,7 @@ struct SearchResultDetailSheet: View {
                                     Text(year)
                                 }
 
-                                MediaTypeBadge(type: result.mediaType == .movie ? .movie : .tv)
+                                MediaTypeBadge(type: result.mediaType == .movie ? .movie : .tvShow)
                             }
                             .font(.subheadline)
                             .foregroundStyle(.secondary)

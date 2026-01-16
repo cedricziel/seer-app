@@ -22,7 +22,7 @@ public struct SearchResult: Identifiable, Codable, Sendable, Hashable {
 
     public enum MediaType: String, Codable, Sendable {
         case movie
-        case tv
+        case tvShow = "tv"
         case person
     }
 

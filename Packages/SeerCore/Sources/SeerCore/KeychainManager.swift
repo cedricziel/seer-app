@@ -52,7 +52,7 @@ public final class KeychainManager: Sendable {
             kSecAttrAccount as String: keyString,
             kSecValueData as String: data,
             kSecAttrSynchronizable as String: true,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
 
         let status = SecItemAdd(query as CFDictionary, nil)
@@ -75,7 +75,7 @@ public final class KeychainManager: Sendable {
             kSecAttrAccount as String: keyString,
             kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecMatchLimit as String: kSecMatchLimitOne
         ]
 
         var result: AnyObject?
@@ -95,7 +95,7 @@ public final class KeychainManager: Sendable {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: keyString,
-            kSecAttrSynchronizable as String: true,
+            kSecAttrSynchronizable as String: true
         ]
         SecItemDelete(syncedQuery as CFDictionary)
 
@@ -104,7 +104,7 @@ public final class KeychainManager: Sendable {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: keyString,
-            kSecAttrSynchronizable as String: false,
+            kSecAttrSynchronizable as String: false
         ]
         SecItemDelete(localQuery as CFDictionary)
 
@@ -163,7 +163,7 @@ public final class KeychainManager: Sendable {
             // Enable iCloud Keychain sync
             kSecAttrSynchronizable as String: true,
             // Accessible after first unlock, compatible with sync
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
 
         let status = SecItemAdd(query as CFDictionary, nil)
@@ -185,7 +185,7 @@ public final class KeychainManager: Sendable {
             kSecAttrAccount as String: key.rawValue,
             kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecMatchLimit as String: kSecMatchLimitOne
         ]
 
         var result: AnyObject?
@@ -203,7 +203,7 @@ public final class KeychainManager: Sendable {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: key.rawValue,
-            kSecAttrSynchronizable as String: true,
+            kSecAttrSynchronizable as String: true
         ]
         SecItemDelete(syncedQuery as CFDictionary)
 
@@ -212,7 +212,7 @@ public final class KeychainManager: Sendable {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: serviceName,
             kSecAttrAccount as String: key.rawValue,
-            kSecAttrSynchronizable as String: false,
+            kSecAttrSynchronizable as String: false
         ]
         SecItemDelete(localQuery as CFDictionary)
 

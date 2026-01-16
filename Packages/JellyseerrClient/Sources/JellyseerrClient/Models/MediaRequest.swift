@@ -48,7 +48,7 @@ public struct MediaRequest: Identifiable, Codable, Sendable, Hashable {
 
     public enum RequestType: String, Codable, Sendable {
         case movie
-        case tv
+        case tvShow = "tv"
     }
 
     public struct MediaDetails: Codable, Sendable, Hashable {

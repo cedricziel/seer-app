@@ -117,7 +117,7 @@ struct MediaDetailView: View {
                 }
 
                 // Media Type Badge
-                MediaTypeBadge(type: item.type == .movie ? .movie : .tv)
+                MediaTypeBadge(type: item.type == .movie ? .movie : .tvShow)
             }
         }
     }
@@ -203,7 +203,7 @@ struct MediaDetailView: View {
                 Task {
                     await requestMedia()
                 }
-            }) {
+            }, label: {
                 HStack {
                     if isRequestingMedia {
                         ProgressView()
@@ -218,7 +218,7 @@ struct MediaDetailView: View {
                 .background(Color.accentColor)
                 .foregroundStyle(.white)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
+            })
             .disabled(isRequestingMedia)
         }
     }
@@ -246,7 +246,7 @@ struct MediaDetailView: View {
         do {
             let service = JellyseerrService(serverURL: serverURL, apiKey: apiKey)
             _ = try await service.createRequest(
-                mediaType: item.type == .movie ? .movie : .tv,
+                mediaType: item.type == .movie ? .movie : .tvShow,
                 mediaId: tmdbID
             )
             showRequestSuccess = true

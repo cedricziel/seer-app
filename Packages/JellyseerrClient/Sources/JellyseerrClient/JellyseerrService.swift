@@ -93,10 +93,13 @@ public actor JellyseerrService {
             return SearchResponse(page: 1, totalPages: 0, totalResults: 0, results: [])
         }
 
-        var components = URLComponents(url: serverURL.appendingPathComponent("api/v1/search"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("api/v1/search"),
+            resolvingAgainstBaseURL: false
+        )!
         components.queryItems = [
             URLQueryItem(name: "query", value: query),
-            URLQueryItem(name: "page", value: String(page)),
+            URLQueryItem(name: "page", value: String(page))
         ]
 
         guard let url = components.url else {
@@ -123,12 +126,15 @@ public actor JellyseerrService {
         filter: RequestFilter = .all,
         sort: RequestSort = .added
     ) async throws -> RequestsResponse {
-        var components = URLComponents(url: serverURL.appendingPathComponent("api/v1/request"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("api/v1/request"),
+            resolvingAgainstBaseURL: false
+        )!
         components.queryItems = [
             URLQueryItem(name: "take", value: String(take)),
             URLQueryItem(name: "skip", value: String(skip)),
             URLQueryItem(name: "filter", value: filter.rawValue),
-            URLQueryItem(name: "sort", value: sort.rawValue),
+            URLQueryItem(name: "sort", value: sort.rawValue)
         ]
 
         guard let url = components.url else {

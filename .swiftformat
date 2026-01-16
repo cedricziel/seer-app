@@ -1,0 +1,5 @@
+--trailingCommas never
+--maxwidth 120
+--indent 4
+--wraparguments before-first
+--wrapcollections before-first

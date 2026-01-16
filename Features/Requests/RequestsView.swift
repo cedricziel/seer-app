@@ -60,9 +60,9 @@ private struct RequestsContentView: View {
                         Task {
                             await viewModel.refresh()
                         }
-                    }) {
+                    }, label: {
                         Image(systemName: "arrow.clockwise")
-                    }
+                    })
                 }
             }
             .refreshable {
@@ -102,14 +102,14 @@ private struct RequestsContentView: View {
                         Task {
                             await viewModel.filterChanged()
                         }
-                    }) {
+                    }, label: {
                         HStack {
                             Text(filter.rawValue)
                             if viewModel.selectedFilter == filter {
                                 Image(systemName: "checkmark")
                             }
                         }
-                    }
+                    })
                 }
             }
 
@@ -120,14 +120,14 @@ private struct RequestsContentView: View {
                         Task {
                             await viewModel.filterChanged()
                         }
-                    }) {
+                    }, label: {
                         HStack {
                             Text(sort.rawValue)
                             if viewModel.selectedSort == sort {
                                 Image(systemName: "checkmark")
                             }
                         }
-                    }
+                    })
                 }
             }
         } label: {
@@ -178,7 +178,7 @@ struct RequestRowView: View {
                     .lineLimit(2)
 
                 HStack(spacing: 8) {
-                    MediaTypeBadge(type: request.type == .movie ? .movie : .tv)
+                    MediaTypeBadge(type: request.type == .movie ? .movie : .tvShow)
                     statusBadge
                 }
 
