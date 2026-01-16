@@ -93,7 +93,8 @@ struct MediaDetailView: View {
             VideoPlayerView(
                 item: playbackItem,
                 appState: appState,
-                startPositionTicks: playbackItem.userData?.playbackPositionTicks ?? 0
+                startPositionTicks: playbackItem.userData?.playbackPositionTicks ?? 0,
+                onPiPStart: { showPlayer = false }
             )
         }
         .onChange(of: showPlayer) { _, isShowing in

@@ -98,7 +98,8 @@ private struct LibraryContentView: View {
             VideoPlayerView(
                 item: item,
                 appState: appState,
-                startPositionTicks: item.userData?.playbackPositionTicks ?? 0
+                startPositionTicks: item.userData?.playbackPositionTicks ?? 0,
+                onPiPStart: { selectedItemForPlayback = nil }
             )
         }
     }

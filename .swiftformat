@@ -3,3 +3,5 @@
 --indent 4
 --wraparguments before-first
 --wrapcollections before-first
+--allman false
+--disable wrapMultilineStatementBraces

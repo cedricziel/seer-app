@@ -46,6 +46,10 @@ targets:
         com.apple.developer.ubiquity-kvstore-identifier: "$(TeamIdentifierPrefix)com.cedricziel.seer"
         com.apple.developer.icloud-container-identifiers: ["iCloud.com.cedricziel.seer"]
         com.apple.developer.icloud-services: ["CloudKit"]
+    capabilities:
+      backgroundModes:
+        modes:
+          - audio
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer

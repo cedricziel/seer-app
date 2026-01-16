@@ -4,168 +4,231 @@ import PlaybackClient
 import SeerCore
 import SwiftUI
 
-/// Main video player view for iOS/iPadOS
-public struct VideoPlayerView: View {
-    @Environment(\.dismiss) private var dismiss
+#if os(iOS)
+    /// Main video player view for iOS/iPadOS using AVPlayerViewController for PiP support
+    public struct VideoPlayerView: View {
+        @Environment(\.dismiss) private var dismiss
 
-    @State private var viewModel: VideoPlayerViewModel
-    @State private var dragOffset: CGFloat = 0
+        @State private var viewModel: VideoPlayerViewModel
 
-    private let item: MediaItem
-    private let startPositionTicks: Int64
-    private let dismissThreshold: CGFloat = 150
+        private let item: MediaItem
+        private let startPositionTicks: Int64
+        private let existingPlayer: AVPlayer?
+        private let onPiPStart: (() -> Void)?
 
-    public init(
-        item: MediaItem,
-        appState: AppState,
-        startPositionTicks: Int64 = 0
-    ) {
-        self.item = item
-        self.startPositionTicks = startPositionTicks
-        _viewModel = State(wrappedValue: VideoPlayerViewModel(
-            item: item,
-            appState: appState,
-            startPositionTicks: startPositionTicks
-        ))
-    }
+        public init(
+            item: MediaItem,
+            appState: AppState,
+            startPositionTicks: Int64 = 0,
+            existingPlayer: AVPlayer? = nil,
+            onPiPStart: (() -> Void)? = nil
+        ) {
+            self.item = item
+            self.startPositionTicks = startPositionTicks
+            self.existingPlayer = existingPlayer
+            self.onPiPStart = onPiPStart
+            _viewModel = State(wrappedValue: VideoPlayerViewModel(
+                item: item,
+                appState: appState,
+                startPositionTicks: startPositionTicks,
+                existingPlayer: existingPlayer
+            ))
+        }
 
-    public var body: some View {
-        ZStack {
-            // Background
-            Color.black.ignoresSafeArea()
+        public var body: some View {
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-            // Video Player
-            if let player = viewModel.player {
-                VideoPlayer(player: player)
-                    .ignoresSafeArea()
-            }
-
-            // Tap overlay for controls toggle (transparent, above video)
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    viewModel.handleTap()
-                }
-
-            // Loading indicator
-            if viewModel.isBuffering {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .scaleEffect(1.5)
-            }
-
-            // Error message
-            if let error = viewModel.errorMessage {
-                errorView(error)
-            }
-
-            // Controls overlay
-            if viewModel.showControls && viewModel.isReady {
-                PlayerControlsOverlay(
-                    viewModel: viewModel,
-                    title: item.name,
-                    subtitle: buildSubtitle(),
-                    onDismiss: {
-                        closePlayer()
-                    }
+                AVPlayerViewControllerRepresentable(
+                    player: viewModel.player,
+                    item: item,
+                    onDismiss: { dismiss() },
+                    onPiPStart: { onPiPStart?() },
+                    viewModel: viewModel
                 )
-                .transition(.opacity)
-            }
+                .ignoresSafeArea()
 
-        }
-        .offset(y: dragOffset)
-        .animation(.interactiveSpring(), value: dragOffset)
-        .gesture(dismissDragGesture)
-        .animation(.easeInOut(duration: 0.25), value: viewModel.showControls)
-        .preferredColorScheme(.dark)
-        .persistentSystemOverlays(.hidden)
-        .task {
-            await viewModel.loadMedia(startPositionTicks: startPositionTicks)
-            // Auto-play when ready
-            if viewModel.isReady && viewModel.errorMessage == nil {
-                viewModel.play()
-            }
-        }
-        .onDisappear {
-            viewModel.stop()
-        }
-    }
+                // Loading indicator (shown while loading, before player is ready)
+                if viewModel.isBuffering && viewModel.player == nil {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                }
 
-    // MARK: - Subviews
-
-    private var dismissDragGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                // Only allow dragging down
-                if value.translation.height > 0 {
-                    dragOffset = value.translation.height
+                // Error message
+                if let error = viewModel.errorMessage {
+                    errorView(error)
                 }
             }
-            .onEnded { value in
-                if value.translation.height > dismissThreshold {
-                    closePlayer()
-                } else {
-                    dragOffset = 0
+            .preferredColorScheme(.dark)
+            .persistentSystemOverlays(.hidden)
+            .task {
+                // Skip loading if we already have a player (restoration from PiP)
+                guard existingPlayer == nil else {
+                    // Mark restoration as complete
+                    PiPPlaybackManager.shared.finishRestoration()
+                    if viewModel.isReady && viewModel.errorMessage == nil {
+                        viewModel.play()
+                    }
+                    return
+                }
+                await viewModel.loadMedia(startPositionTicks: startPositionTicks)
+                // Auto-play when ready
+                if viewModel.isReady && viewModel.errorMessage == nil {
+                    viewModel.play()
                 }
             }
-    }
-
-    private func closePlayer() {
-        viewModel.stop()
-        dismiss()
-    }
-
-    private func errorView(_ message: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(.yellow)
-
-            Text("Playback Error")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text(message)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-
-            Button("Close") {
-                dismiss()
+            .onDisappear {
+                // Only stop if not going to PiP
+                if !PiPPlaybackManager.shared.isPiPActive {
+                    viewModel.stop()
+                    // Clear the manager's player reference
+                    PiPPlaybackManager.shared.clearPlayer()
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .padding(.top)
         }
-        .foregroundStyle(.white)
-    }
 
-    // MARK: - Helpers
+        // MARK: - Subviews
 
-    private func buildSubtitle() -> String? {
-        switch item.type {
-        case .episode:
-            if let seriesName = item.seriesName {
-                var subtitle = seriesName
-                if let season = item.parentIndexNumber {
-                    subtitle += " - S\(season)"
+        private func errorView(_ message: String) -> some View {
+            VStack(spacing: 16) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.yellow)
+
+                Text("Playback Error")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                Text(message)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+
+                Button("Close") {
+                    dismiss()
                 }
-                if let episode = item.indexNumber {
-                    subtitle += "E\(episode)"
-                }
-                return subtitle
+                .buttonStyle(.borderedProminent)
+                .padding(.top)
             }
-            return nil
-        case .movie:
-            if let year = item.year {
-                return String(year)
-            }
-            return nil
-        default:
-            return nil
+            .foregroundStyle(.white)
         }
     }
-}
+
+    // MARK: - AVPlayerViewController Representable
+
+    struct AVPlayerViewControllerRepresentable: UIViewControllerRepresentable {
+        let player: AVPlayer?
+        let item: MediaItem
+        let onDismiss: () -> Void
+        let onPiPStart: () -> Void
+        let viewModel: VideoPlayerViewModel
+
+        func makeUIViewController(context: Context) -> AVPlayerViewController {
+            let controller = AVPlayerViewController()
+            controller.delegate = context.coordinator
+            controller.allowsPictureInPicturePlayback = true
+            controller.canStartPictureInPictureAutomaticallyFromInline = true
+            // Pre-warm the context menu to reduce delay when clicking three dots
+            _ = controller.contentOverlayView
+            return controller
+        }
+
+        func updateUIViewController(_ controller: AVPlayerViewController, context _: Context) {
+            if controller.player !== player {
+                controller.player = player
+            }
+        }
+
+        func makeCoordinator() -> Coordinator {
+            Coordinator(item: item, onDismiss: onDismiss, onPiPStart: onPiPStart, viewModel: viewModel)
+        }
+
+        @MainActor
+        class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+            let item: MediaItem
+            let onDismiss: () -> Void
+            let onPiPStart: () -> Void
+            let viewModel: VideoPlayerViewModel
+
+            init(
+                item: MediaItem,
+                onDismiss: @escaping () -> Void,
+                onPiPStart: @escaping () -> Void,
+                viewModel: VideoPlayerViewModel
+            ) {
+                self.item = item
+                self.onDismiss = onDismiss
+                self.onPiPStart = onPiPStart
+                self.viewModel = viewModel
+            }
+
+            nonisolated func playerViewController(
+                _: AVPlayerViewController,
+                willEndFullScreenPresentationWithAnimationCoordinator _:
+                any UIViewControllerTransitionCoordinator
+            ) {
+                Task { @MainActor in
+                    onDismiss()
+                }
+            }
+
+            nonisolated func playerViewControllerWillStartPictureInPicture(_: AVPlayerViewController) {
+                print("[VideoPlayer] PiP starting")
+            }
+
+            nonisolated func playerViewControllerDidStartPictureInPicture(
+                _ playerViewController: AVPlayerViewController
+            ) {
+                print("[VideoPlayer] PiP started")
+                Task { @MainActor in
+                    // Hand off player to PiP manager
+                    if let player = playerViewController.player {
+                        PiPPlaybackManager.shared.pipDidStart(player: player, item: item)
+                    }
+                    // Dismiss the fullScreenCover
+                    onPiPStart()
+                }
+            }
+
+            nonisolated func playerViewControllerWillStopPictureInPicture(_: AVPlayerViewController) {
+                print("[VideoPlayer] PiP stopping")
+            }
+
+            nonisolated func playerViewControllerDidStopPictureInPicture(_: AVPlayerViewController) {
+                print("[VideoPlayer] PiP stopped")
+                Task { @MainActor in
+                    PiPPlaybackManager.shared.pipDidStop()
+                }
+            }
+
+            nonisolated func playerViewController(
+                _: AVPlayerViewController,
+                failedToStartPictureInPictureWithError error: Error
+            ) {
+                print("[VideoPlayer] PiP failed to start: \(error)")
+            }
+
+            nonisolated func playerViewController(
+                _: AVPlayerViewController,
+                restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler:
+                @escaping (Bool) -> Void
+            ) {
+                // Use nonisolated(unsafe) to handle Swift 6 concurrency
+                // The completion handler must be called on the main thread, which we ensure
+                nonisolated(unsafe) let unsafeCompletion = completionHandler
+
+                Task { @MainActor in
+                    PiPPlaybackManager.shared.requestRestoreUI()
+                    // Give time for UI to restore, then call completion
+                    try? await Task.sleep(for: .milliseconds(300))
+                    unsafeCompletion(true)
+                }
+            }
+        }
+    }
+#endif
 
 // MARK: - Preview
 

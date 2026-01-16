@@ -1,8 +1,10 @@
+import PlaybackClient
 import SeerCore
 import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var appState: AppState
+    @State private var showPiPRestorePlayer = false
 
     var body: some View {
         Group {
@@ -13,6 +15,27 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut, value: appState.isAuthenticated)
+        .fullScreenCover(isPresented: $showPiPRestorePlayer) {
+            let pipManager = PiPPlaybackManager.shared
+            if let item = pipManager.pipItem,
+               let player = pipManager.pipPlayer {
+                VideoPlayerView(
+                    item: item,
+                    appState: appState,
+                    startPositionTicks: 0,
+                    existingPlayer: player,
+                    onPiPStart: { showPiPRestorePlayer = false }
+                )
+            } else {
+                Color.clear.onAppear { showPiPRestorePlayer = false }
+            }
+        }
+        .onChange(of: PiPPlaybackManager.shared.shouldRestorePlayer) { _, shouldRestore in
+            if shouldRestore {
+                showPiPRestorePlayer = true
+                PiPPlaybackManager.shared.clearRestoreRequest()
+            }
+        }
     }
 }
 

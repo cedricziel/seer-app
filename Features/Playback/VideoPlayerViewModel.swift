@@ -66,9 +66,30 @@ public final class VideoPlayerViewModel {
 
     // MARK: - Initialization
 
-    public init(item: MediaItem, appState: AppState, startPositionTicks _: Int64 = 0) {
+    public init(
+        item: MediaItem,
+        appState: AppState,
+        startPositionTicks _: Int64 = 0,
+        existingPlayer: AVPlayer? = nil
+    ) {
         self.item = item
         self.appState = appState
+
+        // If we have an existing player (restoration from PiP), use it
+        if let existingPlayer {
+            player = existingPlayer
+            isReady = true
+            isBuffering = false
+            hasReportedStart = true
+            setupAudioSession()
+            observePlayer(existingPlayer)
+            if let currentItem = existingPlayer.currentItem {
+                let dur = currentItem.duration.seconds
+                if dur.isFinite { duration = dur }
+                let time = existingPlayer.currentTime().seconds
+                if time.isFinite { currentTime = time }
+            }
+        }
 
         // Initialize playback service if we have credentials
         if let serverURL = appState.jellyfinServerURL,
@@ -102,6 +123,9 @@ public final class VideoPlayerViewModel {
             print("[VideoPlayer] deviceID: \(appState.jellyfinDeviceID ?? "nil")")
             return
         }
+
+        // Set up audio session for background playback and PiP
+        setupAudioSession()
 
         isBuffering = true
         errorMessage = nil
@@ -275,6 +299,21 @@ public final class VideoPlayerViewModel {
 
     // MARK: - Private Methods
 
+    private func setupAudioSession() {
+        #if os(iOS)
+            do {
+                try AVAudioSession.sharedInstance().setCategory(
+                    .playback,
+                    mode: .moviePlayback
+                )
+                try AVAudioSession.sharedInstance().setActive(true)
+                print("[VideoPlayer] Audio session configured for background playback")
+            } catch {
+                print("[VideoPlayer] Failed to set up audio session: \(error)")
+            }
+        #endif
+    }
+
     private func observePlayer(_ player: AVPlayer) {
         // Observe time changes
         let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
@@ -316,15 +355,10 @@ public final class VideoPlayerViewModel {
 
     private func handleTimeControlStatus(_ status: AVPlayer.TimeControlStatus) {
         switch status {
-        case .playing:
-            isPlaying = true
-            isBuffering = false
-        case .paused:
-            isPlaying = false
-        case .waitingToPlayAtSpecifiedRate:
-            isBuffering = true
-        @unknown default:
-            break
+        case .playing: isPlaying = true; isBuffering = false
+        case .paused: isPlaying = false
+        case .waitingToPlayAtSpecifiedRate: isBuffering = true
+        @unknown default: break
         }
     }
 
@@ -332,19 +366,12 @@ public final class VideoPlayerViewModel {
         switch status {
         case .readyToPlay:
             isBuffering = false
-            if let currentItem = player?.currentItem {
-                let dur = currentItem.duration.seconds
-                if dur.isFinite {
-                    duration = dur
-                }
-            }
+            if let dur = player?.currentItem?.duration.seconds, dur.isFinite { duration = dur }
         case .failed:
             errorMessage = player?.currentItem?.error?.localizedDescription ?? "Playback failed"
             isBuffering = false
-        case .unknown:
-            break
-        @unknown default:
-            break
+        case .unknown: break
+        @unknown default: break
         }
     }
 
