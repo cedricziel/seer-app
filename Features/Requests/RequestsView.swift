@@ -16,6 +16,7 @@ struct RequestsView: View {
 private struct RequestsContentView: View {
     @ObservedObject var appState: AppState
     @StateObject private var viewModel: RequestsViewModel
+    @State private var selectedRequestDetails: MediaRequest?
 
     init(appState: AppState) {
         self.appState = appState
@@ -67,6 +68,9 @@ private struct RequestsContentView: View {
             }
             .refreshable {
                 await viewModel.refresh()
+            }
+            .sheet(item: $selectedRequestDetails) { request in
+                RequestDetailsSheet(request: request)
             }
         }
         .task {
@@ -140,12 +144,20 @@ private struct RequestsContentView: View {
     private var requestsList: some View {
         List {
             ForEach(viewModel.requests) { request in
-                RequestRowView(request: request)
-                    .onAppear {
+                RequestRowView(
+                    request: request,
+                    onViewDetails: { selectedRequestDetails = request },
+                    onCancelRequest: {
                         Task {
-                            await viewModel.loadMoreRequestsIfNeeded(currentRequest: request)
+                            try? await viewModel.cancelRequest(request)
                         }
                     }
+                )
+                .onAppear {
+                    Task {
+                        await viewModel.loadMoreRequestsIfNeeded(currentRequest: request)
+                    }
+                }
             }
 
             if viewModel.isLoadingMore {
@@ -165,6 +177,8 @@ private struct RequestsContentView: View {
 
 struct RequestRowView: View {
     let request: MediaRequest
+    var onViewDetails: (() -> Void)?
+    var onCancelRequest: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -197,6 +211,36 @@ struct RequestRowView: View {
             statusIcon
         }
         .padding(.vertical, 4)
+        .contextMenu {
+            requestContextMenu
+        }
+    }
+
+    @ViewBuilder
+    private var requestContextMenu: some View {
+        // View Details
+        if let onViewDetails {
+            Button {
+                onViewDetails()
+            } label: {
+                Label("View Details", systemImage: "info.circle")
+            }
+        }
+
+        // Cancel Request (only for pending requests)
+        if canCancel, let onCancelRequest {
+            Divider()
+
+            Button(role: .destructive) {
+                onCancelRequest()
+            } label: {
+                Label("Cancel Request", systemImage: "xmark.circle")
+            }
+        }
+    }
+
+    private var canCancel: Bool {
+        request.status == .pending
     }
 
     @ViewBuilder
@@ -256,6 +300,36 @@ struct RequestRowView: View {
         case .declined: .red
         case .available: .green
         case .processing: .purple
+        }
+    }
+}
+
+// MARK: - Request Details Sheet
+
+struct RequestDetailsSheet: View {
+    let request: MediaRequest
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Details") {
+                    LabeledContent("Title", value: request.media.displayTitle ?? "Unknown")
+                    LabeledContent("Type", value: request.type == .movie ? "Movie" : "TV Show")
+                    LabeledContent("Status", value: request.status.displayName)
+                    LabeledContent("Requested by", value: request.requestedBy.displayName)
+                    LabeledContent("Requested", value: request.formattedCreatedAt)
+                }
+            }
+            .navigationTitle("Request Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }

@@ -274,6 +274,20 @@ public final class LibraryViewModel: ObservableObject {
         serverURL?.appendingPathComponent("Items/\(library.id)/Images/Primary")
     }
 
+    /// Mark an item as watched or unwatched
+    func markAsWatched(_ item: MediaItem, watched: Bool) async throws {
+        guard let service = jellyfinService else { return }
+
+        if watched {
+            try await service.markAsPlayed(itemId: item.id)
+        } else {
+            try await service.markAsUnplayed(itemId: item.id)
+        }
+
+        // Refresh to update the UI with new watch status
+        await refresh()
+    }
+
     func cancelAllTasks() {
         loadTask?.cancel()
         refreshTask?.cancel()

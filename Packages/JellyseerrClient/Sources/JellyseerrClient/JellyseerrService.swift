@@ -208,6 +208,16 @@ public actor JellyseerrService {
         }
     }
 
+    /// Cancel/delete a request by ID
+    public func cancelRequest(id: Int) async throws {
+        let url = serverURL.appendingPathComponent("api/v1/request/\(id)")
+        var request = try authenticatedRequest(url: url)
+        request.httpMethod = "DELETE"
+
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+    }
+
     // MARK: - Media Details
 
     /// Get movie details by TMDB ID

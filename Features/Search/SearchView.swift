@@ -126,17 +126,21 @@ private struct SearchContentView: View {
                 GridItem(.adaptive(minimum: 140), spacing: 16)
             ], spacing: 16) {
                 ForEach(viewModel.searchResults) { result in
-                    SearchResultCard(result: result)
-                        .onTapGesture {
-                            selectedResult = result
-                        }
-                        .onAppear {
-                            if result == viewModel.searchResults.last {
-                                Task {
-                                    await viewModel.loadMoreResults()
-                                }
+                    SearchResultCard(
+                        result: result,
+                        onViewDetails: { selectedResult = result },
+                        onRequest: { Task { await requestMedia(result) } }
+                    )
+                    .onTapGesture {
+                        selectedResult = result
+                    }
+                    .onAppear {
+                        if result == viewModel.searchResults.last {
+                            Task {
+                                await viewModel.loadMoreResults()
                             }
                         }
+                    }
                 }
             }
             .padding()
@@ -169,6 +173,8 @@ private struct SearchContentView: View {
 
 struct SearchResultCard: View {
     let result: SearchResult
+    var onViewDetails: (() -> Void)?
+    var onRequest: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -208,6 +214,30 @@ struct SearchResultCard: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            }
+        }
+        .contextMenu {
+            searchResultContextMenu
+        }
+    }
+
+    @ViewBuilder
+    private var searchResultContextMenu: some View {
+        // View Details
+        if let onViewDetails {
+            Button {
+                onViewDetails()
+            } label: {
+                Label("View Details", systemImage: "info.circle")
+            }
+        }
+
+        // Request (if not already available or pending)
+        if !result.isAvailable && !result.hasPendingRequest, let onRequest {
+            Button {
+                onRequest()
+            } label: {
+                Label("Request", systemImage: "plus.circle")
             }
         }
     }

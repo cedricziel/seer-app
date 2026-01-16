@@ -31,9 +31,7 @@ private struct LibraryContentView: View {
                     LoadingView(message: "Loading library...")
                 } else if let error = viewModel.errorMessage, viewModel.mediaItems.isEmpty {
                     ErrorView(error: error) {
-                        Task {
-                            await viewModel.refresh()
-                        }
+                        Task { await viewModel.refresh() }
                     }
                 } else {
                     contentView
@@ -43,56 +41,13 @@ private struct LibraryContentView: View {
             .navigationDestination(for: MediaItem.self) { item in
                 MediaDetailView(item: item, source: .library, viewModel: viewModel)
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    ServerSwitcherButton()
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        ForEach(LibraryViewModel.MediaTypeFilter.allCases, id: \.self) { filter in
-                            Button(action: {
-                                viewModel.selectedMediaType = filter
-                                Task {
-                                    await viewModel.filterChanged()
-                                }
-                            }, label: {
-                                HStack {
-                                    Text(filter.rawValue)
-                                    if viewModel.selectedMediaType == filter {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            })
-                        }
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                    }
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {
-                        Task {
-                            await viewModel.refresh()
-                        }
-                    }, label: {
-                        Image(systemName: "arrow.clockwise")
-                    })
-                }
-            }
+            .toolbar { toolbarContent }
         }
-        .task {
-            await viewModel.loadInitialData()
-        }
-        .onDisappear {
-            viewModel.cancelAllTasks()
-        }
+        .task { await viewModel.loadInitialData() }
+        .onDisappear { viewModel.cancelAllTasks() }
         .onChange(of: appState.activeServerID) {
-            // Cancel existing tasks before refreshing for new server
             viewModel.cancelAllTasks()
-            Task {
-                await viewModel.refresh()
-            }
+            Task { await viewModel.refresh() }
         }
         .fullScreenCover(item: $selectedItemForPlayback) { item in
             VideoPlayerView(
@@ -104,20 +59,46 @@ private struct LibraryContentView: View {
         }
     }
 
-    // MARK: - Content View
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) { ServerSwitcherButton() }
+        ToolbarItem(placement: .topBarTrailing) { filterMenu }
+        ToolbarItem(placement: .topBarTrailing) { refreshButton }
+    }
+
+    private var filterMenu: some View {
+        Menu {
+            ForEach(LibraryViewModel.MediaTypeFilter.allCases, id: \.self) { filter in
+                Button {
+                    viewModel.selectedMediaType = filter
+                    Task { await viewModel.filterChanged() }
+                } label: {
+                    HStack {
+                        Text(filter.rawValue)
+                        if viewModel.selectedMediaType == filter { Image(systemName: "checkmark") }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+        }
+    }
+
+    private var refreshButton: some View {
+        Button { Task { await viewModel.refresh() } } label: {
+            Image(systemName: "arrow.clockwise")
+        }
+    }
 
     @ViewBuilder
     private var contentView: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
-                // Continue Watching Section
                 if viewModel.isLoadingContinueWatching {
                     SkeletonCardRow(title: "Continue Watching", cardCount: 4, cardWidth: 140)
                 } else if !viewModel.continueWatching.isEmpty {
                     continueWatchingSection
                 }
-
-                // Latest Items Section
                 if viewModel.isLoadingLatestItems {
                     SkeletonCardRow(title: "Recently Added", cardCount: 5, cardWidth: 140)
                 } else if !viewModel.latestItems.isEmpty {
@@ -125,78 +106,60 @@ private struct LibraryContentView: View {
                 } else if viewModel.hasLoadedLatestItems {
                     recentlyAddedEmptySection
                 }
-
-                // Libraries Section
-                if !viewModel.libraries.isEmpty {
-                    librariesSection
-                }
-
-                // All Media Grid
+                if !viewModel.libraries.isEmpty { librariesSection }
                 if viewModel.selectedLibrary != nil || viewModel.selectedMediaType != .all {
                     mediaGridSection
                 }
             }
             .padding(.vertical)
         }
-        .refreshable {
-            await viewModel.refresh()
-        }
+        .refreshable { await viewModel.refresh() }
     }
-
-    // MARK: - Continue Watching
 
     private var continueWatchingSection: some View {
         MediaCardRow(title: "Continue Watching") {
             ForEach(viewModel.continueWatching) { item in
-                Button {
-                    selectedItemForPlayback = item
-                } label: {
-                    MediaCard(
-                        title: item.name,
-                        subtitle: item.seriesName ?? item.formattedRuntime,
-                        imageURL: viewModel.imageURL(for: item)
-                    )
-                    .frame(width: 140)
-                    .overlay(alignment: .bottomTrailing) {
-                        // Play button overlay
-                        Image(systemName: "play.circle.fill")
-                            .font(.title)
-                            .foregroundStyle(.white)
-                            .shadow(radius: 2)
-                            .padding(8)
-                    }
-                    .overlay(alignment: .bottom) {
-                        // Progress bar
-                        if let percentage = item.playedPercentage ?? progressPercentage(for: item) {
-                            GeometryReader { geometry in
-                                Rectangle()
-                                    .fill(Color.accentColor)
-                                    .frame(
-                                        width: geometry.size.width * (percentage / 100.0),
-                                        height: 3
-                                    )
-                            }
-                            .frame(height: 3)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
+                continueWatchingCard(for: item)
             }
         }
     }
 
-    /// Calculate progress percentage from playback position
-    private func progressPercentage(for item: MediaItem) -> Double? {
-        guard let positionTicks = item.userData?.playbackPositionTicks,
-              let durationTicks = item.runTimeTicks,
-              durationTicks > 0
-        else {
-            return nil
+    private func continueWatchingCard(for item: MediaItem) -> some View {
+        Button { selectedItemForPlayback = item } label: {
+            MediaCard(
+                title: item.name,
+                subtitle: item.seriesName ?? item.formattedRuntime,
+                imageURL: viewModel.imageURL(for: item),
+                contextMenuConfig: contextMenuConfig(for: item, canPlay: true, showDetails: true),
+                contextMenuActions: contextMenuActions(for: item, canPlay: true)
+            )
+            .frame(width: 140)
+            .overlay(alignment: .bottomTrailing) { playOverlay }
+            .overlay(alignment: .bottom) { progressOverlay(for: item) }
         }
-        return Double(positionTicks) / Double(durationTicks) * 100.0
+        .buttonStyle(.plain)
     }
 
-    // MARK: - Latest Items
+    private var playOverlay: some View {
+        Image(systemName: "play.circle.fill").font(.title)
+            .foregroundStyle(.white).shadow(radius: 2).padding(8)
+    }
+
+    @ViewBuilder
+    private func progressOverlay(for item: MediaItem) -> some View {
+        if let percentage = item.playedPercentage ?? progressPercentage(for: item) {
+            GeometryReader { geometry in
+                Rectangle().fill(Color.accentColor)
+                    .frame(width: geometry.size.width * (percentage / 100.0), height: 3)
+            }.frame(height: 3)
+        }
+    }
+
+    private func progressPercentage(for item: MediaItem) -> Double? {
+        guard let positionTicks = item.userData?.playbackPositionTicks,
+              let durationTicks = item.runTimeTicks, durationTicks > 0 else { return nil }
+        return Double(positionTicks) / Double(durationTicks) * 100.0
+    }
 
     private var latestItemsSection: some View {
         MediaCardRow(title: "Recently Added") {
@@ -205,67 +168,46 @@ private struct LibraryContentView: View {
                     MediaCard(
                         title: item.name,
                         subtitle: item.year.map { String($0) },
-                        imageURL: viewModel.imageURL(for: item)
-                    )
-                    .frame(width: 140)
-                }
-                .buttonStyle(.plain)
+                        imageURL: viewModel.imageURL(for: item),
+                        contextMenuConfig: contextMenuConfig(for: item, canPlay: item.isPlayable, showDetails: false),
+                        contextMenuActions: contextMenuActions(for: item, canPlay: item.isPlayable)
+                    ).frame(width: 140)
+                }.buttonStyle(.plain)
             }
         }
     }
 
     private var recentlyAddedEmptySection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Recently Added")
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.horizontal)
+            Text("Recently Added").font(.title2).fontWeight(.bold).padding(.horizontal)
             SectionEmptyView(message: "No recent additions", systemImage: "film.stack")
         }
     }
 
-    // MARK: - Libraries
-
     private var librariesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Libraries")
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.horizontal)
-
+            Text("Libraries").font(.title2).fontWeight(.bold).padding(.horizontal)
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 12) {
                     ForEach(viewModel.libraries) { library in
-                        Button(action: {
-                            Task {
-                                await viewModel.selectLibrary(library)
-                            }
-                        }, label: {
+                        Button { Task { await viewModel.selectLibrary(library) } } label: {
                             libraryCard(library)
-                        })
-                        .buttonStyle(.plain)
+                        }.buttonStyle(.plain)
                     }
-                }
-                .padding(.horizontal)
+                }.padding(.horizontal)
             }
         }
     }
 
     private func libraryCard(_ library: Library) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(.systemGray5))
+            RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray5))
                 .frame(width: 160, height: 90)
                 .overlay {
-                    Image(systemName: libraryIcon(for: library.collectionType))
-                        .font(.title)
+                    Image(systemName: libraryIcon(for: library.collectionType)).font(.title)
                         .foregroundStyle(.secondary)
                 }
-
-            Text(library.name)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .lineLimit(1)
+            Text(library.name).font(.subheadline).fontWeight(.medium).lineLimit(1)
         }
     }
 
@@ -279,58 +221,60 @@ private struct LibraryContentView: View {
         }
     }
 
-    // MARK: - Media Grid
-
     private var mediaGridSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(viewModel.selectedLibrary?.name ?? viewModel.selectedMediaType.rawValue)
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                Spacer()
-
-                if viewModel.selectedLibrary != nil {
-                    Button("Clear") {
-                        Task {
-                            await viewModel.selectLibrary(nil)
-                        }
-                    }
-                    .font(.subheadline)
-                }
-            }
-            .padding(.horizontal)
-
-            LazyVGrid(columns: [
-                GridItem(.adaptive(minimum: 140), spacing: 16)
-            ], spacing: 16) {
+            mediaGridHeader
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16)], spacing: 16) {
                 ForEach(viewModel.mediaItems) { item in
                     NavigationLink(value: item) {
                         MediaCard(
                             title: item.name,
                             subtitle: item.year.map { String($0) },
-                            imageURL: viewModel.imageURL(for: item)
-                        )
-                        .onAppear {
-                            Task {
-                                await viewModel.loadMoreItemsIfNeeded(currentItem: item)
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
+                            imageURL: viewModel.imageURL(for: item),
+                            contextMenuConfig: contextMenuConfig(
+                                for: item,
+                                canPlay: item.isPlayable,
+                                showDetails: false
+                            ),
+                            contextMenuActions: contextMenuActions(for: item, canPlay: item.isPlayable)
+                        ).onAppear { Task { await viewModel.loadMoreItemsIfNeeded(currentItem: item) } }
+                    }.buttonStyle(.plain)
                 }
-            }
-            .padding(.horizontal)
-
+            }.padding(.horizontal)
             if viewModel.isLoadingMore {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                }
-                .padding()
+                HStack { Spacer(); ProgressView(); Spacer() }.padding()
             }
         }
+    }
+
+    private var mediaGridHeader: some View {
+        HStack {
+            Text(viewModel.selectedLibrary?.name ?? viewModel.selectedMediaType.rawValue)
+                .font(.title2).fontWeight(.bold)
+            Spacer()
+            if viewModel.selectedLibrary != nil {
+                Button("Clear") { Task { await viewModel.selectLibrary(nil) } }.font(.subheadline)
+            }
+        }.padding(.horizontal)
+    }
+
+    // MARK: - Context Menu Helpers
+
+    private func contextMenuConfig(for item: MediaItem, canPlay: Bool, showDetails: Bool) -> MediaContextMenuConfig {
+        MediaContextMenuConfig(
+            canPlay: canPlay,
+            canDownload: false,
+            isDownloaded: false,
+            isWatched: item.userData?.played == true,
+            showDetailsOption: showDetails
+        )
+    }
+
+    private func contextMenuActions(for item: MediaItem, canPlay: Bool) -> MediaContextMenuActions {
+        MediaContextMenuActions(
+            onPlay: canPlay ? { selectedItemForPlayback = item } : nil,
+            onToggleWatched: { watched in Task { try? await viewModel.markAsWatched(item, watched: watched) } }
+        )
     }
 }
 

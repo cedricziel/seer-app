@@ -168,6 +168,8 @@ struct DownloadsView: View {
 struct DownloadRow: View {
     let download: Download
     let manager: DownloadManager
+    var onPlay: (() -> Void)?
+    var onShowInLibrary: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -238,6 +240,76 @@ struct DownloadRow: View {
             } label: {
                 Label("Delete", systemImage: "trash")
             }
+        }
+        .contextMenu {
+            downloadContextMenu
+        }
+    }
+
+    @ViewBuilder
+    private var downloadContextMenu: some View {
+        // Play (completed only)
+        if download.state == .completed, let onPlay {
+            Button {
+                onPlay()
+            } label: {
+                Label("Play", systemImage: "play.fill")
+            }
+        }
+
+        // Pause (downloading only)
+        if download.state == .downloading {
+            Button {
+                Task {
+                    try? await manager.pauseDownload(download.id)
+                }
+            } label: {
+                Label("Pause", systemImage: "pause.fill")
+            }
+        }
+
+        // Resume (paused only)
+        if download.state == .paused {
+            Button {
+                Task {
+                    try? await manager.resumeDownload(download.id)
+                }
+            } label: {
+                Label("Resume", systemImage: "play.fill")
+            }
+        }
+
+        // Cancel (pending, downloading, or paused)
+        if download.state == .pending || download.state == .downloading || download.state == .paused {
+            Button(role: .destructive) {
+                Task {
+                    try? await manager.deleteDownload(download.id)
+                }
+            } label: {
+                Label("Cancel", systemImage: "xmark.circle")
+            }
+        }
+
+        // Show in Library
+        if let onShowInLibrary {
+            Divider()
+
+            Button {
+                onShowInLibrary()
+            } label: {
+                Label("Show in Library", systemImage: "folder")
+            }
+        }
+
+        // Delete (all states)
+        Divider()
+
+        Button(role: .destructive) {
+            Task {
+                try? await manager.deleteDownload(download.id)
+            }
+        } label: {
+            Label("Delete", systemImage: "trash")
         }
     }
 

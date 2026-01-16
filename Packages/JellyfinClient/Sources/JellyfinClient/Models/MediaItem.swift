@@ -196,6 +196,11 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         }
         return "\(mins)m"
     }
+
+    /// Whether the item can be played directly (movie or episode)
+    public var isPlayable: Bool {
+        type == .movie || type == .episode
+    }
 }
 
 /// Response wrapper for items endpoint

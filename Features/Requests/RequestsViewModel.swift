@@ -156,6 +156,14 @@ public final class RequestsViewModel: ObservableObject {
 
     // MARK: - Helpers
 
+    /// Cancel a request by ID
+    func cancelRequest(_ request: MediaRequest) async throws {
+        guard let service = jellyseerrService else { return }
+        try await service.cancelRequest(id: request.id)
+        // Refresh to update the list
+        await refresh()
+    }
+
     var isJellyseerrConfigured: Bool {
         appState.jellyseerrServerURL != nil && appState.jellyseerrAPIKey != nil
     }

@@ -88,6 +88,8 @@ struct EpisodeRow: View {
     var onPlay: (() -> Void)?
     var onTap: (() -> Void)?
     var onDownload: (() async -> Void)?
+    var onDeleteDownload: (() -> Void)?
+    var onMarkWatched: ((Bool) -> Void)?
     var downloadState: DownloadButtonState = .notDownloaded
 
     var body: some View {
@@ -176,7 +178,7 @@ struct EpisodeRow: View {
                             .foregroundStyle(Color.accentColor)
                     }
                     .buttonStyle(.plain)
-                } else if episode.userData?.played == true {
+                } else if isWatched {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                 }
@@ -186,6 +188,61 @@ struct EpisodeRow: View {
         }
         .buttonStyle(.plain)
         .disabled(onTap == nil)
+        .contextMenu {
+            episodeContextMenu
+        }
+    }
+
+    @ViewBuilder
+    private var episodeContextMenu: some View {
+        // Play
+        if let onPlay {
+            Button {
+                onPlay()
+            } label: {
+                Label("Play", systemImage: "play.fill")
+            }
+        }
+
+        // Download / Delete Download
+        if downloadState == .completed {
+            if let onDeleteDownload {
+                Button(role: .destructive) {
+                    onDeleteDownload()
+                } label: {
+                    Label("Delete Download", systemImage: "trash")
+                }
+            }
+        } else if let onDownload {
+            Button {
+                Task { await onDownload() }
+            } label: {
+                Label("Download", systemImage: "arrow.down.circle")
+            }
+        }
+
+        // Mark as Watched / Unwatched
+        if let onMarkWatched {
+            Divider()
+
+            if isWatched {
+                Button {
+                    onMarkWatched(false)
+                } label: {
+                    Label("Mark as Unwatched", systemImage: "eye.slash")
+                }
+            } else {
+                Button {
+                    onMarkWatched(true)
+                } label: {
+                    Label("Mark as Watched", systemImage: "eye")
+                }
+            }
+        }
+    }
+
+    private var isWatched: Bool {
+        episode.userData?.played == true
     }
 
     private var episodeTitle: String {
