@@ -6,6 +6,15 @@ import SwiftUI
 /// View for searching TMDB and requesting media via Jellyseerr
 struct SearchView: View {
     @EnvironmentObject private var appState: AppState
+
+    var body: some View {
+        SearchContentView(appState: appState)
+    }
+}
+
+/// Internal view that creates the view model with the correct AppState
+private struct SearchContentView: View {
+    @ObservedObject var appState: AppState
     @StateObject private var viewModel: SearchViewModel
 
     @State private var selectedResult: SearchResult?
@@ -13,8 +22,9 @@ struct SearchView: View {
     @State private var requestError: String?
     @State private var showRequestSuccess: Bool = false
 
-    init() {
-        _viewModel = StateObject(wrappedValue: SearchViewModel(appState: AppState()))
+    init(appState: AppState) {
+        self.appState = appState
+        _viewModel = StateObject(wrappedValue: SearchViewModel(appState: appState))
     }
 
     var body: some View {

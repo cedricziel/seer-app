@@ -59,6 +59,11 @@ public struct MediaRequest: Identifiable, Codable, Sendable, Hashable {
         public let mediaType: String?
         public let externalServiceId: Int?
         public let externalServiceSlug: String?
+        // Additional fields for media info (may be populated)
+        public let title: String?
+        public let name: String?
+        public let originalTitle: String?
+        public let posterPath: String?
 
         public var displayMediaType: String {
             switch mediaType {
@@ -66,6 +71,11 @@ public struct MediaRequest: Identifiable, Codable, Sendable, Hashable {
             case "tv": "TV Show"
             default: mediaType ?? "Unknown"
             }
+        }
+
+        /// Returns the display title (title for movies, name for TV)
+        public var displayTitle: String? {
+            title ?? name ?? originalTitle
         }
     }
 

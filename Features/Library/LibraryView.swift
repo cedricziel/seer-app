@@ -6,10 +6,20 @@ import SwiftUI
 /// Main library browsing view
 struct LibraryView: View {
     @EnvironmentObject private var appState: AppState
+
+    var body: some View {
+        LibraryContentView(appState: appState)
+    }
+}
+
+/// Internal view that creates the view model with the correct AppState
+private struct LibraryContentView: View {
+    @ObservedObject var appState: AppState
     @StateObject private var viewModel: LibraryViewModel
 
-    init() {
-        _viewModel = StateObject(wrappedValue: LibraryViewModel(appState: AppState()))
+    init(appState: AppState) {
+        self.appState = appState
+        _viewModel = StateObject(wrappedValue: LibraryViewModel(appState: appState))
     }
 
     var body: some View {
@@ -28,6 +38,9 @@ struct LibraryView: View {
                 }
             }
             .navigationTitle("Library")
+            .navigationDestination(for: MediaItem.self) { item in
+                MediaDetailView(item: item, viewModel: viewModel)
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -115,9 +128,6 @@ struct LibraryView: View {
                 }
                 .buttonStyle(.plain)
             }
-        }
-        .navigationDestination(for: MediaItem.self) { item in
-            MediaDetailView(item: item, viewModel: viewModel)
         }
     }
 

@@ -6,10 +6,20 @@ import SwiftUI
 /// View for displaying and managing media requests
 struct RequestsView: View {
     @EnvironmentObject private var appState: AppState
+
+    var body: some View {
+        RequestsContentView(appState: appState)
+    }
+}
+
+/// Internal view that creates the view model with the correct AppState
+private struct RequestsContentView: View {
+    @ObservedObject var appState: AppState
     @StateObject private var viewModel: RequestsViewModel
 
-    init() {
-        _viewModel = StateObject(wrappedValue: RequestsViewModel(appState: AppState()))
+    init(appState: AppState) {
+        self.appState = appState
+        _viewModel = StateObject(wrappedValue: RequestsViewModel(appState: appState))
     }
 
     var body: some View {
@@ -149,19 +159,14 @@ struct RequestRowView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Placeholder poster
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color(.systemGray5))
-                .frame(width: 50, height: 75)
-                .overlay {
-                    Image(systemName: request.type == .movie ? "film" : "tv")
-                        .foregroundStyle(.secondary)
-                }
+            // Poster image or placeholder
+            posterView
 
             // Info
             VStack(alignment: .leading, spacing: 4) {
-                Text("Request #\(request.id)")
+                Text(request.media.displayTitle ?? "Request #\(request.id)")
                     .font(.headline)
+                    .lineLimit(2)
 
                 HStack(spacing: 8) {
                     MediaTypeBadge(type: request.type == .movie ? .movie : .tv)
@@ -183,6 +188,33 @@ struct RequestRowView: View {
             statusIcon
         }
         .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var posterView: some View {
+        if let posterPath = request.media.posterPath {
+            AsyncImage(url: URL(string: "https://image.tmdb.org/t/p/w92\(posterPath)")) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                posterPlaceholder
+            }
+            .frame(width: 50, height: 75)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        } else {
+            posterPlaceholder
+        }
+    }
+
+    private var posterPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(Color(.systemGray5))
+            .frame(width: 50, height: 75)
+            .overlay {
+                Image(systemName: request.type == .movie ? "film" : "tv")
+                    .foregroundStyle(.secondary)
+            }
     }
 
     private var statusBadge: some View {
