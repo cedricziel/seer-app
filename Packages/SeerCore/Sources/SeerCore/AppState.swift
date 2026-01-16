@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import SwiftUI
 
 /// Global application state shared across the app
@@ -10,55 +11,77 @@ public final class AppState: ObservableObject {
     @Published public var isLoading: Bool = false
     @Published public var errorMessage: String?
 
-    // MARK: - Server Configuration Store
+    // MARK: - SwiftData Context
 
-    @Published public var serverStore: ServerConfigStore
+    private var modelContext: ModelContext?
 
-    // MARK: - Computed Properties (from active server)
+    // MARK: - Computed Properties (from SwiftData)
+
+    public var servers: [ServerConfiguration] {
+        guard let context = modelContext else { return [] }
+        let descriptor = FetchDescriptor<ServerConfiguration>(
+            sortBy: [SortDescriptor(\.lastUsed, order: .reverse), SortDescriptor(\.name)]
+        )
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    public var activeServer: ServerConfiguration? {
+        guard let context = modelContext else { return nil }
+        var descriptor = FetchDescriptor<ServerConfiguration>(
+            predicate: #Predicate { $0.isActive }
+        )
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    public var activeServerID: UUID? {
+        activeServer?.id
+    }
 
     public var jellyfinServerURL: URL? {
-        serverStore.activeServer?.jellyfinURL
+        activeServer?.jellyfinURL
     }
 
     public var jellyfinUserID: String? {
-        serverStore.activeServer?.jellyfinUserID
+        activeServer?.jellyfinUserID
     }
 
     public var jellyfinAccessToken: String? {
-        guard let serverID = serverStore.activeServerID else { return nil }
+        guard let serverID = activeServerID else { return nil }
         return KeychainManager.shared.getCredential(for: serverID, key: .jellyfinAccessToken)
     }
 
     public var jellyfinDeviceID: String? {
-        guard let serverID = serverStore.activeServerID else { return nil }
+        guard let serverID = activeServerID else { return nil }
         return KeychainManager.shared.getCredential(for: serverID, key: .jellyfinDeviceID)
     }
 
     public var jellyseerrServerURL: URL? {
-        serverStore.activeServer?.jellyseerrURL
+        activeServer?.jellyseerrURL
     }
 
     public var jellyseerrAPIKey: String? {
-        guard let serverID = serverStore.activeServerID else { return nil }
+        guard let serverID = activeServerID else { return nil }
         return KeychainManager.shared.getCredential(for: serverID, key: .jellyseerrAPIKey)
     }
 
-    public var activeServer: ServerConfiguration? {
-        serverStore.activeServer
+    public var sortedConfigurations: [ServerConfiguration] {
+        servers
     }
 
-    public var servers: [ServerConfiguration] {
-        serverStore.configurations
-    }
-
-    public var activeServerID: UUID? {
-        serverStore.activeServerID
+    public var hasServers: Bool {
+        !servers.isEmpty
     }
 
     // MARK: - Initialization
 
-    public init(serverStore: ServerConfigStore = ServerConfigStore()) {
-        self.serverStore = serverStore
+    public init() {
+        // ModelContext will be set via setModelContext
+    }
+
+    /// Set the model context for SwiftData operations
+    public func setModelContext(_ context: ModelContext) {
+        modelContext = context
         updateAuthenticationState()
     }
 
@@ -66,39 +89,96 @@ public final class AppState: ObservableObject {
 
     /// Switch to a different server
     public func switchServer(to serverID: UUID) {
-        serverStore.setActiveServer(serverID)
+        guard let context = modelContext else { return }
+
+        // Deactivate all servers
+        let allServers = servers
+        for server in allServers {
+            server.isActive = false
+        }
+
+        // Activate the selected server
+        if let server = allServers.first(where: { $0.id == serverID }) {
+            server.isActive = true
+            server.lastUsed = Date()
+        }
+
+        try? context.save()
+        objectWillChange.send()
         updateAuthenticationState()
     }
 
-    /// Add a new server and switch to it
+    /// Add a new server and optionally switch to it
     public func addServer(_ configuration: ServerConfiguration) {
-        serverStore.add(configuration)
+        guard let context = modelContext else { return }
+
+        context.insert(configuration)
+
+        // If this is the first server, set it as active
+        if servers.count == 1 || configuration.isActive {
+            let allServers = servers
+            for server in allServers where server.id != configuration.id {
+                server.isActive = false
+            }
+            configuration.isActive = true
+        }
+
+        try? context.save()
+        objectWillChange.send()
     }
 
     /// Update a server configuration
-    public func updateServer(_ configuration: ServerConfiguration) {
-        serverStore.update(configuration)
+    public func updateServer(_: ServerConfiguration) {
+        guard let context = modelContext else { return }
+        try? context.save()
+        objectWillChange.send()
     }
 
     /// Delete a server and its credentials
     public func deleteServer(_ configuration: ServerConfiguration) {
+        guard let context = modelContext else { return }
+
+        let wasActive = configuration.isActive
         KeychainManager.shared.deleteServerCredentials(for: configuration.id)
-        serverStore.delete(configuration)
+        context.delete(configuration)
+
+        // If the deleted server was active, switch to another one
+        if wasActive, let firstServer = servers.first {
+            firstServer.isActive = true
+        }
+
+        try? context.save()
+        objectWillChange.send()
         updateAuthenticationState()
     }
 
     /// Delete a server by ID
     public func deleteServer(id: UUID) {
-        KeychainManager.shared.deleteServerCredentials(for: id)
-        serverStore.delete(id: id)
-        updateAuthenticationState()
+        guard let server = servers.first(where: { $0.id == id }) else { return }
+        deleteServer(server)
+    }
+
+    /// Get a configuration by ID
+    public func configuration(for id: UUID) -> ServerConfiguration? {
+        servers.first { $0.id == id }
+    }
+
+    /// Mark a server as recently used
+    public func markAsUsed(_ id: UUID) {
+        guard let context = modelContext,
+              let server = servers.first(where: { $0.id == id })
+        else { return }
+
+        server.lastUsed = Date()
+        try? context.save()
+        objectWillChange.send()
     }
 
     // MARK: - Credential Management
 
     /// Update authentication state based on active server
     public func updateAuthenticationState() {
-        guard let server = serverStore.activeServer else {
+        guard let server = activeServer else {
             isAuthenticated = false
             return
         }
@@ -119,9 +199,10 @@ public final class AppState: ObservableObject {
         keychain.saveCredential(deviceID, for: serverID, key: .jellyfinDeviceID)
 
         // Update user ID in server configuration
-        if var config = serverStore.configuration(for: serverID) {
+        if let config = configuration(for: serverID) {
             config.jellyfinUserID = userID
-            serverStore.update(config)
+            try? modelContext?.save()
+            objectWillChange.send()
         }
 
         updateAuthenticationState()
@@ -135,7 +216,7 @@ public final class AppState: ObservableObject {
         deviceID: String
     ) {
         // Find existing server or create new one
-        if let existingServer = serverStore.configurations.first(where: { $0.jellyfinURL == serverURL }) {
+        if let existingServer = servers.first(where: { $0.jellyfinURL == serverURL }) {
             saveJellyfinCredentials(
                 serverID: existingServer.id,
                 accessToken: accessToken,
@@ -150,7 +231,7 @@ public final class AppState: ObservableObject {
                 jellyfinURL: serverURL,
                 jellyfinUserID: userID
             )
-            serverStore.add(config)
+            addServer(config)
             saveJellyfinCredentials(
                 serverID: config.id,
                 accessToken: accessToken,
@@ -167,21 +248,22 @@ public final class AppState: ObservableObject {
 
     /// Save Jellyseerr credentials (updates active server)
     public func saveJellyseerrCredentials(serverURL: URL, apiKey: String) {
-        guard let serverID = serverStore.activeServerID,
-              var config = serverStore.activeServer
+        guard let serverID = activeServerID,
+              let config = activeServer
         else {
             return
         }
 
         config.jellyseerrURL = serverURL
-        serverStore.update(config)
+        try? modelContext?.save()
+        objectWillChange.send()
         saveJellyseerrCredentials(serverID: serverID, apiKey: apiKey)
     }
 
     /// Clear all stored credentials and log out
     public func logout() {
         // Delete credentials for active server only
-        if let serverID = serverStore.activeServerID {
+        if let serverID = activeServerID {
             KeychainManager.shared.deleteServerCredentials(for: serverID)
         }
         isAuthenticated = false
@@ -189,7 +271,7 @@ public final class AppState: ObservableObject {
 
     /// Log out from all servers
     public func logoutAll() {
-        for config in serverStore.configurations {
+        for config in servers {
             KeychainManager.shared.deleteServerCredentials(for: config.id)
         }
         isAuthenticated = false
@@ -209,7 +291,7 @@ public final class AppState: ObservableObject {
         }
 
         // Check if this server already exists
-        if serverStore.configurations.contains(where: { $0.jellyfinURL == jellyfinURL }) {
+        if servers.contains(where: { $0.jellyfinURL == jellyfinURL }) {
             // Already migrated, just clean up legacy keys
             keychain.deleteAll()
             return
@@ -229,10 +311,11 @@ public final class AppState: ObservableObject {
             jellyseerrURL: jellyseerrURL,
             jellyfinUserID: userID,
             lastUsed: Date(),
-            createdAt: Date()
+            createdAt: Date(),
+            isActive: true
         )
 
-        serverStore.add(config)
+        addServer(config)
 
         // Migrate credentials
         if let accessToken = keychain.getString(for: .jellyfinAccessToken) {
@@ -266,7 +349,7 @@ public final class AppState: ObservableObject {
 
     // MARK: - Legacy Compatibility
 
-    /// Load stored credentials (now handled by server store)
+    /// Load stored credentials (now handled by SwiftData)
     public func loadStoredCredentials() {
         updateAuthenticationState()
     }

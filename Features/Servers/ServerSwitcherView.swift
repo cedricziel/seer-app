@@ -15,7 +15,7 @@ struct ServerSwitcherView: View {
             List {
                 // Server list
                 Section {
-                    ForEach(appState.serverStore.sortedConfigurations) { config in
+                    ForEach(appState.sortedConfigurations) { config in
                         Button {
                             appState.switchServer(to: config.id)
                             dismiss()

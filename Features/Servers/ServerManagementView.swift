@@ -14,7 +14,7 @@ struct ServerManagementView: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(appState.serverStore.sortedConfigurations) { config in
+                ForEach(appState.sortedConfigurations) { config in
                     ServerManagementRow(
                         config: config,
                         isActive: config.id == appState.activeServerID,
@@ -79,7 +79,7 @@ struct ServerManagementView: View {
     }
 
     private func deleteServers(at offsets: IndexSet) {
-        let sorted = appState.serverStore.sortedConfigurations
+        let sorted = appState.sortedConfigurations
         for index in offsets {
             serverToDelete = sorted[index]
         }
