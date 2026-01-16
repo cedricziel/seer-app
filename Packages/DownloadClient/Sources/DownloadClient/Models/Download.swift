@@ -42,6 +42,9 @@ public final class Download {
     /// Year of release
     public var year: Int?
 
+    /// Primary image URL for thumbnail display
+    public var primaryImageURL: String?
+
     // MARK: - Download State
 
     /// Current download state
@@ -146,7 +149,8 @@ public final class Download {
         seasonNumber: Int? = nil,
         episodeNumber: Int? = nil,
         runTimeTicks: Int64? = nil,
-        year: Int? = nil
+        year: Int? = nil,
+        primaryImageURL: String? = nil
     ) {
         id = UUID()
         self.serverID = serverID
@@ -159,6 +163,7 @@ public final class Download {
         self.episodeNumber = episodeNumber
         self.runTimeTicks = runTimeTicks
         self.year = year
+        self.primaryImageURL = primaryImageURL
         stateRawValue = DownloadState.pending.rawValue
         progress = 0
         bytesDownloaded = 0

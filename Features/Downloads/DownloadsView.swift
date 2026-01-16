@@ -189,14 +189,20 @@ struct DownloadRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Thumbnail placeholder
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.secondary.opacity(0.2))
-                .frame(width: 60, height: 90)
-                .overlay {
-                    Image(systemName: download.mediaType == "Movie" ? "film" : "tv")
-                        .foregroundStyle(.secondary)
-                }
+            // Thumbnail
+            if let imageURLString = download.primaryImageURL,
+               let imageURL = URL(string: imageURLString) {
+                PosterImage(url: imageURL, cornerRadius: 8)
+                    .frame(width: 60, height: 90)
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.secondary.opacity(0.2))
+                    .frame(width: 60, height: 90)
+                    .overlay {
+                        Image(systemName: download.mediaType == "Movie" ? "film" : "tv")
+                            .foregroundStyle(.secondary)
+                    }
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(download.name)

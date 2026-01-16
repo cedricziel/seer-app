@@ -182,6 +182,10 @@ public final class DownloadManager {
             }
         }
 
+        // Build image URL for thumbnail
+        let imageURL = serverURL?.appendingPathComponent("Items/\(item.id)/Images/Primary")
+            .appending(queryItems: [URLQueryItem(name: "maxWidth", value: "200")])
+
         // Create download record
         let download = Download(
             serverID: serverID,
@@ -194,7 +198,8 @@ public final class DownloadManager {
             seasonNumber: item.parentIndexNumber,
             episodeNumber: item.indexNumber,
             runTimeTicks: item.runTimeTicks,
-            year: item.year
+            year: item.year,
+            primaryImageURL: imageURL?.absoluteString
         )
 
         // Save to store
