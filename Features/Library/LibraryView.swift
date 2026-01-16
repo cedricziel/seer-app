@@ -101,13 +101,19 @@ private struct LibraryContentView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
                 // Continue Watching Section
-                if !viewModel.continueWatching.isEmpty {
+                if viewModel.isLoadingContinueWatching {
+                    SkeletonCardRow(title: "Continue Watching", cardCount: 4, cardWidth: 140)
+                } else if !viewModel.continueWatching.isEmpty {
                     continueWatchingSection
                 }
 
                 // Latest Items Section
-                if !viewModel.latestItems.isEmpty {
+                if viewModel.isLoadingLatestItems {
+                    SkeletonCardRow(title: "Recently Added", cardCount: 5, cardWidth: 140)
+                } else if !viewModel.latestItems.isEmpty {
                     latestItemsSection
+                } else if viewModel.hasLoadedLatestItems {
+                    recentlyAddedEmptySection
                 }
 
                 // Libraries Section
@@ -160,6 +166,16 @@ private struct LibraryContentView: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+
+    private var recentlyAddedEmptySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Recently Added")
+                .font(.title2)
+                .fontWeight(.bold)
+                .padding(.horizontal)
+            SectionEmptyView(message: "No recent additions", systemImage: "film.stack")
         }
     }
 

@@ -16,6 +16,10 @@ public final class LibraryViewModel: ObservableObject {
 
     @Published var isLoading: Bool = false
     @Published var isLoadingMore: Bool = false
+    @Published var isLoadingLatestItems: Bool = false
+    @Published var isLoadingContinueWatching: Bool = false
+    @Published var hasLoadedLatestItems: Bool = false
+    @Published var hasLoadedContinueWatching: Bool = false
     @Published var errorMessage: String?
 
     @Published var selectedMediaType: MediaTypeFilter = .all
@@ -122,6 +126,8 @@ public final class LibraryViewModel: ObservableObject {
         guard let service = jellyfinService else { return }
         guard !Task.isCancelled else { return }
 
+        isLoadingContinueWatching = true
+
         do {
             let result = try await service.getContinueWatching(limit: 10)
             guard !Task.isCancelled else { return }
@@ -132,11 +138,16 @@ public final class LibraryViewModel: ObservableObject {
                 print("Failed to load continue watching: \(error)")
             }
         }
+
+        hasLoadedContinueWatching = true
+        isLoadingContinueWatching = false
     }
 
     func loadLatestItems() async {
         guard let service = jellyfinService else { return }
         guard !Task.isCancelled else { return }
+
+        isLoadingLatestItems = true
 
         do {
             let result = try await service.getLatestItems(limit: 20)
@@ -148,6 +159,9 @@ public final class LibraryViewModel: ObservableObject {
                 print("Failed to load latest items: \(error)")
             }
         }
+
+        hasLoadedLatestItems = true
+        isLoadingLatestItems = false
     }
 
     func selectLibrary(_ library: Library?) async {
@@ -254,6 +268,10 @@ public final class LibraryViewModel: ObservableObject {
 
             currentPage = 0
             hasMoreItems = true
+
+            // Reset hasLoaded flags so skeleton states show during refresh
+            hasLoadedLatestItems = false
+            hasLoadedContinueWatching = false
 
             await loadInitialData()
 

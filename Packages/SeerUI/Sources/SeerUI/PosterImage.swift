@@ -19,6 +19,7 @@ public struct PosterImage: View {
                 .placeholder {
                     placeholderView
                 }
+                .fade(duration: 0.25)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: geometry.size.width, height: geometry.size.height)
