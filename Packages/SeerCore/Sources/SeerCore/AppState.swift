@@ -73,6 +73,31 @@ public final class AppState: ObservableObject {
         !servers.isEmpty
     }
 
+    /// Convenience struct for accessing Jellyfin credentials
+    public struct JellyfinCredentials {
+        public let serverURL: URL
+        public let accessToken: String
+        public let userId: String
+        public let deviceId: String
+    }
+
+    /// Combined Jellyfin credentials for convenience
+    public var jellyfinCredentials: JellyfinCredentials? {
+        guard let serverURL = jellyfinServerURL,
+              let accessToken = jellyfinAccessToken,
+              let userId = jellyfinUserID,
+              let deviceId = jellyfinDeviceID
+        else {
+            return nil
+        }
+        return JellyfinCredentials(
+            serverURL: serverURL,
+            accessToken: accessToken,
+            userId: userId,
+            deviceId: deviceId
+        )
+    }
+
     // MARK: - Initialization
 
     public init() {

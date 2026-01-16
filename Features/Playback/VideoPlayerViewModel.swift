@@ -1,6 +1,7 @@
 import AVFoundation
 import AVKit
 import Combine
+import DownloadClient
 import JellyfinClient
 import PlaybackClient
 import SeerCore
@@ -55,6 +56,8 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
     private var playbackService: PlaybackService?
     private var streamInfo: StreamInfo?
     private var playbackState: PlaybackState?
+    private var isPlayingOffline: Bool = false
+    private var downloadManager: DownloadManager?
 
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
@@ -70,10 +73,12 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
         item: MediaItem,
         appState: AppState,
         startPositionTicks _: Int64 = 0,
-        existingPlayer: AVPlayer? = nil
+        existingPlayer: AVPlayer? = nil,
+        downloadManager: DownloadManager? = nil
     ) {
         self.item = item
         self.appState = appState
+        self.downloadManager = downloadManager
 
         // If we have an existing player (restoration from PiP), use it
         if let existingPlayer {
@@ -113,6 +118,21 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
 
     /// Load the media and prepare for playback
     func loadMedia(startPositionTicks: Int64 = 0) async {
+        // Set up audio session for background playback and PiP
+        setupAudioSession()
+
+        isBuffering = true
+        errorMessage = nil
+        print("[VideoPlayer] Loading media for item: \(item.id)")
+
+        // Check for local downloaded file first
+        if let localURL = await getLocalFileURL() {
+            print("[VideoPlayer] Found local download, playing offline")
+            await loadFromLocalFile(url: localURL, startPositionTicks: startPositionTicks)
+            return
+        }
+
+        // Fall back to streaming
         guard let service = playbackService else {
             errorMessage = "Not authenticated. Please check your server connection."
             isBuffering = false
@@ -123,13 +143,6 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
             print("[VideoPlayer] deviceID: \(appState.jellyfinDeviceID ?? "nil")")
             return
         }
-
-        // Set up audio session for background playback and PiP
-        setupAudioSession()
-
-        isBuffering = true
-        errorMessage = nil
-        print("[VideoPlayer] Loading media for item: \(item.id)")
 
         do {
             // Get stream info from server
@@ -197,6 +210,62 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
             errorMessage = error.localizedDescription
             isBuffering = false
         }
+    }
+
+    /// Check for local downloaded file
+    private func getLocalFileURL() async -> URL? {
+        guard let manager = downloadManager,
+              let serverURL = appState.jellyfinServerURL
+        else { return nil }
+
+        let serverID = serverURL.host ?? "default"
+        return await manager.localFileURL(forItemID: item.id, serverID: serverID)
+    }
+
+    /// Load media from local file
+    private func loadFromLocalFile(url: URL, startPositionTicks: Int64) async {
+        isPlayingOffline = true
+
+        // Create player from local file
+        let playerItem = AVPlayerItem(url: url)
+        let newPlayer = AVPlayer(playerItem: playerItem)
+        player = newPlayer
+
+        // Observe player status
+        observePlayer(newPlayer)
+
+        // Get duration from file
+        let asset = AVAsset(url: url)
+        do {
+            let durationValue = try await asset.load(.duration)
+            if durationValue.seconds.isFinite {
+                duration = durationValue.seconds
+            }
+        } catch {
+            print("[VideoPlayer] Could not load duration from local file: \(error)")
+        }
+
+        // Seek to start position if provided
+        if startPositionTicks > 0 {
+            let startSeconds = Double(startPositionTicks) / 10_000_000.0
+            await newPlayer.seek(
+                to: CMTime(seconds: startSeconds, preferredTimescale: 1000),
+                toleranceBefore: .zero,
+                toleranceAfter: .zero
+            )
+        }
+
+        // Initialize playback state for offline
+        playbackState = PlaybackState(
+            itemId: item.id,
+            mediaSourceId: item.id,
+            playSessionId: nil,
+            positionTicks: startPositionTicks,
+            playMethod: .directPlay
+        )
+
+        isReady = true
+        print("[VideoPlayer] Ready to play offline from: \(url.path)")
     }
 
     /// Start playback

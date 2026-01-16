@@ -1,4 +1,5 @@
 import AVKit
+import DownloadClient
 import JellyfinClient
 import PlaybackClient
 import SeerCore
@@ -8,10 +9,12 @@ import SwiftUI
     /// Main video player view for iOS/iPadOS using AVPlayerViewController for PiP support
     public struct VideoPlayerView: View {
         @Environment(\.dismiss) private var dismiss
+        @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
 
         @State private var viewModel: VideoPlayerViewModel
 
         private let item: MediaItem
+        private let appState: AppState
         private let startPositionTicks: Int64
         private let existingPlayer: AVPlayer?
         private let onPiPStart: (() -> Void)?
@@ -24,6 +27,7 @@ import SwiftUI
             onPiPStart: (() -> Void)? = nil
         ) {
             self.item = item
+            self.appState = appState
             self.startPositionTicks = startPositionTicks
             self.existingPlayer = existingPlayer
             self.onPiPStart = onPiPStart

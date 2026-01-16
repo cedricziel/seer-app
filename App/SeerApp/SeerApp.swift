@@ -1,3 +1,4 @@
+import DownloadClient
 import Kingfisher
 import OfflineSync
 import SeerCore
@@ -6,17 +7,21 @@ import SwiftUI
 
 @main
 struct SeerApp: App {
+    @UIApplicationDelegateAdaptor(SeerAppDelegate.self) private var appDelegate
+
     @StateObject private var appState: AppState
     @StateObject private var offlineSyncService: OfflineSyncService
     @StateObject private var networkMonitor: NetworkMonitor
+    @State private var downloadManager: DownloadManager?
 
     let modelContainer: ModelContainer
+    let downloadModelContainer: ModelContainer
 
     init() {
         // Configure Kingfisher cache limits
         Self.configureImageCache()
 
-        // Configure SwiftData with CloudKit
+        // Configure SwiftData with CloudKit for app data
         let schema = Schema([
             ServerConfiguration.self,
             CachedLibrary.self,
@@ -33,6 +38,13 @@ struct SeerApp: App {
             modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
+        }
+
+        // Create separate model container for downloads (no CloudKit - per-device)
+        do {
+            downloadModelContainer = try createDownloadModelContainer()
+        } catch {
+            fatalError("Failed to create download ModelContainer: \(error)")
         }
 
         // Initialize AppState
@@ -57,6 +69,32 @@ struct SeerApp: App {
                 .environmentObject(offlineSyncService)
                 .environmentObject(networkMonitor)
                 .modelContainer(modelContainer)
+                .task {
+                    await setupDownloadManager()
+                }
+                .environment(downloadManager)
+        }
+    }
+
+    @MainActor
+    private func setupDownloadManager() async {
+        do {
+            let manager = try DownloadManager(modelContainer: downloadModelContainer)
+
+            // Configure with credentials when available
+            if let credentials = appState.jellyfinCredentials {
+                manager.configure(
+                    serverURL: credentials.serverURL,
+                    accessToken: credentials.accessToken,
+                    userID: credentials.userId,
+                    deviceID: credentials.deviceId
+                )
+            }
+
+            downloadManager = manager
+            appDelegate.downloadManager = manager
+        } catch {
+            print("Failed to initialize DownloadManager: \(error)")
         }
     }
 

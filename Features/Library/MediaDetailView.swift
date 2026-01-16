@@ -1,3 +1,4 @@
+import DownloadClient
 import JellyfinClient
 import JellyseerrClient
 import PlaybackClient
@@ -18,12 +19,15 @@ struct MediaDetailView: View {
     @ObservedObject var viewModel: LibraryViewModel
     @EnvironmentObject private var appState: AppState
 
+    @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
+
     @State private var isRequestingMedia: Bool = false
     @State private var requestError: String?
     @State private var showRequestSuccess: Bool = false
     @State private var seriesViewModel: SeriesDetailViewModel?
     @State private var showPlayer: Bool = false
     @State private var selectedEpisodeForPlayback: MediaItem?
+    @State private var downloadState: DownloadButtonState = .notDownloaded
 
     var body: some View {
         ScrollView {
@@ -165,18 +169,146 @@ struct MediaDetailView: View {
     // MARK: - Play Button
 
     private var playButton: some View {
-        Button {
-            showPlayer = true
-        } label: {
-            HStack {
-                Image(systemName: hasProgress ? "play.fill" : "play.fill")
-                Text(hasProgress ? "Resume" : "Play")
+        HStack(spacing: 12) {
+            Button {
+                showPlayer = true
+            } label: {
+                HStack {
+                    Image(systemName: "play.fill")
+                    Text(hasProgress ? "Resume" : "Play")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.accentColor)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.accentColor)
-            .foregroundStyle(.white)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            // Download button
+            if downloadManager != nil {
+                downloadButton
+            }
+        }
+    }
+
+    // MARK: - Download Button
+
+    private var downloadButton: some View {
+        DownloadButton(
+            state: downloadState,
+            onDownload: {
+                Task { await startDownload() }
+            },
+            onPause: {
+                Task { await pauseDownload() }
+            },
+            onResume: {
+                Task { await resumeDownload() }
+            },
+            onCancel: {
+                Task { await cancelDownload() }
+            },
+            onDelete: {
+                Task { await deleteDownload() }
+            }
+        )
+        .frame(width: 130)
+        .task {
+            await updateDownloadState()
+        }
+    }
+
+    private func startDownload() async {
+        guard let manager = downloadManager,
+              let credentials = appState.jellyfinCredentials
+        else { return }
+
+        do {
+            try await manager.downloadItem(item, serverID: credentials.serverURL.host ?? "default")
+            await updateDownloadState()
+        } catch {
+            // Handle error
+        }
+    }
+
+    private func pauseDownload() async {
+        guard let manager = downloadManager,
+              let credentials = appState.jellyfinCredentials,
+              let download = await manager.download(
+                  forItemID: item.id,
+                  serverID: credentials.serverURL.host ?? "default"
+              )
+        else { return }
+
+        try? await manager.pauseDownload(download.id)
+        await updateDownloadState()
+    }
+
+    private func resumeDownload() async {
+        guard let manager = downloadManager,
+              let credentials = appState.jellyfinCredentials,
+              let download = await manager.download(
+                  forItemID: item.id,
+                  serverID: credentials.serverURL.host ?? "default"
+              )
+        else { return }
+
+        try? await manager.resumeDownload(download.id)
+        await updateDownloadState()
+    }
+
+    private func cancelDownload() async {
+        guard let manager = downloadManager,
+              let credentials = appState.jellyfinCredentials,
+              let download = await manager.download(
+                  forItemID: item.id,
+                  serverID: credentials.serverURL.host ?? "default"
+              )
+        else { return }
+
+        try? await manager.cancelDownload(download.id)
+        await updateDownloadState()
+    }
+
+    private func deleteDownload() async {
+        guard let manager = downloadManager,
+              let credentials = appState.jellyfinCredentials,
+              let download = await manager.download(
+                  forItemID: item.id,
+                  serverID: credentials.serverURL.host ?? "default"
+              )
+        else { return }
+
+        try? await manager.deleteDownload(download.id)
+        await updateDownloadState()
+    }
+
+    @MainActor
+    private func updateDownloadState() async {
+        guard let manager = downloadManager,
+              let credentials = appState.jellyfinCredentials
+        else {
+            downloadState = .notDownloaded
+            return
+        }
+
+        let serverID = credentials.serverURL.host ?? "default"
+
+        if let download = await manager.download(forItemID: item.id, serverID: serverID) {
+            switch download.state {
+            case .pending:
+                downloadState = .pending
+            case .downloading:
+                downloadState = .downloading(progress: download.progress)
+            case .paused:
+                downloadState = .paused
+            case .completed:
+                downloadState = .completed
+            case .failed:
+                downloadState = .failed
+            }
+        } else {
+            downloadState = .notDownloaded
         }
     }
 
