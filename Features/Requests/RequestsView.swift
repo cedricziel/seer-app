@@ -70,7 +70,21 @@ private struct RequestsContentView: View {
                 await viewModel.refresh()
             }
             .sheet(item: $selectedRequestDetails) { request in
-                RequestDetailsSheet(request: request)
+                RequestDetailsSheet(
+                    request: request,
+                    displayTitle: viewModel.displayTitle(for: request),
+                    canManageRequests: viewModel.canManageRequests,
+                    onApprove: {
+                        Task {
+                            try? await viewModel.approveRequest(request)
+                        }
+                    },
+                    onDecline: {
+                        Task {
+                            try? await viewModel.declineRequest(request)
+                        }
+                    }
+                )
             }
         }
         .task {
@@ -146,13 +160,29 @@ private struct RequestsContentView: View {
             ForEach(viewModel.requests) { request in
                 RequestRowView(
                     request: request,
+                    displayTitle: viewModel.displayTitle(for: request),
+                    posterURL: viewModel.posterURL(for: request),
+                    canManageRequests: viewModel.canManageRequests,
                     onViewDetails: { selectedRequestDetails = request },
                     onCancelRequest: {
                         Task {
                             try? await viewModel.cancelRequest(request)
                         }
+                    },
+                    onApproveRequest: {
+                        Task {
+                            try? await viewModel.approveRequest(request)
+                        }
+                    },
+                    onDeclineRequest: {
+                        Task {
+                            try? await viewModel.declineRequest(request)
+                        }
                     }
                 )
+                .onTapGesture {
+                    selectedRequestDetails = request
+                }
                 .onAppear {
                     Task {
                         await viewModel.loadMoreRequestsIfNeeded(currentRequest: request)
@@ -177,8 +207,13 @@ private struct RequestsContentView: View {
 
 struct RequestRowView: View {
     let request: MediaRequest
+    var displayTitle: String
+    var posterURL: URL?
+    var canManageRequests: Bool = false
     var onViewDetails: (() -> Void)?
     var onCancelRequest: (() -> Void)?
+    var onApproveRequest: (() -> Void)?
+    var onDeclineRequest: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -187,7 +222,7 @@ struct RequestRowView: View {
 
             // Info
             VStack(alignment: .leading, spacing: 4) {
-                Text(request.media.displayTitle ?? "Request #\(request.id)")
+                Text(displayTitle)
                     .font(.headline)
                     .lineLimit(2)
 
@@ -227,6 +262,27 @@ struct RequestRowView: View {
             }
         }
 
+        // Admin actions for pending requests
+        if canManageRequests, request.status == .pending {
+            Divider()
+
+            if let onApproveRequest {
+                Button {
+                    onApproveRequest()
+                } label: {
+                    Label("Approve", systemImage: "checkmark.circle")
+                }
+            }
+
+            if let onDeclineRequest {
+                Button(role: .destructive) {
+                    onDeclineRequest()
+                } label: {
+                    Label("Decline", systemImage: "xmark.circle")
+                }
+            }
+        }
+
         // Cancel Request (only for pending requests)
         if canCancel, let onCancelRequest {
             Divider()
@@ -234,7 +290,7 @@ struct RequestRowView: View {
             Button(role: .destructive) {
                 onCancelRequest()
             } label: {
-                Label("Cancel Request", systemImage: "xmark.circle")
+                Label("Cancel Request", systemImage: "trash")
             }
         }
     }
@@ -245,8 +301,8 @@ struct RequestRowView: View {
 
     @ViewBuilder
     private var posterView: some View {
-        if let posterPath = request.media.posterPath {
-            AsyncImage(url: URL(string: "https://image.tmdb.org/t/p/w92\(posterPath)")) { image in
+        if let url = posterURL ?? request.media.posterPath.flatMap({ URL(string: "https://image.tmdb.org/t/p/w92\($0)") }) {
+            AsyncImage(url: url) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -308,17 +364,41 @@ struct RequestRowView: View {
 
 struct RequestDetailsSheet: View {
     let request: MediaRequest
+    var displayTitle: String
+    var canManageRequests: Bool = false
+    var onApprove: (() -> Void)?
+    var onDecline: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List {
                 Section("Details") {
-                    LabeledContent("Title", value: request.media.displayTitle ?? "Unknown")
+                    LabeledContent("Title", value: displayTitle)
                     LabeledContent("Type", value: request.type == .movie ? "Movie" : "TV Show")
                     LabeledContent("Status", value: request.status.displayName)
                     LabeledContent("Requested by", value: request.requestedBy.displayName)
                     LabeledContent("Requested", value: request.formattedCreatedAt)
+                }
+
+                // Admin actions for pending requests
+                if canManageRequests, request.status == .pending {
+                    Section("Actions") {
+                        Button {
+                            onApprove?()
+                            dismiss()
+                        } label: {
+                            Label("Approve Request", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+
+                        Button(role: .destructive) {
+                            onDecline?()
+                            dismiss()
+                        } label: {
+                            Label("Decline Request", systemImage: "xmark.circle.fill")
+                        }
+                    }
                 }
             }
             .navigationTitle("Request Details")

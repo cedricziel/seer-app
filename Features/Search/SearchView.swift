@@ -22,6 +22,10 @@ private struct SearchContentView: View {
     @State private var requestError: String?
     @State private var showRequestSuccess: Bool = false
 
+    // Request options
+    @State private var showRequestOptions: Bool = false
+    @State private var requestOptionsResult: SearchResult?
+
     init(appState: AppState) {
         self.appState = appState
         _viewModel = StateObject(wrappedValue: SearchViewModel(appState: appState))
@@ -64,14 +68,28 @@ private struct SearchContentView: View {
             .sheet(item: $selectedResult) { result in
                 SearchResultDetailSheet(
                     result: result,
+                    canRequest4K: viewModel.canRequest4K,
                     onRequest: {
-                        Task {
-                            await requestMedia(result)
-                        }
+                        handleRequestAction(result)
                     },
                     isRequesting: isRequestingMedia
                 )
                 .presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: $showRequestOptions) {
+                if let result = requestOptionsResult {
+                    RequestOptionsSheet(
+                        result: result,
+                        viewModel: viewModel,
+                        canRequest4K: viewModel.canRequest4K,
+                        onSubmit: { seasons, is4k in
+                            Task {
+                                await requestMediaWithOptions(result, seasons: seasons, is4k: is4k)
+                            }
+                        }
+                    )
+                    .presentationDetents([.medium, .large])
+                }
             }
         }
         .onChange(of: appState.activeServerID) {
@@ -129,7 +147,7 @@ private struct SearchContentView: View {
                     SearchResultCard(
                         result: result,
                         onViewDetails: { selectedResult = result },
-                        onRequest: { Task { await requestMedia(result) } }
+                        onRequest: { handleRequestAction(result) }
                     )
                     .onTapGesture {
                         selectedResult = result
@@ -154,6 +172,27 @@ private struct SearchContentView: View {
 
     // MARK: - Actions
 
+    private func handleRequestAction(_ result: SearchResult) {
+        // For TV shows, show options sheet for season selection
+        if result.mediaType == .tvShow {
+            requestOptionsResult = result
+            showRequestOptions = true
+            Task {
+                await viewModel.loadTVDetails(tmdbId: result.id)
+            }
+        } else {
+            // For movies, either show options if 4K is available, or request directly
+            if viewModel.canRequest4K {
+                requestOptionsResult = result
+                showRequestOptions = true
+            } else {
+                Task {
+                    await requestMedia(result)
+                }
+            }
+        }
+    }
+
     private func requestMedia(_ result: SearchResult) async {
         isRequestingMedia = true
 
@@ -167,195 +206,26 @@ private struct SearchContentView: View {
 
         isRequestingMedia = false
     }
-}
 
-// MARK: - Search Result Card
+    private func requestMediaWithOptions(
+        _ result: SearchResult,
+        seasons: [Int]?,
+        is4k: Bool
+    ) async {
+        isRequestingMedia = true
+        showRequestOptions = false
 
-struct SearchResultCard: View {
-    let result: SearchResult
-    var onViewDetails: (() -> Void)?
-    var onRequest: (() -> Void)?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Poster
-            ZStack(alignment: .topTrailing) {
-                PosterImage(url: result.posterURL())
-
-                // Status indicator
-                if result.isAvailable {
-                    RequestStatusBadge(status: .available, style: .compact)
-                        .padding(8)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Circle())
-                        .padding(4)
-                } else if result.hasPendingRequest {
-                    RequestStatusBadge(status: .pending, style: .compact)
-                        .padding(8)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Circle())
-                        .padding(4)
-                }
-            }
-
-            // Info
-            VStack(alignment: .leading, spacing: 2) {
-                Text(result.displayTitle)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .lineLimit(2)
-
-                HStack(spacing: 4) {
-                    if let year = result.displayYear {
-                        Text(year)
-                    }
-
-                    MediaTypeBadge(type: result.mediaType == .movie ? .movie : .tvShow)
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-        }
-        .contextMenu {
-            searchResultContextMenu
-        }
-    }
-
-    @ViewBuilder
-    private var searchResultContextMenu: some View {
-        // View Details
-        if let onViewDetails {
-            Button {
-                onViewDetails()
-            } label: {
-                Label("View Details", systemImage: "info.circle")
-            }
+        do {
+            try await viewModel.requestMediaWithOptions(result, seasons: seasons, is4k: is4k)
+            showRequestSuccess = true
+            selectedResult = nil
+            requestOptionsResult = nil
+        } catch {
+            requestError = error.localizedDescription
         }
 
-        // Request (if not already available or pending)
-        if !result.isAvailable && !result.hasPendingRequest, let onRequest {
-            Button {
-                onRequest()
-            } label: {
-                Label("Request", systemImage: "plus.circle")
-            }
-        }
-    }
-}
-
-// MARK: - Search Result Detail Sheet
-
-struct SearchResultDetailSheet: View {
-    let result: SearchResult
-    let onRequest: () -> Void
-    let isRequesting: Bool
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Header
-                    HStack(alignment: .top, spacing: 16) {
-                        PosterImage(url: result.posterURL())
-                            .frame(width: 120)
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(result.displayTitle)
-                                .font(.title2)
-                                .fontWeight(.bold)
-
-                            HStack(spacing: 8) {
-                                if let year = result.displayYear {
-                                    Text(year)
-                                }
-
-                                MediaTypeBadge(type: result.mediaType == .movie ? .movie : .tvShow)
-                            }
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                            if let rating = result.voteAverage, rating > 0 {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "star.fill")
-                                        .foregroundStyle(.yellow)
-                                    Text(String(format: "%.1f", rating))
-                                        .fontWeight(.medium)
-                                }
-                                .font(.subheadline)
-                            }
-
-                            // Status
-                            if result.isAvailable {
-                                RequestStatusBadge(status: .available, style: .full)
-                            } else if result.hasPendingRequest {
-                                RequestStatusBadge(status: .pending, style: .full)
-                            }
-                        }
-                    }
-
-                    // Overview
-                    if let overview = result.overview, !overview.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Overview")
-                                .font(.headline)
-
-                            Text(overview)
-                                .font(.body)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Spacer()
-
-                    // Request Button
-                    if !result.isAvailable, !result.hasPendingRequest {
-                        Button(action: onRequest) {
-                            HStack {
-                                if isRequesting {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle())
-                                        .tint(.white)
-                                } else {
-                                    Image(systemName: "plus.circle.fill")
-                                }
-                                Text(isRequesting ? "Requesting..." : "Request")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.accentColor)
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .disabled(isRequesting)
-                    } else if result.isAvailable {
-                        Label("Already Available", systemImage: "checkmark.seal.fill")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.green.opacity(0.15))
-                            .foregroundStyle(.green)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else {
-                        Label("Already Requested", systemImage: "clock")
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.orange.opacity(0.15))
-                            .foregroundStyle(.orange)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                }
-                .padding()
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
+        isRequestingMedia = false
+        viewModel.clearTVDetails()
     }
 }
 

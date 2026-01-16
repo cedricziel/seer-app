@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.cedricziel.seer
   deploymentTarget:
     iOS: "26.0"
+    tvOS: "26.0"
   xcodeVersion: "16.0"
   createIntermediateGroups: true
   generateEmptyDirectories: true
@@ -19,11 +20,13 @@ packages:
   Kingfisher:
     url: https://github.com/onevcat/Kingfisher
     from: "8.0.0"
+  JellyseerrAPI:
+    path: Packages/JellyseerrAPI
 
 targets:
   SeerApp:
     type: application
-    platform: iOS
+    supportedDestinations: [iOS, tvOS]
     sources:
       - path: App/SeerApp
         excludes:
@@ -81,7 +84,7 @@ targets:
 
   SeerCore:
     type: framework
-    platform: iOS
+    supportedDestinations: [iOS, tvOS]
     sources:
       - path: Packages/SeerCore/Sources/SeerCore
         excludes:
@@ -98,7 +101,7 @@ targets:
 
   JellyfinClient:
     type: framework
-    platform: iOS
+    supportedDestinations: [iOS, tvOS]
     sources:
       - path: Packages/JellyfinClient/Sources/JellyfinClient
         excludes:
@@ -118,13 +121,14 @@ targets:
 
   JellyseerrClient:
     type: framework
-    platform: iOS
+    supportedDestinations: [iOS, tvOS]
     sources:
       - path: Packages/JellyseerrClient/Sources/JellyseerrClient
         excludes:
           - "**/.DS_Store"
     dependencies:
       - target: SeerCore
+      - package: JellyseerrAPI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.jellyseerrclient
@@ -137,7 +141,7 @@ targets:
 
   SeerUI:
     type: framework
-    platform: iOS
+    supportedDestinations: [iOS, tvOS]
     sources:
       - path: Packages/SeerUI/Sources/SeerUI
         excludes:
@@ -156,7 +160,7 @@ targets:
 
   PlaybackClient:
     type: framework
-    platform: iOS
+    supportedDestinations: [iOS, tvOS]
     sources:
       - path: Packages/PlaybackClient/Sources/PlaybackClient
         excludes:
@@ -176,7 +180,7 @@ targets:
 
   OfflineSync:
     type: framework
-    platform: iOS
+    supportedDestinations: [iOS, tvOS]
     sources:
       - path: Packages/OfflineSync/Sources/OfflineSync
         excludes:
@@ -197,7 +201,7 @@ targets:
 
   DownloadClient:
     type: framework
-    platform: iOS
+    supportedDestinations: [iOS, tvOS]
     sources:
       - path: Packages/DownloadClient/Sources/DownloadClient
         excludes:
@@ -218,7 +222,7 @@ targets:
 
   NotificationClient:
     type: framework
-    platform: iOS
+    supportedDestinations: [iOS, tvOS]
     sources:
       - path: Packages/NotificationClient/Sources/NotificationClient
         excludes:
@@ -239,7 +243,7 @@ targets:
 
   PlaybackClientTests:
     type: bundle.unit-test
-    platform: iOS
+    supportedDestinations: [iOS, tvOS]
     sources:
       - path: Tests/PlaybackClientTests
         excludes:
@@ -257,7 +261,7 @@ targets:
 
   DownloadClientTests:
     type: bundle.unit-test
-    platform: iOS
+    supportedDestinations: [iOS, tvOS]
     sources:
       - path: Tests/DownloadClientTests
         excludes:

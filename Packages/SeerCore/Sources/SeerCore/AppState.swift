@@ -11,6 +11,39 @@ public final class AppState: ObservableObject {
     @Published public var isLoading: Bool = false
     @Published public var errorMessage: String?
 
+    // MARK: - Jellyseerr User State
+
+    /// The current Jellyseerr user's permissions (stored as raw value)
+    @Published public var jellyseerrUserPermissions: Int = 0
+
+    /// Whether the current user can manage requests (approve/decline)
+    public var canManageRequests: Bool {
+        let permissions = JellyseerrPermissions(rawValue: jellyseerrUserPermissions)
+        return permissions.canManageRequests
+    }
+
+    /// Whether the current user can request 4K content
+    public var canRequest4K: Bool {
+        let permissions = JellyseerrPermissions(rawValue: jellyseerrUserPermissions)
+        return permissions.canRequest4K
+    }
+
+    /// Whether the current user is an admin
+    public var isJellyseerrAdmin: Bool {
+        let permissions = JellyseerrPermissions(rawValue: jellyseerrUserPermissions)
+        return permissions.contains(.admin)
+    }
+
+    /// Update the Jellyseerr user permissions
+    public func setJellyseerrPermissions(_ permissions: Int) {
+        jellyseerrUserPermissions = permissions
+    }
+
+    /// Clear the Jellyseerr user permissions (on logout or server switch)
+    public func clearJellyseerrPermissions() {
+        jellyseerrUserPermissions = 0
+    }
+
     // MARK: - SwiftData Context
 
     private var modelContext: ModelContext?
@@ -138,6 +171,7 @@ public final class AppState: ObservableObject {
         try? context.save()
         objectWillChange.send()
         updateAuthenticationState()
+        clearJellyseerrPermissions() // Permissions need to be re-fetched for the new server
     }
 
     /// Add a new server and optionally switch to it
@@ -299,6 +333,7 @@ public final class AppState: ObservableObject {
             KeychainManager.shared.deleteServerCredentials(for: serverID)
         }
         isAuthenticated = false
+        clearJellyseerrPermissions()
     }
 
     /// Log out from all servers
@@ -307,6 +342,7 @@ public final class AppState: ObservableObject {
             KeychainManager.shared.deleteServerCredentials(for: config.id)
         }
         isAuthenticated = false
+        clearJellyseerrPermissions()
     }
 
     // MARK: - Error Handling

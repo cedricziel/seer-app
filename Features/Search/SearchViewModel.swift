@@ -18,6 +18,10 @@ public final class SearchViewModel: ObservableObject {
     @Published var totalPages: Int = 1
     @Published var isLoadingMore: Bool = false
 
+    // TV Details for season selection
+    @Published var tvDetails: TVDetails?
+    @Published var isLoadingTVDetails: Bool = false
+
     // MARK: - Private Properties
 
     private var jellyseerrService: JellyseerrService?
@@ -117,6 +121,7 @@ public final class SearchViewModel: ObservableObject {
         searchResults = []
         hasSearched = false
         errorMessage = nil
+        tvDetails = nil
     }
 
     func serverChanged() {
@@ -124,8 +129,32 @@ public final class SearchViewModel: ObservableObject {
         clearSearch()
     }
 
+    // MARK: - TV Details
+
+    /// Load TV details for season selection
+    func loadTVDetails(tmdbId: Int) async {
+        guard let service = jellyseerrService else { return }
+
+        isLoadingTVDetails = true
+        tvDetails = nil
+
+        do {
+            tvDetails = try await service.getTVDetails(tmdbId: tmdbId)
+        } catch {
+            print("Failed to load TV details: \(error)")
+        }
+
+        isLoadingTVDetails = false
+    }
+
+    /// Clear loaded TV details
+    func clearTVDetails() {
+        tvDetails = nil
+    }
+
     // MARK: - Request Media
 
+    /// Simple request for movies
     func requestMedia(_ result: SearchResult) async throws {
         guard let service = jellyseerrService else {
             throw JellyseerrService.JellyseerrError.notAuthenticated
@@ -137,9 +166,47 @@ public final class SearchViewModel: ObservableObject {
         )
     }
 
-    // MARK: - Helpers
+    /// Request media with options (seasons for TV, 4K)
+    func requestMediaWithOptions(
+        _ result: SearchResult,
+        seasons: [Int]? = nil,
+        is4k: Bool = false
+    ) async throws {
+        guard let service = jellyseerrService else {
+            throw JellyseerrService.JellyseerrError.notAuthenticated
+        }
+
+        _ = try await service.createRequest(
+            mediaType: result.mediaType,
+            mediaId: result.id,
+            seasons: seasons,
+            is4k: is4k
+        )
+    }
+
+    // MARK: - Computed Properties
 
     var isJellyseerrConfigured: Bool {
         appState.jellyseerrServerURL != nil && appState.jellyseerrAPIKey != nil
+    }
+
+    /// Whether the user can request 4K content
+    var canRequest4K: Bool {
+        appState.canRequest4K
+    }
+
+    /// Whether TV show has seasons available for selection
+    var hasSeasons: Bool {
+        guard let details = tvDetails,
+              let seasons = details.seasons
+        else {
+            return false
+        }
+        return !seasons.isEmpty
+    }
+
+    /// Get available seasons from TV details
+    var availableSeasons: [TVDetails.Season] {
+        tvDetails?.seasons?.filter { $0.seasonNumber > 0 } ?? []
     }
 }

@@ -1,10 +1,15 @@
 import Foundation
+import JellyseerrAPI
+import OpenAPIRuntime
+import OpenAPIURLSession
 import SeerCore
 
 /// Service for interacting with the Jellyseerr API
 public actor JellyseerrService {
     private var serverURL: URL
     private var apiKey: String?
+
+    private var generatedClient: Client?
 
     private let session: URLSession
     private let decoder: JSONDecoder
@@ -18,6 +23,8 @@ public actor JellyseerrService {
         case decodingError(Error)
         case serverError(Int, String?)
         case requestFailed(String)
+        case unauthorized
+        case forbidden
 
         public var errorDescription: String? {
             switch self {
@@ -35,6 +42,10 @@ public actor JellyseerrService {
                 "Server error (\(code)): \(message ?? "Unknown error")"
             case let .requestFailed(message):
                 "Request failed: \(message)"
+            case .unauthorized:
+                "Unauthorized"
+            case .forbidden:
+                "Forbidden - insufficient permissions"
             }
         }
     }
@@ -50,6 +61,16 @@ public actor JellyseerrService {
 
         decoder = JSONDecoder()
         encoder = JSONEncoder()
+
+        // Initialize generated client if we have an API key
+        if let apiKey {
+            let apiURL = serverURL.appendingPathComponent("api/v1")
+            generatedClient = Client(
+                serverURL: apiURL,
+                transport: URLSessionTransport(),
+                middlewares: [APIKeyMiddleware(apiKey: apiKey)]
+            )
+        }
     }
 
     // MARK: - Configuration
@@ -57,6 +78,16 @@ public actor JellyseerrService {
     /// Set the API key
     public func setAPIKey(_ apiKey: String) {
         self.apiKey = apiKey
+        initializeGeneratedClient(serverURL: serverURL, apiKey: apiKey)
+    }
+
+    private func initializeGeneratedClient(serverURL: URL, apiKey: String) {
+        let apiURL = serverURL.appendingPathComponent("api/v1")
+        generatedClient = Client(
+            serverURL: apiURL,
+            transport: URLSessionTransport(),
+            middlewares: [APIKeyMiddleware(apiKey: apiKey)]
+        )
     }
 
     // MARK: - Authentication
@@ -218,6 +249,64 @@ public actor JellyseerrService {
         try validateResponse(response, data: data)
     }
 
+    // MARK: - Admin Request Actions
+
+    /// Approve a pending request (requires MANAGE_REQUESTS permission)
+    public func approveRequest(id: Int) async throws -> MediaRequest {
+        let url = serverURL.appendingPathComponent("api/v1/request/\(id)/approve")
+        var request = try authenticatedRequest(url: url)
+        request.httpMethod = "POST"
+
+        let (data, response) = try await performRequest(request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw JellyseerrError.networkError(URLError(.badServerResponse))
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw JellyseerrError.unauthorized
+        }
+        if httpResponse.statusCode == 403 {
+            throw JellyseerrError.forbidden
+        }
+
+        try validateResponse(response, data: data)
+
+        do {
+            return try decoder.decode(MediaRequest.self, from: data)
+        } catch {
+            throw JellyseerrError.decodingError(error)
+        }
+    }
+
+    /// Decline a pending request (requires MANAGE_REQUESTS permission)
+    public func declineRequest(id: Int) async throws -> MediaRequest {
+        let url = serverURL.appendingPathComponent("api/v1/request/\(id)/decline")
+        var request = try authenticatedRequest(url: url)
+        request.httpMethod = "POST"
+
+        let (data, response) = try await performRequest(request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw JellyseerrError.networkError(URLError(.badServerResponse))
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw JellyseerrError.unauthorized
+        }
+        if httpResponse.statusCode == 403 {
+            throw JellyseerrError.forbidden
+        }
+
+        try validateResponse(response, data: data)
+
+        do {
+            return try decoder.decode(MediaRequest.self, from: data)
+        } catch {
+            throw JellyseerrError.decodingError(error)
+        }
+    }
+
     // MARK: - Media Details
 
     /// Get movie details by TMDB ID
@@ -252,10 +341,11 @@ public actor JellyseerrService {
 
     // MARK: - Enums
 
-    public enum RequestFilter: String, Sendable {
+    public enum RequestFilter: String, Sendable, CaseIterable {
         case all
         case pending
         case approved
+        case declined
         case processing
         case available
         case unavailable

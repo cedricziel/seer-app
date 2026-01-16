@@ -1,3 +1,6 @@
+excluded:
+  - Packages/JellyseerrAPI
+
 line_length:
   warning: 120
   error: 150

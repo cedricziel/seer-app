@@ -16,10 +16,16 @@ public final class RequestsViewModel: ObservableObject {
     @Published var selectedFilter: RequestFilter = .all
     @Published var selectedSort: RequestSort = .added
 
+    /// Cache of media titles by TMDB ID
+    @Published var mediaTitles: [Int: String] = [:]
+    /// Cache of poster paths by TMDB ID
+    @Published var mediaPosterPaths: [Int: String] = [:]
+
     enum RequestFilter: String, CaseIterable {
         case all = "All"
         case pending = "Pending"
         case approved = "Approved"
+        case declined = "Declined"
         case available = "Available"
         case processing = "Processing"
 
@@ -28,6 +34,7 @@ public final class RequestsViewModel: ObservableObject {
             case .all: .all
             case .pending: .pending
             case .approved: .approved
+            case .declined: .declined
             case .available: .available
             case .processing: .processing
             }
@@ -96,6 +103,11 @@ public final class RequestsViewModel: ObservableObject {
             requests = response.results
             totalItems = response.pageInfo.results
             hasMoreItems = requests.count < totalItems
+
+            // Fetch media details (titles, posters) in background
+            Task {
+                await fetchMediaDetails()
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -154,7 +166,7 @@ public final class RequestsViewModel: ObservableObject {
         await loadRequests()
     }
 
-    // MARK: - Helpers
+    // MARK: - Request Actions
 
     /// Cancel a request by ID
     func cancelRequest(_ request: MediaRequest) async throws {
@@ -164,13 +176,84 @@ public final class RequestsViewModel: ObservableObject {
         await refresh()
     }
 
+    /// Approve a pending request (admin only)
+    func approveRequest(_ request: MediaRequest) async throws {
+        guard let service = jellyseerrService else { return }
+        _ = try await service.approveRequest(id: request.id)
+        // Refresh to update the list
+        await refresh()
+    }
+
+    /// Decline a pending request (admin only)
+    func declineRequest(_ request: MediaRequest) async throws {
+        guard let service = jellyseerrService else { return }
+        _ = try await service.declineRequest(id: request.id)
+        // Refresh to update the list
+        await refresh()
+    }
+
+    // MARK: - Computed Properties
+
     var isJellyseerrConfigured: Bool {
         appState.jellyseerrServerURL != nil && appState.jellyseerrAPIKey != nil
     }
 
-    func posterURL(for _: MediaRequest) -> URL? {
-        // We don't have the poster path from the request directly
-        // This would need to be fetched from TMDB if needed
-        nil
+    /// Whether the current user can manage requests (approve/decline)
+    var canManageRequests: Bool {
+        appState.canManageRequests
+    }
+
+    func posterURL(for request: MediaRequest) -> URL? {
+        guard let tmdbId = request.media.tmdbId,
+              let posterPath = mediaPosterPaths[tmdbId]
+        else {
+            return nil
+        }
+        return URL(string: "https://image.tmdb.org/t/p/w92\(posterPath)")
+    }
+
+    /// Get the display title for a request (from cache or fallback)
+    func displayTitle(for request: MediaRequest) -> String {
+        if let title = request.media.displayTitle, !title.isEmpty {
+            return title
+        }
+        if let tmdbId = request.media.tmdbId, let cachedTitle = mediaTitles[tmdbId] {
+            return cachedTitle
+        }
+        if let tmdbId = request.media.tmdbId {
+            return "TMDB #\(tmdbId)"
+        }
+        return "Request #\(request.id)"
+    }
+
+    /// Fetch media details (title, poster) for all requests
+    func fetchMediaDetails() async {
+        guard let service = jellyseerrService else { return }
+
+        for request in requests {
+            guard let tmdbId = request.media.tmdbId else { continue }
+
+            // Skip if already cached
+            if mediaTitles[tmdbId] != nil { continue }
+
+            do {
+                if request.type == .movie {
+                    let details = try await service.getMovieDetails(tmdbId: tmdbId)
+                    mediaTitles[tmdbId] = details.title
+                    if let posterPath = details.posterPath {
+                        mediaPosterPaths[tmdbId] = posterPath
+                    }
+                } else {
+                    let details = try await service.getTVDetails(tmdbId: tmdbId)
+                    mediaTitles[tmdbId] = details.name
+                    if let posterPath = details.posterPath {
+                        mediaPosterPaths[tmdbId] = posterPath
+                    }
+                }
+            } catch {
+                // Silently fail for individual lookups
+                print("Failed to fetch details for TMDB ID \(tmdbId): \(error)")
+            }
+        }
     }
 }
