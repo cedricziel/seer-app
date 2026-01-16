@@ -295,6 +295,17 @@ struct DownloadRow: View {
             }
         }
 
+        // Retry (failed only)
+        if download.state == .failed {
+            Button {
+                Task {
+                    try? await manager.resumeDownload(download.id)
+                }
+            } label: {
+                Label("Retry", systemImage: "arrow.clockwise")
+            }
+        }
+
         // Cancel (pending, downloading, paused, or waiting for WiFi)
         if download.state == .pending || download.state == .downloading || download.state == .paused || download
             .state == .waitingForWiFi {
@@ -363,11 +374,8 @@ struct DownloadRow: View {
     private func handleDownloadAction() {
         Task {
             switch download.state {
-            case .paused:
+            case .paused, .failed:
                 try? await manager.resumeDownload(download.id)
-            case .failed:
-                // Retry would need to re-fetch item info
-                break
             default:
                 break
             }

@@ -71,6 +71,7 @@
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
         <string>com.cedricziel.seer.autodownload</string>
+        <string>com.cedricziel.seer.requestpoll</string>
     </array>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Seer needs location access to detect your WiFi network name so it can switch to your internal server URL when you're on your home network.</string>

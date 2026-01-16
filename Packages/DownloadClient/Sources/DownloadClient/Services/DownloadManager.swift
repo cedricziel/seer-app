@@ -36,7 +36,7 @@ public final class DownloadManager {
     // MARK: - Internal State (accessible to extensions)
 
     let store: DownloadStore
-    private let storage: DownloadStorage
+    let storage: DownloadStorage
     let queue: DownloadQueue
     let sessionManager: BackgroundSessionManager
     private let modelContainer: ModelContainer
@@ -49,6 +49,11 @@ public final class DownloadManager {
 
     // WiFi-only downloads setting
     var wifiOnlyEnabled: Bool = true
+
+    // MARK: - Notification Delegate
+
+    /// Delegate for download event notifications
+    public weak var notificationDelegate: DownloadNotificationDelegate?
 
     // MARK: - Initialization
 
@@ -224,15 +229,15 @@ public final class DownloadManager {
         await refresh()
     }
 
-    /// Resume a paused download
+    /// Resume a paused or retry a failed download
     public func resumeDownload(_ downloadID: UUID) async throws {
         guard let download = try await store.fetchDownload(id: downloadID),
-              download.state == .paused
+              download.state == .paused || download.state == .failed
         else {
             return
         }
 
-        // Update state and re-queue
+        // Update state and re-queue (updateState clears errorMessage by default)
         try await store.updateState(downloadID: downloadID, state: .pending)
         await queue.enqueue(downloadID)
         await refresh()
@@ -404,92 +409,6 @@ public final class DownloadManager {
             case .insufficientStorage:
                 "Insufficient storage space"
             }
-        }
-    }
-}
-
-// MARK: - BackgroundSessionDelegate
-
-extension DownloadManager: BackgroundSessionDelegate {
-    public nonisolated func downloadDidProgress(
-        taskIdentifier: Int,
-        progress: Double,
-        bytesWritten: Int64,
-        totalBytes: Int64
-    ) {
-        guard let downloadID = sessionManager.downloadID(forTask: taskIdentifier) else { return }
-
-        Task { @MainActor [weak self] in
-            try? await self?.store.updateProgress(
-                downloadID: downloadID,
-                progress: progress,
-                bytesDownloaded: bytesWritten,
-                totalBytes: totalBytes
-            )
-            await self?.refresh()
-        }
-    }
-
-    public nonisolated func downloadDidComplete(taskIdentifier: Int, tempFileURL: URL) {
-        guard let downloadID = sessionManager.downloadID(forTask: taskIdentifier) else { return }
-
-        Task { @MainActor [weak self] in
-            guard let self,
-                  let download = try? await self.store.fetchDownload(id: downloadID)
-            else { return }
-
-            do {
-                // Move file to permanent location
-                let relativePath = try await self.storage.moveDownloadedFile(
-                    from: tempFileURL,
-                    serverID: download.serverID,
-                    mediaType: download.mediaType,
-                    itemID: download.itemID,
-                    fileName: "\(download.itemID).mp4"
-                )
-
-                // Update download record
-                try await self.store.updateFilePath(downloadID: downloadID, relativePath: relativePath)
-                try await self.store.updateState(downloadID: downloadID, state: .completed)
-
-                await self.queue.markCompleted(downloadID)
-                await self.refresh()
-            } catch {
-                try? await self.store.updateState(
-                    downloadID: downloadID,
-                    state: .failed,
-                    errorMessage: error.localizedDescription
-                )
-                await self.queue.markCompleted(downloadID)
-                await self.refresh()
-            }
-        }
-    }
-
-    public nonisolated func downloadDidFail(taskIdentifier: Int, error: Error, resumeData: Data?) {
-        guard let downloadID = sessionManager.downloadID(forTask: taskIdentifier) else { return }
-
-        Task { @MainActor [weak self] in
-            // Save resume data if available
-            if let resumeData {
-                try? await self?.store.updateResumeData(downloadID: downloadID, resumeData: resumeData)
-                try? await self?.store.updateState(downloadID: downloadID, state: .paused)
-            } else {
-                try? await self?.store.updateState(
-                    downloadID: downloadID,
-                    state: .failed,
-                    errorMessage: error.localizedDescription
-                )
-            }
-
-            await self?.queue.markCompleted(downloadID)
-            await self?.refresh()
-        }
-    }
-
-    public nonisolated func allTasksCompleted() {
-        Task { @MainActor [weak self] in
-            await self?.refresh()
         }
     }
 }
