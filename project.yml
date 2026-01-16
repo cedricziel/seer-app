@@ -158,11 +158,30 @@ targets:
         DEFINES_MODULE: true
         GENERATE_INFOPLIST_FILE: true
 
+  PlaybackClientTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/PlaybackClientTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: PlaybackClient
+      - target: JellyfinClient
+      - target: SeerCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.playbackclienttests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
 schemes:
   SeerApp:
     build:
       targets:
         SeerApp: all
+        PlaybackClientTests: [test]
     run:
       config: Debug
       environmentVariables:
@@ -174,6 +193,8 @@ schemes:
           isEnabled: true
     test:
       config: Debug
+      targets:
+        - PlaybackClientTests
     profile:
       config: Release
     analyze:
