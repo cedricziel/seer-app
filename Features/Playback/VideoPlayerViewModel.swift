@@ -11,42 +11,19 @@ import SwiftUI
 @MainActor
 @Observable
 public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_length
-    // MARK: - Public Properties
+    // MARK: - Properties
 
-    /// The AVPlayer instance
     private(set) var player: AVPlayer?
-
-    /// Whether the player is currently playing
     private(set) var isPlaying: Bool = false
-
-    /// Whether the player is buffering
     private(set) var isBuffering: Bool = true
-
-    /// Current playback position in seconds
     private(set) var currentTime: Double = 0
-
-    /// Total duration in seconds
     private(set) var duration: Double = 0
-
-    /// Whether controls should be visible
     var showControls: Bool = true
-
-    /// Current error message
     private(set) var errorMessage: String?
-
-    /// Whether playback is ready
     private(set) var isReady: Bool = false
-
-    /// Available audio tracks
     private(set) var audioTracks: [MediaStream] = []
-
-    /// Available subtitle tracks
     private(set) var subtitleTracks: [MediaStream] = []
-
-    /// Currently selected audio track index
     private(set) var selectedAudioIndex: Int?
-
-    /// Currently selected subtitle track index (-1 for none)
     private(set) var selectedSubtitleIndex: Int?
 
     // MARK: - Private Properties
@@ -118,70 +95,48 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
 
     /// Load the media and prepare for playback
     func loadMedia(startPositionTicks: Int64 = 0) async {
-        // Set up audio session for background playback and PiP
         setupAudioSession()
-
         isBuffering = true
         errorMessage = nil
-        print("[VideoPlayer] Loading media for item: \(item.id)")
 
         // Check for local downloaded file first
         if let localURL = await getLocalFileURL() {
-            print("[VideoPlayer] Found local download, playing offline")
             await loadFromLocalFile(url: localURL, startPositionTicks: startPositionTicks)
             return
         }
 
         // Fall back to streaming
+        await loadFromStream(startPositionTicks: startPositionTicks)
+    }
+
+    /// Load media from streaming server
+    private func loadFromStream(startPositionTicks: Int64) async {
         guard let service = playbackService else {
             errorMessage = "Not authenticated. Please check your server connection."
             isBuffering = false
-            print("[VideoPlayer] Error: PlaybackService is nil - credentials missing")
-            print("[VideoPlayer] serverURL: \(appState.jellyfinServerURL?.absoluteString ?? "nil")")
-            print("[VideoPlayer] hasToken: \(appState.jellyfinAccessToken != nil)")
-            print("[VideoPlayer] userID: \(appState.jellyfinUserID ?? "nil")")
-            print("[VideoPlayer] deviceID: \(appState.jellyfinDeviceID ?? "nil")")
             return
         }
 
         do {
-            // Get stream info from server
             let info = try await service.getStreamInfo(
                 itemId: item.id,
                 startPositionTicks: startPositionTicks
             )
             streamInfo = info
-
-            // Store track information
             audioTracks = info.audioStreams
             subtitleTracks = info.subtitleStreams
             selectedAudioIndex = info.selectedAudioIndex
             selectedSubtitleIndex = info.selectedSubtitleIndex
 
-            // Set duration
             if let dur = info.durationSeconds {
                 duration = dur
             }
 
-            // Create player with stream URL
             let playerItem = AVPlayerItem(url: info.url)
-
-            // Add headers if needed for non-HLS streams
-            if info.type != .hls {
-                let asset = playerItem.asset
-                if let urlAsset = asset as? AVURLAsset {
-                    // Headers are automatically included via the URL for authenticated requests
-                    _ = urlAsset
-                }
-            }
-
             let newPlayer = AVPlayer(playerItem: playerItem)
             player = newPlayer
-
-            // Observe player status
             observePlayer(newPlayer)
 
-            // Seek to start position if provided
             if startPositionTicks > 0 {
                 let startSeconds = Double(startPositionTicks) / 10_000_000.0
                 await newPlayer.seek(
@@ -191,7 +146,6 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
                 )
             }
 
-            // Initialize playback state
             playbackState = PlaybackState(
                 itemId: item.id,
                 mediaSourceId: info.mediaSourceId,
@@ -201,12 +155,7 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
             )
 
             isReady = true
-            print("[VideoPlayer] Ready to play. URL: \(info.url.absoluteString)")
-            // Temporarily disabled to debug black screen issue
-            // updateNowPlayingInfo(player: newPlayer)
-
         } catch {
-            print("[VideoPlayer] Error loading media: \(error)")
             errorMessage = error.localizedDescription
             isBuffering = false
         }
@@ -242,7 +191,7 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
                 duration = durationValue.seconds
             }
         } catch {
-            print("[VideoPlayer] Could not load duration from local file: \(error)")
+            // Duration loading failed, will use default
         }
 
         // Seek to start position if provided
@@ -265,7 +214,6 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
         )
 
         isReady = true
-        print("[VideoPlayer] Ready to play offline from: \(url.path)")
     }
 
     /// Start playback
@@ -373,14 +321,10 @@ public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_le
     private func setupAudioSession() {
         #if os(iOS)
             do {
-                try AVAudioSession.sharedInstance().setCategory(
-                    .playback,
-                    mode: .moviePlayback
-                )
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
                 try AVAudioSession.sharedInstance().setActive(true)
-                print("[VideoPlayer] Audio session configured for background playback")
             } catch {
-                print("[VideoPlayer] Failed to set up audio session: \(error)")
+                // Audio session setup failed, playback may not work in background
             }
         #endif
     }

@@ -17,17 +17,20 @@ struct MediaDetailView: View {
     let item: MediaItem
     let source: MediaItemSource
     @ObservedObject var viewModel: LibraryViewModel
-    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject var appState: AppState
 
-    @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
+    @Environment(DownloadManager.self) var downloadManager: DownloadManager?
 
     @State private var isRequestingMedia: Bool = false
     @State private var requestError: String?
     @State private var showRequestSuccess: Bool = false
-    @State private var seriesViewModel: SeriesDetailViewModel?
-    @State private var showPlayer: Bool = false
-    @State private var selectedEpisodeForPlayback: MediaItem?
-    @State private var downloadState: DownloadButtonState = .notDownloaded
+    @State var seriesViewModel: SeriesDetailViewModel?
+    @State var showPlayer: Bool = false
+    @State var selectedEpisodeForPlayback: MediaItem?
+    @State var downloadState: DownloadButtonState = .notDownloaded
+    @State var episodeDownloadStates: [String: DownloadButtonState] = [:]
+    @State var selectedEpisodeForDetail: MediaItem?
+    @State var showEpisodeDetail: Bool = false
 
     var body: some View {
         ScrollView {
@@ -106,326 +109,29 @@ struct MediaDetailView: View {
                 selectedEpisodeForPlayback = nil
             }
         }
-    }
-
-    // MARK: - Header Section
-
-    private var headerSection: some View {
-        HStack(alignment: .top, spacing: 16) {
-            // Poster
-            PosterImage(url: viewModel.imageURL(for: item), cornerRadius: 8)
-                .frame(width: 100)
-
-            // Info
-            VStack(alignment: .leading, spacing: 8) {
-                Text(item.name)
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                if let originalTitle = item.originalTitle, originalTitle != item.name {
-                    Text(originalTitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack(spacing: 12) {
-                    if let year = item.year {
-                        Text(String(year))
+        .sheet(isPresented: $showEpisodeDetail) {
+            if let episode = selectedEpisodeForDetail {
+                EpisodeDetailSheet(
+                    episode: episode,
+                    imageURL: viewModel.imageURL(for: episode, type: .primary),
+                    downloadState: episodeDownloadStates[episode.id] ?? .notDownloaded,
+                    onPlay: {
+                        showEpisodeDetail = false
+                        selectedEpisodeForPlayback = episode
+                        showPlayer = true
+                    },
+                    onDownload: {
+                        Task { await downloadEpisode(episode) }
                     }
-
-                    if let runtime = item.formattedRuntime {
-                        Text(runtime)
-                    }
-
-                    if let rating = item.officialRating {
-                        Text(rating)
-                            .font(.caption)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color(.systemGray5))
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                    }
-                }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-                // Rating
-                if let rating = item.communityRating {
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill")
-                            .foregroundStyle(.yellow)
-                        Text(String(format: "%.1f", rating))
-                            .fontWeight(.medium)
-                    }
-                    .font(.subheadline)
-                }
-
-                // Media Type Badge
-                MediaTypeBadge(type: item.type == .movie ? .movie : .tvShow)
+                )
             }
-        }
-    }
-
-    // MARK: - Play Button
-
-    private var playButton: some View {
-        HStack(spacing: 12) {
-            Button {
-                showPlayer = true
-            } label: {
-                HStack {
-                    Image(systemName: "play.fill")
-                    Text(hasProgress ? "Resume" : "Play")
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.accentColor)
-                .foregroundStyle(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-
-            // Download button
-            if downloadManager != nil {
-                downloadButton
-            }
-        }
-    }
-
-    // MARK: - Download Button
-
-    private var downloadButton: some View {
-        DownloadButton(
-            state: downloadState,
-            onDownload: {
-                Task { await startDownload() }
-            },
-            onPause: {
-                Task { await pauseDownload() }
-            },
-            onResume: {
-                Task { await resumeDownload() }
-            },
-            onCancel: {
-                Task { await cancelDownload() }
-            },
-            onDelete: {
-                Task { await deleteDownload() }
-            }
-        )
-        .frame(width: 130)
-        .task {
-            await updateDownloadState()
-        }
-    }
-
-    private func startDownload() async {
-        guard let manager = downloadManager,
-              let credentials = appState.jellyfinCredentials
-        else { return }
-
-        do {
-            try await manager.downloadItem(item, serverID: credentials.serverURL.host ?? "default")
-            await updateDownloadState()
-        } catch {
-            // Handle error
-        }
-    }
-
-    private func pauseDownload() async {
-        guard let manager = downloadManager,
-              let credentials = appState.jellyfinCredentials,
-              let download = await manager.download(
-                  forItemID: item.id,
-                  serverID: credentials.serverURL.host ?? "default"
-              )
-        else { return }
-
-        try? await manager.pauseDownload(download.id)
-        await updateDownloadState()
-    }
-
-    private func resumeDownload() async {
-        guard let manager = downloadManager,
-              let credentials = appState.jellyfinCredentials,
-              let download = await manager.download(
-                  forItemID: item.id,
-                  serverID: credentials.serverURL.host ?? "default"
-              )
-        else { return }
-
-        try? await manager.resumeDownload(download.id)
-        await updateDownloadState()
-    }
-
-    private func cancelDownload() async {
-        guard let manager = downloadManager,
-              let credentials = appState.jellyfinCredentials,
-              let download = await manager.download(
-                  forItemID: item.id,
-                  serverID: credentials.serverURL.host ?? "default"
-              )
-        else { return }
-
-        try? await manager.cancelDownload(download.id)
-        await updateDownloadState()
-    }
-
-    private func deleteDownload() async {
-        guard let manager = downloadManager,
-              let credentials = appState.jellyfinCredentials,
-              let download = await manager.download(
-                  forItemID: item.id,
-                  serverID: credentials.serverURL.host ?? "default"
-              )
-        else { return }
-
-        try? await manager.deleteDownload(download.id)
-        await updateDownloadState()
-    }
-
-    @MainActor
-    private func updateDownloadState() async {
-        guard let manager = downloadManager,
-              let credentials = appState.jellyfinCredentials
-        else {
-            downloadState = .notDownloaded
-            return
-        }
-
-        let serverID = credentials.serverURL.host ?? "default"
-
-        if let download = await manager.download(forItemID: item.id, serverID: serverID) {
-            switch download.state {
-            case .pending:
-                downloadState = .pending
-            case .downloading:
-                downloadState = .downloading(progress: download.progress)
-            case .paused:
-                downloadState = .paused
-            case .completed:
-                downloadState = .completed
-            case .failed:
-                downloadState = .failed
-            }
-        } else {
-            downloadState = .notDownloaded
         }
     }
 
     /// Whether the item has playback progress
-    private var hasProgress: Bool {
+    var hasProgress: Bool {
         guard let ticks = item.userData?.playbackPositionTicks else { return false }
         return ticks > 0
-    }
-
-    // MARK: - Overview Section
-
-    private func overviewSection(_ overview: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Overview")
-                .font(.headline)
-
-            Text(overview)
-                .font(.body)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    // MARK: - Genres Section
-
-    private func genresSection(_ genres: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Genres")
-                .font(.headline)
-
-            FlowLayout(spacing: 8) {
-                ForEach(genres, id: \.self) { genre in
-                    Text(genre)
-                        .font(.caption)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color(.systemGray5))
-                        .clipShape(Capsule())
-                }
-            }
-        }
-    }
-
-    // MARK: - Cast Section
-
-    private func castSection(_ people: [MediaItem.Person]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Cast")
-                .font(.headline)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(people.prefix(10), id: \.name) { person in
-                        VStack {
-                            Circle()
-                                .fill(Color(.systemGray5))
-                                .frame(width: 60, height: 60)
-                                .overlay {
-                                    Image(systemName: "person.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-
-                            Text(person.name ?? "Unknown")
-                                .font(.caption)
-                                .lineLimit(1)
-
-                            if let role = person.role {
-                                Text(role)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .frame(width: 80)
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Seasons Section
-
-    private var seasonsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Seasons")
-                .font(.headline)
-
-            if let viewModel = seriesViewModel {
-                if viewModel.isLoadingSeasons {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                } else if viewModel.seasons.isEmpty {
-                    Text("No seasons available")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.seasons) { season in
-                        SeasonDisclosureRow(
-                            season: season,
-                            episodes: viewModel.episodesBySeason[season.id] ?? [],
-                            isExpanded: viewModel.expandedSeasons.contains(season.id),
-                            isLoading: viewModel.isLoadingEpisodes[season.id] ?? false,
-                            onToggle: {
-                                Task {
-                                    await viewModel.toggleSeason(season.id)
-                                }
-                            },
-                            imageURL: { viewModel.imageURL(for: $0, type: .primary) },
-                            onPlayEpisode: { episode in
-                                selectedEpisodeForPlayback = episode
-                                showPlayer = true
-                            }
-                        )
-                    }
-                }
-            }
-        }
     }
 
     // MARK: - Request Section
@@ -491,64 +197,6 @@ struct MediaDetailView: View {
         }
 
         isRequestingMedia = false
-    }
-}
-
-// MARK: - Flow Layout
-
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
-        let result = FlowResult(
-            in: proposal.replacingUnspecifiedDimensions().width,
-            subviews: subviews,
-            spacing: spacing
-        )
-        return result.size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
-        let result = FlowResult(
-            in: bounds.width,
-            subviews: subviews,
-            spacing: spacing
-        )
-
-        for (index, subview) in subviews.enumerated() {
-            subview.place(at: CGPoint(
-                x: bounds.minX + result.positions[index].x,
-                y: bounds.minY + result.positions[index].y
-            ), proposal: .unspecified)
-        }
-    }
-
-    struct FlowResult {
-        var size: CGSize = .zero
-        var positions: [CGPoint] = []
-
-        init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var currentX: CGFloat = 0
-            var currentY: CGFloat = 0
-            var lineHeight: CGFloat = 0
-
-            for subview in subviews {
-                let size = subview.sizeThatFits(.unspecified)
-
-                if currentX + size.width > maxWidth, currentX > 0 {
-                    currentX = 0
-                    currentY += lineHeight + spacing
-                    lineHeight = 0
-                }
-
-                positions.append(CGPoint(x: currentX, y: currentY))
-                lineHeight = max(lineHeight, size.height)
-                currentX += size.width + spacing
-                self.size.width = max(self.size.width, currentX)
-            }
-
-            size.height = currentY + lineHeight
-        }
     }
 }
 

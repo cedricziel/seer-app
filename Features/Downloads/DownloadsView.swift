@@ -40,92 +40,109 @@ struct DownloadsView: View {
             emptyState
         } else {
             List {
-                // Active Downloads Section
-                if !manager.activeDownloads.isEmpty {
-                    Section("Downloading") {
-                        ForEach(manager.activeDownloads, id: \.id) { download in
-                            DownloadRow(download: download, manager: manager)
-                        }
-                    }
-                }
-
-                // Pending Downloads
-                let pendingDownloads = manager.downloads.filter { $0.state == .pending }
-                if !pendingDownloads.isEmpty {
-                    Section("Waiting") {
-                        ForEach(pendingDownloads, id: \.id) { download in
-                            DownloadRow(download: download, manager: manager)
-                        }
-                    }
-                }
-
-                // Paused Downloads
-                let pausedDownloads = manager.downloads.filter { $0.state == .paused }
-                if !pausedDownloads.isEmpty {
-                    Section("Paused") {
-                        ForEach(pausedDownloads, id: \.id) { download in
-                            DownloadRow(download: download, manager: manager)
-                        }
-                    }
-                }
-
-                // Completed Downloads - grouped by type
-                if !manager.completedDownloads.isEmpty {
-                    let movies = manager.completedDownloads.filter { $0.mediaType == "Movie" }
-                    let episodes = manager.completedDownloads.filter { $0.mediaType == "Episode" }
-
-                    if !movies.isEmpty {
-                        Section("Movies") {
-                            ForEach(movies, id: \.id) { download in
-                                DownloadRow(download: download, manager: manager)
-                            }
-                            .onDelete { indexSet in
-                                deleteDownloads(at: indexSet, from: movies, manager: manager)
-                            }
-                        }
-                    }
-
-                    if !episodes.isEmpty {
-                        // Group episodes by series
-                        let grouped = Dictionary(grouping: episodes) { $0.seriesName ?? "Unknown" }
-                        ForEach(grouped.keys.sorted(), id: \.self) { seriesName in
-                            Section(seriesName) {
-                                ForEach(grouped[seriesName]!, id: \.id) { download in
-                                    DownloadRow(download: download, manager: manager)
-                                }
-                                .onDelete { indexSet in
-                                    deleteDownloads(at: indexSet, from: grouped[seriesName]!, manager: manager)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Failed Downloads
-                let failedDownloads = manager.downloads.filter { $0.state == .failed }
-                if !failedDownloads.isEmpty {
-                    Section("Failed") {
-                        ForEach(failedDownloads, id: \.id) { download in
-                            DownloadRow(download: download, manager: manager)
-                        }
-                        .onDelete { indexSet in
-                            deleteDownloads(at: indexSet, from: failedDownloads, manager: manager)
-                        }
-                    }
-                }
-
-                // Storage Info
-                Section {
-                    HStack {
-                        Text("Total Downloaded")
-                        Spacer()
-                        Text(ByteCountFormatter.string(fromByteCount: manager.totalDownloadedSize, countStyle: .file))
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                activeDownloadsSection(manager: manager)
+                pendingDownloadsSection(manager: manager)
+                pausedDownloadsSection(manager: manager)
+                completedDownloadsSection(manager: manager)
+                failedDownloadsSection(manager: manager)
+                storageInfoSection(manager: manager)
             }
             .refreshable {
                 await manager.refresh()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func activeDownloadsSection(manager: DownloadManager) -> some View {
+        if !manager.activeDownloads.isEmpty {
+            Section("Downloading") {
+                ForEach(manager.activeDownloads, id: \.id) { download in
+                    DownloadRow(download: download, manager: manager)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func pendingDownloadsSection(manager: DownloadManager) -> some View {
+        let pendingDownloads = manager.downloads.filter { $0.state == .pending }
+        if !pendingDownloads.isEmpty {
+            Section("Waiting") {
+                ForEach(pendingDownloads, id: \.id) { download in
+                    DownloadRow(download: download, manager: manager)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func pausedDownloadsSection(manager: DownloadManager) -> some View {
+        let pausedDownloads = manager.downloads.filter { $0.state == .paused }
+        if !pausedDownloads.isEmpty {
+            Section("Paused") {
+                ForEach(pausedDownloads, id: \.id) { download in
+                    DownloadRow(download: download, manager: manager)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func completedDownloadsSection(manager: DownloadManager) -> some View {
+        if !manager.completedDownloads.isEmpty {
+            let movies = manager.completedDownloads.filter { $0.mediaType == "Movie" }
+            let episodes = manager.completedDownloads.filter { $0.mediaType == "Episode" }
+
+            if !movies.isEmpty {
+                Section("Movies") {
+                    ForEach(movies, id: \.id) { download in
+                        DownloadRow(download: download, manager: manager)
+                    }
+                    .onDelete { indexSet in
+                        deleteDownloads(at: indexSet, from: movies, manager: manager)
+                    }
+                }
+            }
+
+            if !episodes.isEmpty {
+                let grouped = Dictionary(grouping: episodes) { $0.seriesName ?? "Unknown" }
+                ForEach(grouped.keys.sorted(), id: \.self) { seriesName in
+                    Section(seriesName) {
+                        ForEach(grouped[seriesName]!, id: \.id) { download in
+                            DownloadRow(download: download, manager: manager)
+                        }
+                        .onDelete { indexSet in
+                            deleteDownloads(at: indexSet, from: grouped[seriesName]!, manager: manager)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func failedDownloadsSection(manager: DownloadManager) -> some View {
+        let failedDownloads = manager.downloads.filter { $0.state == .failed }
+        if !failedDownloads.isEmpty {
+            Section("Failed") {
+                ForEach(failedDownloads, id: \.id) { download in
+                    DownloadRow(download: download, manager: manager)
+                }
+                .onDelete { indexSet in
+                    deleteDownloads(at: indexSet, from: failedDownloads, manager: manager)
+                }
+            }
+        }
+    }
+
+    private func storageInfoSection(manager: DownloadManager) -> some View {
+        Section {
+            HStack {
+                Text("Total Downloaded")
+                Spacer()
+                Text(ByteCountFormatter.string(fromByteCount: manager.totalDownloadedSize, countStyle: .file))
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -208,7 +225,8 @@ struct DownloadRow: View {
 
             CompactDownloadButton(
                 state: buttonState,
-                onTap: handleAction
+                onDownload: handleDownloadAction,
+                onCancel: handleCancelAction
             )
         }
         .padding(.vertical, 4)
@@ -249,11 +267,9 @@ struct DownloadRow: View {
         }
     }
 
-    private func handleAction() {
+    private func handleDownloadAction() {
         Task {
             switch download.state {
-            case .downloading:
-                try? await manager.pauseDownload(download.id)
             case .paused:
                 try? await manager.resumeDownload(download.id)
             case .failed:
@@ -261,6 +277,14 @@ struct DownloadRow: View {
                 break
             default:
                 break
+            }
+        }
+    }
+
+    private func handleCancelAction() {
+        Task {
+            if download.state == .downloading {
+                try? await manager.pauseDownload(download.id)
             }
         }
     }
