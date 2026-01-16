@@ -162,9 +162,9 @@ extension MediaDetailView {
         else { return .notDownloaded }
 
         let serverID = credentials.serverURL.host ?? "default"
-        guard let download = manager.downloads.first(where: {
-            $0.itemID == episodeID && $0.serverID == serverID
-        }) else {
+
+        // Use O(1) dictionary lookup instead of linear search
+        guard let download = manager.downloadSync(forItemID: episodeID, serverID: serverID) else {
             return .notDownloaded
         }
 

@@ -27,6 +27,16 @@ public final class DownloadManager {
     /// Total downloaded size in bytes
     public private(set) var totalDownloadedSize: Int64 = 0
 
+    /// Dictionary for O(1) download lookups by itemID+serverID key
+    public var downloadsByKey: [String: Download] {
+        Dictionary(downloads.map { ("\($0.serverID)/\($0.itemID)", $0) }) { first, _ in first }
+    }
+
+    /// Get download for item synchronously (O(1) lookup)
+    public func downloadSync(forItemID itemID: String, serverID: String) -> Download? {
+        downloadsByKey["\(serverID)/\(itemID)"]
+    }
+
     /// Whether a refresh is in progress
     public private(set) var isRefreshing: Bool = false
 
