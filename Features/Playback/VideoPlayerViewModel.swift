@@ -9,7 +9,7 @@ import SwiftUI
 /// ViewModel managing video playback state and AVPlayer
 @MainActor
 @Observable
-public final class VideoPlayerViewModel {
+public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_length
     // MARK: - Public Properties
 
     /// The AVPlayer instance
@@ -189,6 +189,8 @@ public final class VideoPlayerViewModel {
 
             isReady = true
             print("[VideoPlayer] Ready to play. URL: \(info.url.absoluteString)")
+            // Temporarily disabled to debug black screen issue
+            // updateNowPlayingInfo(player: newPlayer)
 
         } catch {
             print("[VideoPlayer] Error loading media: \(error)")
@@ -312,6 +314,16 @@ public final class VideoPlayerViewModel {
                 print("[VideoPlayer] Failed to set up audio session: \(error)")
             }
         #endif
+    }
+
+    /// Updates Now Playing info for lock screen / control center
+    private func updateNowPlayingInfo(player: AVPlayer) {
+        let imageURL = appState.jellyfinServerURL?.appendingPathComponent("Items/\(item.id)/Images/Primary")
+        PiPPlaybackManager.shared.updateNowPlayingInfo(
+            for: item,
+            player: player,
+            imageURL: imageURL
+        )
     }
 
     private func observePlayer(_ player: AVPlayer) {

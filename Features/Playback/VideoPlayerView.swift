@@ -64,9 +64,8 @@ import SwiftUI
             .persistentSystemOverlays(.hidden)
             .task {
                 // Skip loading if we already have a player (restoration from PiP)
+                // Restoration completion is now handled by signalRestorationComplete() in updateUIViewController
                 guard existingPlayer == nil else {
-                    // Mark restoration as complete
-                    PiPPlaybackManager.shared.finishRestoration()
                     if viewModel.isReady && viewModel.errorMessage == nil {
                         viewModel.play()
                     }
@@ -136,8 +135,16 @@ import SwiftUI
         }
 
         func updateUIViewController(_ controller: AVPlayerViewController, context _: Context) {
+            let isRestoring = PiPPlaybackManager.shared.isRestoring
+            print("[VideoPlayer] updateUIVC - hasPlayer: \(player != nil), isRestoring: \(isRestoring)")
             if controller.player !== player {
+                print("[VideoPlayer] updateUIVC - attaching player")
                 controller.player = player
+                // If we're restoring from PiP, signal that UI is ready now
+                if isRestoring, player != nil {
+                    print("[VideoPlayer] updateUIVC - signaling restoration complete")
+                    PiPPlaybackManager.shared.signalRestorationComplete()
+                }
             }
         }
 
@@ -169,7 +176,16 @@ import SwiftUI
                 willEndFullScreenPresentationWithAnimationCoordinator _:
                 any UIViewControllerTransitionCoordinator
             ) {
+                print("[VideoPlayer] willEndFullScreenPresentation called")
                 Task { @MainActor in
+                    // Don't dismiss if we're in PiP mode or restoring from PiP
+                    // The restoration presents the controller, which triggers this delegate
+                    let pipManager = PiPPlaybackManager.shared
+                    if pipManager.isPiPActive || pipManager.isRestoring {
+                        print("[VideoPlayer] Skipping dismiss - PiP active or restoring")
+                        return
+                    }
+                    print("[VideoPlayer] Dismissing player view")
                     onDismiss()
                 }
             }
@@ -183,9 +199,17 @@ import SwiftUI
             ) {
                 print("[VideoPlayer] PiP started")
                 Task { @MainActor in
-                    // Hand off player to PiP manager
+                    // Hand off player, controller, AND delegate to PiP manager
+                    // CRITICAL: Pass self (Coordinator) to keep it alive after view dismissal!
+                    // AVPlayerViewController.delegate is weak, so without storing the delegate
+                    // in PiPPlaybackManager, it would be deallocated when the view dismisses.
                     if let player = playerViewController.player {
-                        PiPPlaybackManager.shared.pipDidStart(player: player, item: item)
+                        PiPPlaybackManager.shared.pipDidStart(
+                            player: player,
+                            item: item,
+                            controller: playerViewController,
+                            delegate: self
+                        )
                     }
                     // Dismiss the fullScreenCover
                     onPiPStart()
@@ -199,6 +223,7 @@ import SwiftUI
             nonisolated func playerViewControllerDidStopPictureInPicture(_: AVPlayerViewController) {
                 print("[VideoPlayer] PiP stopped")
                 Task { @MainActor in
+                    print("[VideoPlayer] PiP stopped - isRestoring: \(PiPPlaybackManager.shared.isRestoring)")
                     PiPPlaybackManager.shared.pipDidStop()
                 }
             }
@@ -215,15 +240,15 @@ import SwiftUI
                 restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler:
                 @escaping (Bool) -> Void
             ) {
+                print("[VideoPlayer] restoreUserInterface delegate called")
                 // Use nonisolated(unsafe) to handle Swift 6 concurrency
                 // The completion handler must be called on the main thread, which we ensure
                 nonisolated(unsafe) let unsafeCompletion = completionHandler
 
                 Task { @MainActor in
-                    PiPPlaybackManager.shared.requestRestoreUI()
-                    // Give time for UI to restore, then call completion
-                    try? await Task.sleep(for: .milliseconds(300))
-                    unsafeCompletion(true)
+                    print("[VideoPlayer] Requesting UI restoration from PiPManager")
+                    // Store completion handler - it will be called when the new view is ready
+                    PiPPlaybackManager.shared.requestRestoreUI(completion: unsafeCompletion)
                 }
             }
         }
