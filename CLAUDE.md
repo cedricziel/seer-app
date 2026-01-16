@@ -22,6 +22,13 @@ make resolve        # Resolve Swift package dependencies
 make clean          # Clean build artifacts and derived data
 ```
 
+Run a single test file:
+```bash
+xcodebuild test -scheme SeerApp \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -only-testing:PlaybackClientTests/PiPPlaybackManagerTests
+```
+
 Always run `make lint` and `make format` before committing.
 
 ## Architecture
@@ -39,29 +46,42 @@ Uses XcodeGen with `project.yml` to generate the Xcode project. Never edit `.xco
 - `Library/` - Media browsing (libraries, items, continue watching, latest)
 - `Search/` - Content search via Jellyseerr
 - `Requests/` - Media request management
+- `Playback/` - Video player with PiP support
+- `Downloads/` - Offline media downloads
+- `Servers/` - Multi-server management
 
 **Framework Targets (in `Packages/`)**
-- `SeerCore` - Shared utilities (AppState, KeychainManager, extensions)
+- `SeerCore` - Shared utilities (AppState, KeychainManager, SwiftData models)
 - `JellyfinClient` - Jellyfin API service and models
 - `JellyseerrClient` - Jellyseerr API service and models
 - `SeerUI` - Reusable UI components (MediaCard, PosterImage, LoadingView, etc.)
+- `PlaybackClient` - Video playback, streaming, and PiP management
+- `OfflineSync` - Offline library caching with SwiftData
+- `DownloadClient` - Background media downloads
 
 ### Key Patterns
 
 **MVVM Architecture**
 - Each feature has a View + ViewModel pair
-- ViewModels are `@Observable` classes with `@Published` properties
+- ViewModels are `@MainActor` classes using `@Published` properties
 - Views observe state changes and call ViewModel methods
 
 **App State Management**
 - `AppState` (in SeerCore) is the central state holder, injected via `@Environment`
-- Manages authentication state, credentials, and error handling
+- Manages authentication state, credentials, and multi-server configuration
 - Credentials stored in Keychain via `KeychainManager`
+- Server configurations persisted with SwiftData (`ServerConfiguration` model)
 
 **Service Layer**
 - `JellyfinService` - Handles Jellyfin API (auth, libraries, items, images, search)
 - `JellyseerrService` - Handles Jellyseerr API (auth, search, requests, media details)
+- `PlaybackService` - Streaming URL building and playback session management
 - Services are created by ViewModels using credentials from AppState
+
+**Offline Support**
+- SwiftData models in `SeerCore`: `CachedLibrary`, `CachedMediaItem`, `CachedUserProgress`
+- Sync services in `OfflineSync`: `LibrarySyncService`, `MediaItemSyncService`
+- `NetworkMonitor` detects connectivity; views show cached data when offline
 
 ### Dependencies
 - `JellyfinAPI` (jellyfin-sdk-swift) - Official Jellyfin SDK
