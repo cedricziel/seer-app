@@ -69,7 +69,7 @@ import UIKit
             }
             .preferredColorScheme(.dark)
             .persistentSystemOverlays(.hidden)
-            .task {
+            .onAppear {
                 // Skip loading if we already have a player (restoration from PiP)
                 // Restoration completion is now handled by signalRestorationComplete() in updateUIViewController
                 guard existingPlayer == nil else {
@@ -78,10 +78,13 @@ import UIKit
                     }
                     return
                 }
-                await viewModel.loadMedia(startPositionTicks: startPositionTicks)
-                // Auto-play when ready
-                if viewModel.isReady && viewModel.errorMessage == nil {
-                    viewModel.play()
+                // Use explicit Task to avoid SwiftUI's .task cancellation during fullScreenCover presentation
+                Task {
+                    await viewModel.loadMedia(startPositionTicks: startPositionTicks)
+                    // Auto-play when ready
+                    if viewModel.isReady && viewModel.errorMessage == nil {
+                        viewModel.play()
+                    }
                 }
             }
             .onDisappear {
@@ -113,12 +116,25 @@ import UIKit
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
 
-                Button("Close") {
-                    dismiss()
+                HStack(spacing: 16) {
+                    Button("Retry") {
+                        Task {
+                            await viewModel.loadMedia(startPositionTicks: startPositionTicks)
+                            if viewModel.isReady && viewModel.errorMessage == nil {
+                                viewModel.play()
+                            }
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityHint("Double tap to retry loading the video")
+
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityHint("Double tap to close the player")
                 }
-                .buttonStyle(.borderedProminent)
                 .padding(.top)
-                .accessibilityHint("Double tap to close the player")
             }
             .foregroundStyle(.white)
             .accessibilityElement(children: .combine)

@@ -155,6 +155,14 @@ public final class VideoPlayerViewModel {
             )
 
             isReady = true
+        } catch is CancellationError {
+            // Task was cancelled (e.g., view lifecycle during presentation) - don't show error
+            isBuffering = false
+            return
+        } catch let error as URLError where error.code == .cancelled {
+            // URL request was cancelled - treat same as CancellationError
+            isBuffering = false
+            return
         } catch {
             errorMessage = error.localizedDescription
             isBuffering = false
