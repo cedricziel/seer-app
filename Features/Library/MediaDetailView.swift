@@ -31,6 +31,12 @@ struct MediaDetailView: View {
     @State var episodeDownloadStates: [String: DownloadButtonState] = [:]
     @State var selectedEpisodeForDetail: MediaItem?
     @State var showEpisodeDetail: Bool = false
+    @State private var detailedItem: MediaItem?
+
+    /// The item to display - uses detailed item if available, otherwise falls back to passed item
+    var displayItem: MediaItem {
+        detailedItem ?? item
+    }
 
     var body: some View {
         ScrollView {
@@ -51,6 +57,11 @@ struct MediaDetailView: View {
                     // Overview
                     if let overview = item.overview {
                         overviewSection(overview)
+                    }
+
+                    // Format Info (for playable items)
+                    if source == .library, item.isPlayable {
+                        formatInfoSection
                     }
 
                     // Genres
@@ -78,6 +89,12 @@ struct MediaDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            // Fetch detailed item info with MediaSources for format info
+            if source == .library, item.isPlayable {
+                detailedItem = await viewModel.getItemDetails(id: item.id)
+            }
+
+            // Load series details
             guard item.type == .series, source == .library else { return }
             seriesViewModel = SeriesDetailViewModel(series: item, appState: appState)
             await seriesViewModel?.loadSeasons()

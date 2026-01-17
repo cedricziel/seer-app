@@ -200,9 +200,23 @@ public extension JellyfinService {
             throw JellyfinError.notAuthenticated
         }
 
-        let url = serverURL.appendingPathComponent("Users/\(userID)/Items/\(id)")
-        let request = try authenticatedRequest(url: url)
+        var components = try serverURL
+            .appendingPathComponent("Users/\(userID)/Items/\(id)")
+            .urlComponents()
 
+        // Include MediaSources to get format information
+        components.queryItems = [
+            URLQueryItem(
+                name: "Fields",
+                value: "Overview,Genres,Studios,People,ProviderIds,CommunityRating,OfficialRating,MediaSources"
+            )
+        ]
+
+        guard let url = components.url else {
+            throw JellyfinError.invalidURL
+        }
+
+        let request = try authenticatedRequest(url: url)
         let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
 

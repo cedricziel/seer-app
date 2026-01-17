@@ -130,6 +130,57 @@ extension MediaDetailView {
         }
     }
 
+    // MARK: - Format Info Section
+
+    @ViewBuilder
+    var formatInfoSection: some View {
+        let formatItem = displayItem
+        let hasFormatInfo = formatItem.formattedVideoInfo != nil ||
+            formatItem.formattedAudioInfo != nil ||
+            formatItem.formattedContainer != nil
+
+        if hasFormatInfo {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Format")
+                    .font(.headline)
+
+                HStack(spacing: 16) {
+                    if let videoInfo = formatItem.formattedVideoInfo {
+                        formatBadge(icon: "video", label: "Video", value: videoInfo)
+                    }
+
+                    if let audioInfo = formatItem.formattedAudioInfo {
+                        formatBadge(icon: "speaker.wave.2", label: "Audio", value: audioInfo)
+                    }
+
+                    if let container = formatItem.formattedContainer {
+                        formatBadge(icon: "doc", label: "Container", value: container)
+                    }
+                }
+            }
+        }
+    }
+
+    private func formatBadge(icon: String, label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(label)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
     // MARK: - Genres Section
 
     func genresSection(_ genres: [String]) -> some View {

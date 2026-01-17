@@ -285,6 +285,11 @@ public final class MediaItemSyncService {
             imageBlurHashBackdrop: serverItem.imageBlurHashes?.backdrop?.values.first,
             lastSyncedAt: Date(),
             premiereDate: serverItem.premiereDate,
+            container: serverItem.container,
+            videoCodec: serverItem.videoCodec,
+            audioCodec: serverItem.audioCodec,
+            videoResolution: serverItem.videoResolution,
+            audioChannels: serverItem.audioChannels,
             libraryId: library?.id,
             library: library
         )
@@ -311,6 +316,13 @@ public final class MediaItemSyncService {
         cached.imageBlurHashBackdrop = serverItem.imageBlurHashes?.backdrop?.values.first
         cached.premiereDate = serverItem.premiereDate
         cached.lastSyncedAt = Date()
+
+        // Update format information
+        cached.container = serverItem.container
+        cached.videoCodec = serverItem.videoCodec
+        cached.audioCodec = serverItem.audioCodec
+        cached.videoResolution = serverItem.videoResolution
+        cached.audioChannels = serverItem.audioChannels
 
         if let library {
             cached.library = library

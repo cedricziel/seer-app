@@ -13,6 +13,10 @@ settings:
     SWIFT_VERSION: "6.0"
     ENABLE_USER_SCRIPT_SANDBOXING: false
 
+configFiles:
+  Debug: Config/Secrets.xcconfig
+  Release: Config/Secrets.xcconfig
+
 packages:
   JellyfinAPI:
     url: https://github.com/jellyfin/jellyfin-sdk-swift
@@ -22,6 +26,9 @@ packages:
     from: "8.0.0"
   JellyseerrAPI:
     path: Packages/JellyseerrAPI
+  ErrataSDK:
+    url: https://github.com/cedricziel/errata
+    branch: main
 
 targets:
   SeerApp:
@@ -89,6 +96,9 @@ targets:
       - path: Packages/SeerCore/Sources/SeerCore
         excludes:
           - "**/.DS_Store"
+    dependencies:
+      - package: ErrataSDK
+        product: ErrataSDK
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.core

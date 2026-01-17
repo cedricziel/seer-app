@@ -36,6 +36,14 @@ public struct StreamInfo: Sendable {
         case directPlay
         case directStream
         case hls
+
+        public var debugDescription: String {
+            switch self {
+            case .directPlay: return "DirectPlay"
+            case .directStream: return "DirectStream"
+            case .hls: return "HLS"
+            }
+        }
     }
 
     public init(

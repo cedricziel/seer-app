@@ -285,6 +285,17 @@ public final class LibraryViewModel: ObservableObject {
         serverURL?.appendingPathComponent("Items/\(library.id)/Images/Primary")
     }
 
+    /// Fetch full item details including format information (MediaSources)
+    func getItemDetails(id: String) async -> MediaItem? {
+        guard let service = jellyfinService else { return nil }
+        do {
+            return try await service.getItem(id: id)
+        } catch {
+            Self.logger.error("Failed to fetch item details: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
     /// Mark an item as watched or unwatched
     func markAsWatched(_ item: MediaItem, watched: Bool) async throws {
         guard let service = jellyfinService else { return }

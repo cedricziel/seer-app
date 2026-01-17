@@ -37,6 +37,7 @@ public final class DiagnosticsConsent: ObservableObject {
         didSet {
             UserDefaults.standard.set(crashReportsEnabled, forKey: Keys.crashReportsEnabled)
             logConsentChange("Crash reports", enabled: crashReportsEnabled)
+            notifyConsentChanged()
         }
     }
 
@@ -45,6 +46,7 @@ public final class DiagnosticsConsent: ObservableObject {
         didSet {
             UserDefaults.standard.set(performanceMetricsEnabled, forKey: Keys.performanceMetricsEnabled)
             logConsentChange("Performance metrics", enabled: performanceMetricsEnabled)
+            notifyConsentChanged()
         }
     }
 
@@ -122,6 +124,11 @@ public final class DiagnosticsConsent: ObservableObject {
 
     private func logConsentChange(_ feature: String, enabled: Bool) {
         Self.logger.info("\(feature) consent changed to: \(enabled)")
+    }
+
+    private func notifyConsentChanged() {
+        // Notify MetricsReporter to initialize/update Errata SDK
+        MetricsReporter.shared.onConsentChanged()
     }
 }
 

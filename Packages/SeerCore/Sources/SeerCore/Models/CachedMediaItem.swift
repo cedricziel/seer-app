@@ -46,6 +46,14 @@ public final class CachedMediaItem {
     public var lastSyncedAt: Date = Date()
     public var premiereDate: Date?
 
+    // MARK: - Format Information
+
+    public var container: String?
+    public var videoCodec: String?
+    public var audioCodec: String?
+    public var videoResolution: String?
+    public var audioChannels: Int?
+
     // MARK: - Relationship IDs (for predicate queries)
 
     public var libraryId: String?
@@ -90,6 +98,11 @@ public final class CachedMediaItem {
         hasLocalPrimaryImage: Bool = false,
         lastSyncedAt: Date = Date(),
         premiereDate: Date? = nil,
+        container: String? = nil,
+        videoCodec: String? = nil,
+        audioCodec: String? = nil,
+        videoResolution: String? = nil,
+        audioChannels: Int? = nil,
         libraryId: String? = nil,
         library: CachedLibrary? = nil,
         parentSeries: CachedMediaItem? = nil,
@@ -119,6 +132,11 @@ public final class CachedMediaItem {
         self.hasLocalPrimaryImage = hasLocalPrimaryImage
         self.lastSyncedAt = lastSyncedAt
         self.premiereDate = premiereDate
+        self.container = container
+        self.videoCodec = videoCodec
+        self.audioCodec = audioCodec
+        self.videoResolution = videoResolution
+        self.audioChannels = audioChannels
         self.libraryId = libraryId ?? library?.id
         self.library = library
         self.parentSeries = parentSeries
@@ -144,5 +162,38 @@ public final class CachedMediaItem {
             return "\(hours)h \(mins)m"
         }
         return "\(mins)m"
+    }
+
+    /// Formatted video info string (e.g., "H.264 1080p")
+    public var formattedVideoInfo: String? {
+        guard let codec = videoCodec else { return nil }
+        let codecDisplay = codec.uppercased()
+        if let resolution = videoResolution {
+            return "\(codecDisplay) \(resolution)"
+        }
+        return codecDisplay
+    }
+
+    /// Formatted audio info string (e.g., "AAC 5.1")
+    public var formattedAudioInfo: String? {
+        guard let codec = audioCodec else { return nil }
+        let codecDisplay = codec.uppercased()
+        if let channels = audioChannels {
+            let channelString: String
+            switch channels {
+            case 1: channelString = "Mono"
+            case 2: channelString = "Stereo"
+            case 6: channelString = "5.1"
+            case 8: channelString = "7.1"
+            default: channelString = "\(channels)ch"
+            }
+            return "\(codecDisplay) \(channelString)"
+        }
+        return codecDisplay
+    }
+
+    /// Formatted container string (e.g., "MP4")
+    public var formattedContainer: String? {
+        container?.uppercased()
     }
 }

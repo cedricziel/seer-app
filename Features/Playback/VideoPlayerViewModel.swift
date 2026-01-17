@@ -3,9 +3,12 @@ import AVKit
 import Combine
 import DownloadClient
 import JellyfinClient
+import OSLog
 import PlaybackClient
 import SeerCore
 import SwiftUI
+
+private let logger = Logger(subsystem: "com.cedricziel.seer", category: "VideoPlayer")
 
 /// ViewModel managing video playback state and AVPlayer
 @MainActor
@@ -111,17 +114,21 @@ public final class VideoPlayerViewModel {
 
     /// Load media from streaming server
     private func loadFromStream(startPositionTicks: Int64) async {
+        print("🎬 [VideoPlayer] loadFromStream called for item: \(item.id)")
         guard let service = playbackService else {
+            print("🎬 [VideoPlayer] ERROR: No playback service")
             errorMessage = "Not authenticated. Please check your server connection."
             isBuffering = false
             return
         }
 
         do {
+            print("🎬 [VideoPlayer] Getting stream info...")
             let info = try await service.getStreamInfo(
                 itemId: item.id,
                 startPositionTicks: startPositionTicks
             )
+            print("🎬 [VideoPlayer] Got stream info successfully")
             streamInfo = info
             audioTracks = info.audioStreams
             subtitleTracks = info.subtitleStreams
@@ -132,7 +139,7 @@ public final class VideoPlayerViewModel {
                 duration = dur
             }
 
-            let playerItem = AVPlayerItem(url: info.url)
+            let playerItem = createPlayerItem(from: info)
             let newPlayer = AVPlayer(playerItem: playerItem)
             player = newPlayer
             observePlayer(newPlayer)
@@ -337,6 +344,22 @@ public final class VideoPlayerViewModel {
         #endif
     }
 
+    /// Creates an AVPlayerItem with appropriate authentication for the stream type
+    private func createPlayerItem(from info: StreamInfo) -> AVPlayerItem {
+        // Log stream info for debugging
+        let streamTypeStr: String
+        switch info.type {
+        case .hls: streamTypeStr = "HLS"
+        case .directPlay: streamTypeStr = "DirectPlay"
+        case .directStream: streamTypeStr = "DirectStream"
+        }
+        print("🎬 [VideoPlayer] Stream type: \(streamTypeStr)")
+        print("🎬 [VideoPlayer] Stream URL: \(info.url.absoluteString)")
+
+        // All stream types now have auth in URL query params
+        return AVPlayerItem(url: info.url)
+    }
+
     /// Updates Now Playing info for lock screen / control center
     private func updateNowPlayingInfo(player: AVPlayer) {
         let imageURL = appState.jellyfinServerURL?.appendingPathComponent("Items/\(item.id)/Images/Primary")
@@ -398,14 +421,34 @@ public final class VideoPlayerViewModel {
     private func handleItemStatus(_ status: AVPlayerItem.Status) {
         switch status {
         case .readyToPlay:
+            print("🎬 [VideoPlayer] AVPlayerItem ready to play")
             isBuffering = false
             if let dur = player?.currentItem?.duration.seconds, dur.isFinite { duration = dur }
         case .failed:
-            errorMessage = player?.currentItem?.error?.localizedDescription ?? "Playback failed"
-            isBuffering = false
-        case .unknown: break
+            handlePlaybackFailure()
+        case .unknown:
+            print("🎬 [VideoPlayer] AVPlayerItem status unknown")
         @unknown default: break
         }
+    }
+
+    private func handlePlaybackFailure() {
+        let playerError = player?.currentItem?.error
+        let errorDesc = playerError?.localizedDescription ?? "Playback failed"
+        print("🎬 [VideoPlayer] AVPlayerItem FAILED: \(errorDesc)")
+        logPlaybackError(playerError)
+        let streamTypeStr = streamInfo?.type.debugDescription ?? "Unknown"
+        errorMessage = "[\(streamTypeStr)] \(errorDesc)"
+        isBuffering = false
+    }
+
+    private func logPlaybackError(_ error: Error?) {
+        guard let nsError = error as? NSError else { return }
+        print("🎬 [VideoPlayer] Error domain: \(nsError.domain), code: \(nsError.code)")
+        print("🎬 [VideoPlayer] Error userInfo: \(nsError.userInfo)")
+        guard let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? NSError else { return }
+        print("🎬 [VideoPlayer] Underlying error: \(underlyingError.domain), code: \(underlyingError.code)")
+        print("🎬 [VideoPlayer] Underlying userInfo: \(underlyingError.userInfo)")
     }
 
     private func scheduleControlsHide() {
