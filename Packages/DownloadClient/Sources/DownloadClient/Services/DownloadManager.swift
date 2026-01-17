@@ -357,11 +357,32 @@ public final class DownloadManager {
             let playbackService = PlaybackService(
                 serverURL: serverURL, accessToken: accessToken, userID: userID ?? "", deviceID: deviceID
             )
-            let streamInfo = try await playbackService.getStreamInfo(itemId: download.itemID)
-            let downloadURL = buildDownloadURL(
-                itemID: download.itemID, mediaSourceID: streamInfo.mediaSourceId,
-                serverURL: serverURL, accessToken: accessToken, quality: download.quality
-            )
+
+            // Get full playback info to check format compatibility
+            let playbackInfo = try await playbackService.getPlaybackInfo(itemId: download.itemID)
+
+            guard let mediaSource = playbackInfo.mediaSources.first else {
+                throw DownloadError.downloadFailed("No media source available")
+            }
+
+            // Convert quality setting to StreamURLBuilder format
+            let qualitySettings = convertQuality(download.quality)
+
+            // Build download URL using the same logic as playback
+            guard let (downloadURL, isTranscoded) = StreamURLBuilder.buildDownloadURL(
+                mediaSource: mediaSource,
+                serverURL: serverURL,
+                accessToken: accessToken,
+                deviceID: deviceID,
+                quality: qualitySettings
+            ) else {
+                throw DownloadError.downloadFailed("No suitable download method available")
+            }
+
+            print("[Download] Starting download: \(download.name)")
+            print("[Download] URL: \(downloadURL.absoluteString)")
+            print("[Download] Transcoded: \(isTranscoded)")
+
             let headers = StreamURLBuilder.buildAuthHeaders(accessToken: accessToken, deviceID: deviceID)
             let task = sessionManager.startDownload(url: downloadURL, downloadID: downloadID, headers: headers)
             try await store.updateTaskIdentifier(downloadID: downloadID, taskIdentifier: task.taskIdentifier)
@@ -375,33 +396,18 @@ public final class DownloadManager {
         }
     }
 
-    private func buildDownloadURL(
-        itemID: String,
-        mediaSourceID: String,
-        serverURL: URL,
-        accessToken: String,
-        quality: DownloadQuality
-    ) -> URL {
-        guard var components = URLComponents(
-            url: serverURL.appendingPathComponent("Items/\(itemID)/Download"),
-            resolvingAgainstBaseURL: false
-        ) else {
-            return serverURL
+    /// Convert DownloadQuality to StreamURLBuilder.DownloadQualitySettings
+    private func convertQuality(_ quality: DownloadQuality) -> StreamURLBuilder.DownloadQualitySettings {
+        switch quality {
+        case .original:
+            return .original
+        case .high:
+            return .high
+        case .medium:
+            return .medium
+        case .low:
+            return .low
         }
-
-        var queryItems = [
-            URLQueryItem(name: "api_key", value: accessToken),
-            URLQueryItem(name: "mediaSourceId", value: mediaSourceID)
-        ]
-
-        // Add quality restrictions if not original
-        if quality != .original, let maxWidth = quality.maxWidth {
-            queryItems.append(URLQueryItem(name: "MaxWidth", value: String(maxWidth)))
-            queryItems.append(URLQueryItem(name: "VideoBitRate", value: String(quality.maxBitrate)))
-        }
-
-        components.queryItems = queryItems
-        return components.url ?? serverURL
     }
 
     // MARK: - Error Types

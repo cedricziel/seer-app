@@ -32,6 +32,40 @@ public struct MediaSource: Codable, Sendable, Identifiable {
     public let mediaStreams: [MediaStream]?
     public let runTimeTicks: Int64?
 
+    public init(
+        id: String,
+        name: String? = nil,
+        path: String? = nil,
+        container: String? = nil,
+        size: Int64? = nil,
+        bitrate: Int? = nil,
+        supportsDirectPlay: Bool? = nil,
+        supportsDirectStream: Bool? = nil,
+        supportsTranscoding: Bool? = nil,
+        directStreamUrl: String? = nil,
+        transcodingUrl: String? = nil,
+        transcodingSubProtocol: String? = nil,
+        transcodingContainer: String? = nil,
+        mediaStreams: [MediaStream]? = nil,
+        runTimeTicks: Int64? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.path = path
+        self.container = container
+        self.size = size
+        self.bitrate = bitrate
+        self.supportsDirectPlay = supportsDirectPlay
+        self.supportsDirectStream = supportsDirectStream
+        self.supportsTranscoding = supportsTranscoding
+        self.directStreamUrl = directStreamUrl
+        self.transcodingUrl = transcodingUrl
+        self.transcodingSubProtocol = transcodingSubProtocol
+        self.transcodingContainer = transcodingContainer
+        self.mediaStreams = mediaStreams
+        self.runTimeTicks = runTimeTicks
+    }
+
     enum CodingKeys: String, CodingKey {
         case id = "Id"
         case name = "Name"
@@ -69,6 +103,38 @@ public struct MediaStream: Codable, Sendable, Identifiable {
     public let bitRate: Int?
     public let channels: Int?
     public let sampleRate: Int?
+
+    public init(
+        index: Int,
+        type: StreamType,
+        codec: String? = nil,
+        language: String? = nil,
+        displayTitle: String? = nil,
+        title: String? = nil,
+        isDefault: Bool? = nil,
+        isExternal: Bool? = nil,
+        deliveryUrl: String? = nil,
+        width: Int? = nil,
+        height: Int? = nil,
+        bitRate: Int? = nil,
+        channels: Int? = nil,
+        sampleRate: Int? = nil
+    ) {
+        self.index = index
+        self.type = type
+        self.codec = codec
+        self.language = language
+        self.displayTitle = displayTitle
+        self.title = title
+        self.isDefault = isDefault
+        self.isExternal = isExternal
+        self.deliveryUrl = deliveryUrl
+        self.width = width
+        self.height = height
+        self.bitRate = bitRate
+        self.channels = channels
+        self.sampleRate = sampleRate
+    }
 
     public enum StreamType: String, Codable, Sendable {
         case video = "Video"
