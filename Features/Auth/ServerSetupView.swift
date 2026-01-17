@@ -5,20 +5,23 @@ import SwiftUI
 /// View for setting up server connections
 struct ServerSetupView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var onboardingManager: OnboardingManager
 
     var body: some View {
-        ServerSetupContentView(appState: appState)
+        ServerSetupContentView(appState: appState, onboardingManager: onboardingManager)
     }
 }
 
 /// Internal view that creates the view model with the correct AppState
 private struct ServerSetupContentView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject var onboardingManager: OnboardingManager
     @StateObject private var viewModel: AuthViewModel
     @StateObject private var cloudKitStatus = CloudKitStatus()
 
-    init(appState: AppState) {
+    init(appState: AppState, onboardingManager: OnboardingManager) {
         self.appState = appState
+        self.onboardingManager = onboardingManager
         _viewModel = StateObject(wrappedValue: AuthViewModel(appState: appState))
     }
 
@@ -264,6 +267,7 @@ private struct ServerSetupContentView: View {
             Spacer()
 
             Button(action: {
+                onboardingManager.markOnboardingComplete()
                 viewModel.completeSetup()
             }, label: {
                 Text("Get Started")
@@ -313,4 +317,5 @@ private struct ServerSetupContentView: View {
 #Preview {
     ServerSetupView()
         .environmentObject(AppState())
+        .environmentObject(OnboardingManager())
 }

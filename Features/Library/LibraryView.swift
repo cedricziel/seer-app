@@ -7,20 +7,23 @@ import SwiftUI
 /// Main library browsing view
 struct LibraryView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var onboardingManager: OnboardingManager
 
     var body: some View {
-        LibraryContentView(appState: appState)
+        LibraryContentView(appState: appState, onboardingManager: onboardingManager)
     }
 }
 
 /// Internal view that creates the view model with the correct AppState
 private struct LibraryContentView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject var onboardingManager: OnboardingManager
     @StateObject private var viewModel: LibraryViewModel
     @State private var selectedItemForPlayback: MediaItem?
 
-    init(appState: AppState) {
+    init(appState: AppState, onboardingManager: OnboardingManager) {
         self.appState = appState
+        self.onboardingManager = onboardingManager
         _viewModel = StateObject(wrappedValue: LibraryViewModel(appState: appState))
     }
 
@@ -94,6 +97,9 @@ private struct LibraryContentView: View {
     private var contentView: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
+                if onboardingManager.isFirstLaunchAfterSetup {
+                    firstTimeTipSection
+                }
                 if viewModel.isLoadingContinueWatching {
                     SkeletonCardRow(title: "Continue Watching", cardCount: 4, cardWidth: 140)
                 } else if !viewModel.continueWatching.isEmpty {
@@ -114,6 +120,24 @@ private struct LibraryContentView: View {
             .padding(.vertical)
         }
         .refreshable { await viewModel.refresh() }
+    }
+
+    private var firstTimeTipSection: some View {
+        VStack(spacing: 12) {
+            OnboardingTipView(
+                title: "Welcome to Your Library",
+                description: "Your library is syncing. Explore the Discover tab to find new content while you wait."
+            )
+            .padding(.horizontal)
+
+            Button {
+                onboardingManager.clearFirstLaunchFlag()
+            } label: {
+                Text("Dismiss")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     private var continueWatchingSection: some View {
@@ -286,4 +310,5 @@ private struct LibraryContentView: View {
 #Preview {
     LibraryView()
         .environmentObject(AppState())
+        .environmentObject(OnboardingManager())
 }

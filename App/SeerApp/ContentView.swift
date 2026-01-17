@@ -1,17 +1,21 @@
 import PlaybackClient
 import SeerCore
+import SeerUI
 import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var appState: AppState
+    @StateObject private var onboardingManager = OnboardingManager()
     @State private var showPiPRestorePlayer = false
 
     var body: some View {
         Group {
             if appState.isAuthenticated {
                 MainTabView()
+                    .environmentObject(onboardingManager)
             } else {
                 ServerSetupView()
+                    .environmentObject(onboardingManager)
             }
         }
         .animation(.easeInOut, value: appState.isAuthenticated)
@@ -30,10 +34,26 @@ struct ContentView: View {
                 Color.clear.onAppear { showPiPRestorePlayer = false }
             }
         }
+        .sheet(isPresented: $onboardingManager.showWhatsNew) {
+            WhatsNewView(
+                appName: "Seer",
+                features: WhatsNewData.features,
+                onContinue: {
+                    onboardingManager.markWhatsNewSeen()
+                }
+            )
+            .interactiveDismissDisabled()
+            .presentationDetents([.large])
+        }
         .onChange(of: PiPPlaybackManager.shared.shouldRestorePlayer) { _, shouldRestore in
             if shouldRestore {
                 showPiPRestorePlayer = true
                 PiPPlaybackManager.shared.clearRestoreRequest()
+            }
+        }
+        .onAppear {
+            if appState.isAuthenticated {
+                onboardingManager.checkAndShowWhatsNew()
             }
         }
     }

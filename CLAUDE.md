@@ -83,6 +83,14 @@ Uses XcodeGen with `project.yml` to generate the Xcode project. Never edit `.xco
 - Sync services in `OfflineSync`: `LibrarySyncService`, `MediaItemSyncService`
 - `NetworkMonitor` detects connectivity; views show cached data when offline
 
+**Onboarding & What's New**
+- `OnboardingManager` tracks first-launch and version states via `@AppStorage`
+- What's New modal shown to returning users after app updates
+- First-time tips displayed in empty states for new users
+- Feature content defined in `App/SeerApp/WhatsNew/WhatsNewData.swift`
+- UI components in `Packages/SeerUI/Sources/SeerUI/WhatsNew/` and `.../Onboarding/`
+- See `docs/onboarding.md` for detailed documentation
+
 ### Dependencies
 - `JellyfinAPI` (jellyfin-sdk-swift) - Official Jellyfin SDK
 - `Kingfisher` - Image loading and caching
