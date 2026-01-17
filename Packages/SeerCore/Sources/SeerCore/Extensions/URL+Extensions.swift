@@ -24,4 +24,12 @@ public extension URL {
 
         return components.url
     }
+
+    /// Returns URLComponents from this URL, throwing if conversion fails
+    func urlComponents(resolvingAgainstBaseURL: Bool = false) throws -> URLComponents {
+        guard let components = URLComponents(url: self, resolvingAgainstBaseURL: resolvingAgainstBaseURL) else {
+            throw URLError(.badURL)
+        }
+        return components
+    }
 }

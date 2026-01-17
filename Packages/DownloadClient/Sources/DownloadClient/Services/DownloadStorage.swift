@@ -11,6 +11,7 @@ public actor DownloadStorage {
         case moveFileFailed
         case deleteFailed
         case insufficientStorage
+        case storageUnavailable
 
         public var errorDescription: String? {
             switch self {
@@ -24,12 +25,16 @@ public actor DownloadStorage {
                 "Failed to delete file"
             case .insufficientStorage:
                 "Insufficient storage space"
+            case .storageUnavailable:
+                "Storage location unavailable"
             }
         }
     }
 
     public init() throws {
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            throw StorageError.storageUnavailable
+        }
         downloadsDirectory = documentsPath.appendingPathComponent("Downloads", isDirectory: true)
 
         // Create downloads directory if needed

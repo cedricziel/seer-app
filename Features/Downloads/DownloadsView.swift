@@ -124,12 +124,14 @@ struct DownloadsView: View {
             if !episodes.isEmpty {
                 let grouped = Dictionary(grouping: episodes) { $0.seriesName ?? "Unknown" }
                 ForEach(grouped.keys.sorted(), id: \.self) { seriesName in
-                    Section(seriesName) {
-                        ForEach(grouped[seriesName]!, id: \.id) { download in
-                            DownloadRow(download: download, manager: manager)
-                        }
-                        .onDelete { indexSet in
-                            deleteDownloads(at: indexSet, from: grouped[seriesName]!, manager: manager)
+                    if let seriesEpisodes = grouped[seriesName] {
+                        Section(seriesName) {
+                            ForEach(seriesEpisodes, id: \.id) { download in
+                                DownloadRow(download: download, manager: manager)
+                            }
+                            .onDelete { indexSet in
+                                deleteDownloads(at: indexSet, from: seriesEpisodes, manager: manager)
+                            }
                         }
                     }
                 }

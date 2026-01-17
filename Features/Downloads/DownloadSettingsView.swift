@@ -136,8 +136,12 @@ struct DownloadSettingsView: View {
         }
 
         // Get available storage
+        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            availableStorage = 0
+            return
+        }
+
         do {
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
             let resourceValues = try documentsPath
                 .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
             availableStorage = resourceValues.volumeAvailableCapacityForImportantUsage ?? 0

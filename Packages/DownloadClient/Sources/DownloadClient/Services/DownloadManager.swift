@@ -382,10 +382,12 @@ public final class DownloadManager {
         accessToken: String,
         quality: DownloadQuality
     ) -> URL {
-        var components = URLComponents(
+        guard var components = URLComponents(
             url: serverURL.appendingPathComponent("Items/\(itemID)/Download"),
             resolvingAgainstBaseURL: false
-        )!
+        ) else {
+            return serverURL
+        }
 
         var queryItems = [
             URLQueryItem(name: "api_key", value: accessToken),
@@ -399,7 +401,7 @@ public final class DownloadManager {
         }
 
         components.queryItems = queryItems
-        return components.url!
+        return components.url ?? serverURL
     }
 
     // MARK: - Error Types

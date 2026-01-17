@@ -156,10 +156,9 @@ public extension JellyfinService {
             throw JellyfinError.notAuthenticated
         }
 
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("Users/\(userID)/Items"),
-            resolvingAgainstBaseURL: false
-        )!
+        var components = try serverURL
+            .appendingPathComponent("Users/\(userID)/Items")
+            .urlComponents()
 
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "SortBy", value: sortBy),
@@ -216,10 +215,9 @@ public extension JellyfinService {
             throw JellyfinError.notAuthenticated
         }
 
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("Users/\(userID)/Items/Resume"),
-            resolvingAgainstBaseURL: false
-        )!
+        var components = try serverURL
+            .appendingPathComponent("Users/\(userID)/Items/Resume")
+            .urlComponents()
         components.queryItems = [
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "Fields", value: "Overview"),
@@ -248,10 +246,9 @@ public extension JellyfinService {
             throw JellyfinError.notAuthenticated
         }
 
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("Users/\(userID)/Items/Latest"),
-            resolvingAgainstBaseURL: false
-        )!
+        var components = try serverURL
+            .appendingPathComponent("Users/\(userID)/Items/Latest")
+            .urlComponents()
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "Limit", value: String(limit)),
             URLQueryItem(name: "Fields", value: "Overview,Genres")
@@ -315,10 +312,9 @@ public extension JellyfinService {
             throw JellyfinError.notAuthenticated
         }
 
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("Users/\(userID)/Items"),
-            resolvingAgainstBaseURL: false
-        )!
+        var components = try serverURL
+            .appendingPathComponent("Users/\(userID)/Items")
+            .urlComponents()
         components.queryItems = [
             URLQueryItem(name: "SearchTerm", value: query),
             URLQueryItem(name: "Limit", value: String(limit)),
@@ -350,10 +346,12 @@ public extension JellyfinService {
         maxWidth: Int? = nil,
         maxHeight: Int? = nil
     ) -> URL {
-        var components = URLComponents(
+        guard var components = URLComponents(
             url: serverURL.appendingPathComponent("Items/\(itemID)/Images/\(imageType.rawValue)"),
             resolvingAgainstBaseURL: false
-        )!
+        ) else {
+            return serverURL
+        }
 
         var queryItems: [URLQueryItem] = []
         if let maxWidth {

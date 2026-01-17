@@ -110,13 +110,15 @@ public enum StreamURLBuilder {
         audioStreamIndex: Int? = nil,
         subtitleStreamIndex: Int? = nil
     ) -> URL {
-        var components = URLComponents(
+        guard var components = URLComponents(
             url: serverURL
                 .appendingPathComponent("Videos")
                 .appendingPathComponent(itemId)
                 .appendingPathComponent("master.m3u8"),
             resolvingAgainstBaseURL: false
-        )!
+        ) else {
+            return serverURL
+        }
 
         var queryItems = [
             URLQueryItem(name: "api_key", value: accessToken),
@@ -132,7 +134,7 @@ public enum StreamURLBuilder {
         }
 
         components.queryItems = queryItems
-        return components.url!
+        return components.url ?? serverURL
     }
 
     /// Build authorization headers

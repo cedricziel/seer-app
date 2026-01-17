@@ -143,7 +143,7 @@ public final class OfflineSyncService: ObservableObject {
 
     /// Cleans up old cached data
     public func cleanupOldCache(olderThan days: Int = 30) throws {
-        let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date())!
+        let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
         try mediaItemSyncService.removeOldItems(olderThan: cutoffDate)
     }
 

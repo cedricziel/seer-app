@@ -124,10 +124,9 @@ public actor JellyseerrService {
             return SearchResponse(page: 1, totalPages: 0, totalResults: 0, results: [])
         }
 
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("api/v1/search"),
-            resolvingAgainstBaseURL: false
-        )!
+        var components = try serverURL
+            .appendingPathComponent("api/v1/search")
+            .urlComponents()
         components.queryItems = [
             URLQueryItem(name: "query", value: query),
             URLQueryItem(name: "page", value: String(page))
@@ -157,10 +156,9 @@ public actor JellyseerrService {
         filter: RequestFilter = .all,
         sort: RequestSort = .added
     ) async throws -> RequestsResponse {
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("api/v1/request"),
-            resolvingAgainstBaseURL: false
-        )!
+        var components = try serverURL
+            .appendingPathComponent("api/v1/request")
+            .urlComponents()
         components.queryItems = [
             URLQueryItem(name: "take", value: String(take)),
             URLQueryItem(name: "skip", value: String(skip)),
@@ -360,10 +358,9 @@ public actor JellyseerrService {
 
     /// Get trending movies and TV shows
     public func getTrending(page: Int = 1) async throws -> DiscoverResponse {
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("api/v1/discover/trending"),
-            resolvingAgainstBaseURL: false
-        )!
+        var components = try serverURL
+            .appendingPathComponent("api/v1/discover/trending")
+            .urlComponents()
         components.queryItems = [
             URLQueryItem(name: "page", value: String(page))
         ]
@@ -386,10 +383,9 @@ public actor JellyseerrService {
 
     /// Get upcoming movies
     public func getUpcomingMovies(page: Int = 1) async throws -> DiscoverResponse {
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("api/v1/discover/movies/upcoming"),
-            resolvingAgainstBaseURL: false
-        )!
+        var components = try serverURL
+            .appendingPathComponent("api/v1/discover/movies/upcoming")
+            .urlComponents()
         components.queryItems = [
             URLQueryItem(name: "page", value: String(page))
         ]
@@ -412,10 +408,9 @@ public actor JellyseerrService {
 
     /// Get upcoming TV shows
     public func getUpcomingTV(page: Int = 1) async throws -> DiscoverResponse {
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("api/v1/discover/tv/upcoming"),
-            resolvingAgainstBaseURL: false
-        )!
+        var components = try serverURL
+            .appendingPathComponent("api/v1/discover/tv/upcoming")
+            .urlComponents()
         components.queryItems = [
             URLQueryItem(name: "page", value: String(page))
         ]
@@ -466,10 +461,9 @@ public actor JellyseerrService {
 
     /// Get movies by genre
     public func getMoviesByGenre(genreId: Int, page: Int = 1) async throws -> DiscoverResponse {
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("api/v1/discover/movies/genre/\(genreId)"),
-            resolvingAgainstBaseURL: false
-        )!
+        var components = try serverURL
+            .appendingPathComponent("api/v1/discover/movies/genre/\(genreId)")
+            .urlComponents()
         components.queryItems = [
             URLQueryItem(name: "page", value: String(page))
         ]
@@ -492,10 +486,9 @@ public actor JellyseerrService {
 
     /// Get TV shows by genre
     public func getTVByGenre(genreId: Int, page: Int = 1) async throws -> DiscoverResponse {
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("api/v1/discover/tv/genre/\(genreId)"),
-            resolvingAgainstBaseURL: false
-        )!
+        var components = try serverURL
+            .appendingPathComponent("api/v1/discover/tv/genre/\(genreId)")
+            .urlComponents()
         components.queryItems = [
             URLQueryItem(name: "page", value: String(page))
         ]
