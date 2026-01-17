@@ -262,6 +262,7 @@ public struct CompactDownloadButton: View {
                 .foregroundStyle(iconColor)
         }
         .buttonStyle(.plain)
+        .frame(minWidth: 44, minHeight: 44)
         .disabled(state == .pending || state == .waitingForWiFi)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(accessibilityValue)

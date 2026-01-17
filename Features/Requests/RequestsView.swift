@@ -249,6 +249,11 @@ struct RequestRowView: View {
 
             // Status icon
             statusIcon
+
+            // Disclosure indicator for tap-to-view-details
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
         .contextMenu {

@@ -93,8 +93,8 @@ private struct ServerSetupContentView: View {
                                         .foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundStyle(.secondary)
+                                Image(systemName: "arrow.right.circle")
+                                    .foregroundStyle(.accentColor)
                             }
                         }
                         .foregroundStyle(.primary)
