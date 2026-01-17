@@ -1,11 +1,14 @@
 import Foundation
 import JellyseerrClient
+import os
 import SeerCore
 import SwiftUI
 
 /// View model for managing and viewing requests
 @MainActor
 public final class RequestsViewModel: ObservableObject {
+    private static let logger = Logger(subsystem: "com.seer.app", category: "RequestsViewModel")
+
     // MARK: - Published Properties
 
     @Published var requests: [MediaRequest] = []
@@ -150,7 +153,7 @@ public final class RequestsViewModel: ObservableObject {
             hasMoreItems = requests.count < response.pageInfo.results
         } catch {
             currentSkip -= pageSize
-            print("Failed to load more requests: \(error)")
+            Self.logger.debug("Failed to load more requests: \(error.localizedDescription)")
         }
 
         isLoadingMore = false
@@ -252,7 +255,7 @@ public final class RequestsViewModel: ObservableObject {
                 }
             } catch {
                 // Silently fail for individual lookups
-                print("Failed to fetch details for TMDB ID \(tmdbId): \(error)")
+                Self.logger.debug("Failed to fetch details for TMDB ID \(tmdbId): \(error.localizedDescription)")
             }
         }
     }

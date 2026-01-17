@@ -2,6 +2,7 @@ import Foundation
 import JellyfinClient
 import Observation
 import OfflineSync
+import os
 import SeerCore
 import SwiftData
 
@@ -9,6 +10,8 @@ import SwiftData
 @MainActor
 @Observable
 final class SeriesDetailViewModel {
+    private static let logger = Logger(subsystem: "com.seer.app", category: "SeriesDetailViewModel")
+
     // MARK: - Observable Properties
 
     var seasons: [MediaItem] = []
@@ -126,7 +129,7 @@ final class SeriesDetailViewModel {
                 isShowingCachedData = true
             }
         } catch {
-            print("Failed to load cached seasons: \(error)")
+            Self.logger.debug("Failed to load cached seasons: \(error.localizedDescription)")
         }
     }
 
@@ -148,7 +151,7 @@ final class SeriesDetailViewModel {
             let episodes = try await service.getEpisodes(seasonId: season.id)
             episodesBySeason[season.id] = episodes
         } catch {
-            print("Failed to load episodes for season \(season.name): \(error)")
+            Self.logger.debug("Failed to load episodes for season \(season.name): \(error.localizedDescription)")
         }
     }
 
@@ -162,7 +165,7 @@ final class SeriesDetailViewModel {
                 episodesBySeason[season.id] = cachedEpisodes.map { convertCachedToMediaItem($0) }
             }
         } catch {
-            print("Failed to load cached episodes: \(error)")
+            Self.logger.debug("Failed to load cached episodes: \(error.localizedDescription)")
         }
     }
 

@@ -1,6 +1,7 @@
 import Foundation
 import JellyfinClient
 import OfflineSync
+import os
 import SeerCore
 import SwiftData
 import SwiftUI
@@ -8,6 +9,8 @@ import SwiftUI
 /// View model for the library browsing feature with offline support
 @MainActor
 public final class LibraryViewModel: ObservableObject {
+    private static let logger = Logger(subsystem: "com.seer.app", category: "LibraryViewModel")
+
     @Published var libraries: [Library] = []
     @Published var selectedLibrary: Library?
     @Published var mediaItems: [MediaItem] = []
@@ -124,7 +127,7 @@ public final class LibraryViewModel: ObservableObject {
                 continueWatching = cachedCW.map { dataConverter.convertToMediaItem($0) }
                 hasLoadedContinueWatching = true
             }
-        } catch { print("Failed to load cached data: \(error)") }
+        } catch { Self.logger.debug("Failed to load cached data: \(error.localizedDescription)") }
     }
 
     func loadLibraries() async {
@@ -149,7 +152,10 @@ public final class LibraryViewModel: ObservableObject {
             if let cfg = appState.activeServer {
                 try? await mediaItemSyncService?.syncContinueWatching(serverConfig: cfg, service: service)
             }
-        } catch { if !Task.isCancelled { print("Failed to load continue watching: \(error)") } }
+        } catch {
+            if !Task
+                .isCancelled { Self.logger.debug("Failed to load continue watching: \(error.localizedDescription)") }
+        }
         hasLoadedContinueWatching = true
         isLoadingContinueWatching = false
     }
@@ -164,7 +170,9 @@ public final class LibraryViewModel: ObservableObject {
             if let cfg = appState.activeServer {
                 try? await mediaItemSyncService?.syncLatestItems(serverConfig: cfg, service: service)
             }
-        } catch { if !Task.isCancelled { print("Failed to load latest items: \(error)") } }
+        } catch {
+            if !Task.isCancelled { Self.logger.debug("Failed to load latest items: \(error.localizedDescription)") }
+        }
         hasLoadedLatestItems = true
         isLoadingLatestItems = false
     }
@@ -189,7 +197,7 @@ public final class LibraryViewModel: ObservableObject {
                 mediaItems = items.map { dataConverter.convertToMediaItem($0) }
                 isShowingCachedData = true
             }
-        } catch { print("Failed to load cached library items: \(error)") }
+        } catch { Self.logger.debug("Failed to load cached library items: \(error.localizedDescription)") }
     }
 
     func loadMediaItems() async {
@@ -236,7 +244,10 @@ public final class LibraryViewModel: ObservableObject {
             guard !Task.isCancelled else { currentPage -= 1; isLoadingMore = false; return }
             mediaItems.append(contentsOf: response.items)
             hasMoreItems = mediaItems.count < response.totalRecordCount
-        } catch { currentPage -= 1; if !Task.isCancelled { print("Failed to load more items: \(error)") } }
+        } catch {
+            currentPage -= 1; if !Task
+                .isCancelled { Self.logger.debug("Failed to load more items: \(error.localizedDescription)") }
+        }
         isLoadingMore = false
     }
 

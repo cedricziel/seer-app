@@ -1,11 +1,14 @@
 import Foundation
 import JellyseerrClient
+import os
 import SeerCore
 import SwiftUI
 
 /// View model for the search feature
 @MainActor
 public final class SearchViewModel: ObservableObject {
+    private static let logger = Logger(subsystem: "com.seer.app", category: "SearchViewModel")
+
     // MARK: - Published Properties
 
     @Published var searchQuery: String = ""
@@ -60,7 +63,7 @@ public final class SearchViewModel: ObservableObject {
             let userInfo = try await service.verifyAuth()
             appState.setJellyseerrPermissions(userInfo.permissions)
         } catch {
-            print("Failed to load Jellyseerr permissions: \(error)")
+            Self.logger.debug("Failed to load Jellyseerr permissions: \(error.localizedDescription)")
         }
     }
 
@@ -129,7 +132,7 @@ public final class SearchViewModel: ObservableObject {
             searchResults.append(contentsOf: newResults)
         } catch {
             currentPage -= 1
-            print("Failed to load more results: \(error)")
+            Self.logger.debug("Failed to load more results: \(error.localizedDescription)")
         }
 
         isLoadingMore = false
@@ -160,7 +163,7 @@ public final class SearchViewModel: ObservableObject {
         do {
             tvDetails = try await service.getTVDetails(tmdbId: tmdbId)
         } catch {
-            print("Failed to load TV details: \(error)")
+            Self.logger.debug("Failed to load TV details: \(error.localizedDescription)")
         }
 
         isLoadingTVDetails = false

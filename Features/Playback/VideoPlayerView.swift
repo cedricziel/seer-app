@@ -1,10 +1,13 @@
 import AVKit
 import DownloadClient
 import JellyfinClient
+import os
 import PlaybackClient
 import SeerCore
 import SwiftUI
 import UIKit
+
+private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerView")
 
 #if os(iOS)
     /// Main video player view for iOS/iPadOS using AVPlayerViewController for PiP support
@@ -213,13 +216,13 @@ import UIKit
 
         func updateUIViewController(_ controller: AVPlayerViewController, context _: Context) {
             let isRestoring = PiPPlaybackManager.shared.isRestoring
-            print("[VideoPlayer] updateUIVC - hasPlayer: \(player != nil), isRestoring: \(isRestoring)")
+            logger.debug("[VideoPlayer] updateUIVC - hasPlayer: \(player != nil), isRestoring: \(isRestoring)")
             if controller.player !== player {
-                print("[VideoPlayer] updateUIVC - attaching player")
+                logger.debug("[VideoPlayer] updateUIVC - attaching player")
                 controller.player = player
                 // If we're restoring from PiP, signal that UI is ready now
                 if isRestoring, player != nil {
-                    print("[VideoPlayer] updateUIVC - signaling restoration complete")
+                    logger.debug("[VideoPlayer] updateUIVC - signaling restoration complete")
                     PiPPlaybackManager.shared.signalRestorationComplete()
                 }
             }
@@ -275,28 +278,28 @@ import UIKit
                 willEndFullScreenPresentationWithAnimationCoordinator _:
                 any UIViewControllerTransitionCoordinator
             ) {
-                print("[VideoPlayer] willEndFullScreenPresentation called")
+                logger.debug("[VideoPlayer] willEndFullScreenPresentation called")
                 Task { @MainActor in
                     // Don't dismiss if we're in PiP mode or restoring from PiP
                     // The restoration presents the controller, which triggers this delegate
                     let pipManager = PiPPlaybackManager.shared
                     if pipManager.isPiPActive || pipManager.isRestoring {
-                        print("[VideoPlayer] Skipping dismiss - PiP active or restoring")
+                        logger.debug("[VideoPlayer] Skipping dismiss - PiP active or restoring")
                         return
                     }
-                    print("[VideoPlayer] Dismissing player view")
+                    logger.debug("[VideoPlayer] Dismissing player view")
                     onDismiss()
                 }
             }
 
             nonisolated func playerViewControllerWillStartPictureInPicture(_: AVPlayerViewController) {
-                print("[VideoPlayer] PiP starting")
+                logger.debug("[VideoPlayer] PiP starting")
             }
 
             nonisolated func playerViewControllerDidStartPictureInPicture(
                 _ playerViewController: AVPlayerViewController
             ) {
-                print("[VideoPlayer] PiP started")
+                logger.debug("[VideoPlayer] PiP started")
                 Task { @MainActor in
                     // Hand off player, controller, AND delegate to PiP manager
                     // CRITICAL: Pass self (Coordinator) to keep it alive after view dismissal!
@@ -316,13 +319,13 @@ import UIKit
             }
 
             nonisolated func playerViewControllerWillStopPictureInPicture(_: AVPlayerViewController) {
-                print("[VideoPlayer] PiP stopping")
+                logger.debug("[VideoPlayer] PiP stopping")
             }
 
             nonisolated func playerViewControllerDidStopPictureInPicture(_: AVPlayerViewController) {
-                print("[VideoPlayer] PiP stopped")
+                logger.debug("[VideoPlayer] PiP stopped")
                 Task { @MainActor in
-                    print("[VideoPlayer] PiP stopped - isRestoring: \(PiPPlaybackManager.shared.isRestoring)")
+                    logger.debug("[VideoPlayer] PiP stopped - isRestoring: \(PiPPlaybackManager.shared.isRestoring)")
                     PiPPlaybackManager.shared.pipDidStop()
                 }
             }
@@ -331,7 +334,7 @@ import UIKit
                 _: AVPlayerViewController,
                 failedToStartPictureInPictureWithError error: Error
             ) {
-                print("[VideoPlayer] PiP failed to start: \(error)")
+                logger.debug("[VideoPlayer] PiP failed to start: \(error.localizedDescription)")
             }
 
             nonisolated func playerViewController(
@@ -339,13 +342,13 @@ import UIKit
                 restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler:
                 @escaping (Bool) -> Void
             ) {
-                print("[VideoPlayer] restoreUserInterface delegate called")
+                logger.debug("[VideoPlayer] restoreUserInterface delegate called")
                 // Use nonisolated(unsafe) to handle Swift 6 concurrency
                 // The completion handler must be called on the main thread, which we ensure
                 nonisolated(unsafe) let unsafeCompletion = completionHandler
 
                 Task { @MainActor in
-                    print("[VideoPlayer] Requesting UI restoration from PiPManager")
+                    logger.debug("[VideoPlayer] Requesting UI restoration from PiPManager")
                     // Store completion handler - it will be called when the new view is ready
                     PiPPlaybackManager.shared.requestRestoreUI(completion: unsafeCompletion)
                 }

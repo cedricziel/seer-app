@@ -1,8 +1,11 @@
 import DownloadClient
 import JellyfinClient
+import os
 import SeerCore
 import SeerUI
 import SwiftUI
+
+private let logger = Logger(subsystem: "com.seer.app", category: "MediaDetailViewDownloads")
 
 // MARK: - Download Methods Extension
 
@@ -117,7 +120,7 @@ extension MediaDetailView {
             try await manager.downloadItem(episode, serverID: serverID)
             await updateEpisodeDownloadStates(episodes: [episode])
         } catch {
-            print("Failed to download episode: \(error)")
+            logger.debug("Failed to download episode: \(error.localizedDescription)")
         }
     }
 

@@ -1,4 +1,5 @@
 import JellyseerrClient
+import os
 import SeerCore
 import SeerUI
 import SwiftUI
@@ -203,6 +204,8 @@ private struct GenreBrowseContentView: View {
 
 @MainActor
 final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
+    private static let logger = Logger(subsystem: "com.seer.app", category: "GenreBrowseViewModel")
+
     // MARK: - Published Properties
 
     @Published var results: [SearchResult] = []
@@ -294,7 +297,7 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
             results.append(contentsOf: response.results)
         } catch {
             currentPage -= 1
-            print("Failed to load more: \(error)")
+            Self.logger.debug("Failed to load more: \(error.localizedDescription)")
         }
 
         isLoadingMore = false
@@ -311,7 +314,7 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
         do {
             tvDetails = try await service.getTVDetails(tmdbId: tmdbId)
         } catch {
-            print("Failed to load TV details: \(error)")
+            Self.logger.debug("Failed to load TV details: \(error.localizedDescription)")
         }
 
         isLoadingTVDetails = false

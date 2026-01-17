@@ -1,10 +1,13 @@
 import Foundation
 import JellyseerrClient
+import os
 import SeerCore
 
 /// ViewModel for the Discover tab
 @MainActor
 public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
+    private static let logger = Logger(subsystem: "com.seer.app", category: "DiscoverViewModel")
+
     // MARK: - Published Properties
 
     // Content
@@ -71,7 +74,7 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             let userInfo = try await service.verifyAuth()
             appState.setJellyseerrPermissions(userInfo.permissions)
         } catch {
-            print("Failed to load Jellyseerr permissions: \(error)")
+            Self.logger.debug("Failed to load Jellyseerr permissions: \(error.localizedDescription)")
         }
     }
 
@@ -110,7 +113,7 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             trendingPage = response.page
             trendingTotalPages = response.totalPages
         } catch {
-            print("Failed to load trending: \(error)")
+            Self.logger.debug("Failed to load trending: \(error.localizedDescription)")
         }
 
         isLoadingTrending = false
@@ -128,7 +131,7 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             upcomingMoviesPage = response.page
             upcomingMoviesTotalPages = response.totalPages
         } catch {
-            print("Failed to load upcoming movies: \(error)")
+            Self.logger.debug("Failed to load upcoming movies: \(error.localizedDescription)")
         }
 
         isLoadingUpcomingMovies = false
@@ -146,7 +149,7 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             upcomingTVPage = response.page
             upcomingTVTotalPages = response.totalPages
         } catch {
-            print("Failed to load upcoming TV: \(error)")
+            Self.logger.debug("Failed to load upcoming TV: \(error.localizedDescription)")
         }
 
         isLoadingUpcomingTV = false
@@ -165,7 +168,7 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             movieGenres = try await movieGenresTask
             tvGenres = try await tvGenresTask
         } catch {
-            print("Failed to load genres: \(error)")
+            Self.logger.debug("Failed to load genres: \(error.localizedDescription)")
         }
 
         isLoadingGenres = false
@@ -204,7 +207,7 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
         do {
             tvDetails = try await service.getTVDetails(tmdbId: tmdbId)
         } catch {
-            print("Failed to load TV details: \(error)")
+            Self.logger.debug("Failed to load TV details: \(error.localizedDescription)")
         }
 
         isLoadingTVDetails = false
