@@ -356,6 +356,259 @@ public actor JellyseerrService {
         case modified
     }
 
+    // MARK: - Discover
+
+    /// Get trending movies and TV shows
+    public func getTrending(page: Int = 1) async throws -> DiscoverResponse {
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("api/v1/discover/trending"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "page", value: String(page))
+        ]
+
+        guard let url = components.url else {
+            throw JellyseerrError.invalidURL
+        }
+
+        let request = try authenticatedRequest(url: url)
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        do {
+            let rawResponse = try decoder.decode(RawDiscoverResponse.self, from: data)
+            return convertTrendingResults(rawResponse)
+        } catch {
+            throw JellyseerrError.decodingError(error)
+        }
+    }
+
+    /// Get upcoming movies
+    public func getUpcomingMovies(page: Int = 1) async throws -> DiscoverResponse {
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("api/v1/discover/movies/upcoming"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "page", value: String(page))
+        ]
+
+        guard let url = components.url else {
+            throw JellyseerrError.invalidURL
+        }
+
+        let request = try authenticatedRequest(url: url)
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        do {
+            let rawResponse = try decoder.decode(RawDiscoverResponse.self, from: data)
+            return convertMovieResults(rawResponse)
+        } catch {
+            throw JellyseerrError.decodingError(error)
+        }
+    }
+
+    /// Get upcoming TV shows
+    public func getUpcomingTV(page: Int = 1) async throws -> DiscoverResponse {
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("api/v1/discover/tv/upcoming"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "page", value: String(page))
+        ]
+
+        guard let url = components.url else {
+            throw JellyseerrError.invalidURL
+        }
+
+        let request = try authenticatedRequest(url: url)
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        do {
+            let rawResponse = try decoder.decode(RawDiscoverResponse.self, from: data)
+            return convertTVResults(rawResponse)
+        } catch {
+            throw JellyseerrError.decodingError(error)
+        }
+    }
+
+    /// Get movie genres with backdrop images
+    public func getMovieGenres() async throws -> [DiscoverGenre] {
+        let url = serverURL.appendingPathComponent("api/v1/discover/genreslider/movie")
+        let request = try authenticatedRequest(url: url)
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        do {
+            return try decoder.decode([DiscoverGenre].self, from: data)
+        } catch {
+            throw JellyseerrError.decodingError(error)
+        }
+    }
+
+    /// Get TV genres with backdrop images
+    public func getTVGenres() async throws -> [DiscoverGenre] {
+        let url = serverURL.appendingPathComponent("api/v1/discover/genreslider/tv")
+        let request = try authenticatedRequest(url: url)
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        do {
+            return try decoder.decode([DiscoverGenre].self, from: data)
+        } catch {
+            throw JellyseerrError.decodingError(error)
+        }
+    }
+
+    /// Get movies by genre
+    public func getMoviesByGenre(genreId: Int, page: Int = 1) async throws -> DiscoverResponse {
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("api/v1/discover/movies/genre/\(genreId)"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "page", value: String(page))
+        ]
+
+        guard let url = components.url else {
+            throw JellyseerrError.invalidURL
+        }
+
+        let request = try authenticatedRequest(url: url)
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        do {
+            let rawResponse = try decoder.decode(RawDiscoverResponse.self, from: data)
+            return convertMovieResults(rawResponse)
+        } catch {
+            throw JellyseerrError.decodingError(error)
+        }
+    }
+
+    /// Get TV shows by genre
+    public func getTVByGenre(genreId: Int, page: Int = 1) async throws -> DiscoverResponse {
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("api/v1/discover/tv/genre/\(genreId)"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "page", value: String(page))
+        ]
+
+        guard let url = components.url else {
+            throw JellyseerrError.invalidURL
+        }
+
+        let request = try authenticatedRequest(url: url)
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        do {
+            let rawResponse = try decoder.decode(RawDiscoverResponse.self, from: data)
+            return convertTVResults(rawResponse)
+        } catch {
+            throw JellyseerrError.decodingError(error)
+        }
+    }
+
+    // MARK: - Discover Response Conversion
+
+    private func convertTrendingResults(_ raw: RawDiscoverResponse) -> DiscoverResponse {
+        let results = raw.results.compactMap { item -> SearchResult? in
+            guard let mediaType = item.mediaType else { return nil }
+            return SearchResult(
+                id: item.id,
+                mediaType: mediaType == "movie" ? .movie : .tvShow,
+                title: item.title,
+                name: item.name,
+                originalTitle: item.originalTitle,
+                originalName: item.originalName,
+                overview: item.overview,
+                posterPath: item.posterPath,
+                backdropPath: item.backdropPath,
+                releaseDate: item.releaseDate,
+                firstAirDate: item.firstAirDate,
+                voteAverage: item.voteAverage,
+                voteCount: item.voteCount,
+                popularity: item.popularity,
+                originalLanguage: item.originalLanguage,
+                genreIds: item.genreIds,
+                mediaInfo: item.mediaInfo
+            )
+        }
+        return DiscoverResponse(
+            page: raw.page,
+            totalPages: raw.totalPages,
+            totalResults: raw.totalResults,
+            results: results
+        )
+    }
+
+    private func convertMovieResults(_ raw: RawDiscoverResponse) -> DiscoverResponse {
+        let results = raw.results.map { item in
+            SearchResult(
+                id: item.id,
+                mediaType: .movie,
+                title: item.title,
+                name: item.name,
+                originalTitle: item.originalTitle,
+                originalName: item.originalName,
+                overview: item.overview,
+                posterPath: item.posterPath,
+                backdropPath: item.backdropPath,
+                releaseDate: item.releaseDate,
+                firstAirDate: item.firstAirDate,
+                voteAverage: item.voteAverage,
+                voteCount: item.voteCount,
+                popularity: item.popularity,
+                originalLanguage: item.originalLanguage,
+                genreIds: item.genreIds,
+                mediaInfo: item.mediaInfo
+            )
+        }
+        return DiscoverResponse(
+            page: raw.page,
+            totalPages: raw.totalPages,
+            totalResults: raw.totalResults,
+            results: results
+        )
+    }
+
+    private func convertTVResults(_ raw: RawDiscoverResponse) -> DiscoverResponse {
+        let results = raw.results.map { item in
+            SearchResult(
+                id: item.id,
+                mediaType: .tvShow,
+                title: item.title,
+                name: item.name,
+                originalTitle: item.originalTitle,
+                originalName: item.originalName,
+                overview: item.overview,
+                posterPath: item.posterPath,
+                backdropPath: item.backdropPath,
+                releaseDate: item.releaseDate,
+                firstAirDate: item.firstAirDate,
+                voteAverage: item.voteAverage,
+                voteCount: item.voteCount,
+                popularity: item.popularity,
+                originalLanguage: item.originalLanguage,
+                genreIds: item.genreIds,
+                mediaInfo: item.mediaInfo
+            )
+        }
+        return DiscoverResponse(
+            page: raw.page,
+            totalPages: raw.totalPages,
+            totalResults: raw.totalResults,
+            results: results
+        )
+    }
+
     // MARK: - Private Helpers
 
     private func authenticatedRequest(url: URL) throws -> URLRequest {
@@ -454,4 +707,69 @@ public struct TVDetails: Codable, Sendable {
         guard let firstAirDate, firstAirDate.count >= 4 else { return nil }
         return String(firstAirDate.prefix(4))
     }
+}
+
+// MARK: - Discover Models
+
+/// Response from discover endpoints
+public struct DiscoverResponse: Codable, Sendable {
+    public let page: Int
+    public let totalPages: Int
+    public let totalResults: Int
+    public let results: [SearchResult]
+
+    public init(page: Int, totalPages: Int, totalResults: Int, results: [SearchResult]) {
+        self.page = page
+        self.totalPages = totalPages
+        self.totalResults = totalResults
+        self.results = results
+    }
+}
+
+/// Genre with backdrop images from genre slider endpoints
+public struct DiscoverGenre: Identifiable, Codable, Sendable, Hashable {
+    public let id: Int
+    public let name: String
+    public let backdrops: [String]?
+
+    public init(id: Int, name: String, backdrops: [String]? = nil) {
+        self.id = id
+        self.name = name
+        self.backdrops = backdrops
+    }
+
+    /// Get backdrop URL for the genre (uses first available backdrop)
+    public func backdropURL(size: String = "w780") -> URL? {
+        guard let path = backdrops?.first else { return nil }
+        return URL(string: "https://image.tmdb.org/t/p/\(size)\(path)")
+    }
+}
+
+/// Raw response from discover endpoints before type conversion
+struct RawDiscoverResponse: Codable, Sendable {
+    let page: Int
+    let totalPages: Int
+    let totalResults: Int
+    let results: [RawDiscoverResult]
+}
+
+/// Raw result item before type conversion
+struct RawDiscoverResult: Codable, Sendable {
+    let id: Int
+    let mediaType: String?
+    let title: String?
+    let name: String?
+    let originalTitle: String?
+    let originalName: String?
+    let overview: String?
+    let posterPath: String?
+    let backdropPath: String?
+    let releaseDate: String?
+    let firstAirDate: String?
+    let voteAverage: Double?
+    let voteCount: Int?
+    let popularity: Double?
+    let originalLanguage: String?
+    let genreIds: [Int]?
+    let mediaInfo: SearchResult.MediaInfo?
 }

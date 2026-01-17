@@ -10,7 +10,7 @@ import SwiftUI
 /// ViewModel managing video playback state and AVPlayer
 @MainActor
 @Observable
-public final class VideoPlayerViewModel { // swiftlint:disable:this type_body_length
+public final class VideoPlayerViewModel {
     // MARK: - Properties
 
     private(set) var player: AVPlayer?

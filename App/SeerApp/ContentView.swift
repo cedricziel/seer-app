@@ -44,6 +44,7 @@ struct MainTabView: View {
 
     enum Tab: Hashable {
         case library
+        case discover
         case search
         case downloads
         case requests
@@ -56,6 +57,12 @@ struct MainTabView: View {
                     Label("Library", systemImage: "play.square.stack")
                 }
                 .tag(Tab.library)
+
+            DiscoverView()
+                .tabItem {
+                    Label("Discover", systemImage: "sparkles")
+                }
+                .tag(Tab.discover)
 
             SearchView()
                 .tabItem {

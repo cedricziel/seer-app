@@ -15,7 +15,7 @@ import MediaPlayer
 /// enable proper restoration when exiting PiP.
 @MainActor
 @Observable
-public final class PiPPlaybackManager { // swiftlint:disable:this type_body_length
+public final class PiPPlaybackManager {
     public static let shared = PiPPlaybackManager()
 
     /// The player being used in PiP mode (nil when not in PiP)

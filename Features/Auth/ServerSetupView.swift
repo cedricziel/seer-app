@@ -59,9 +59,10 @@ private struct ServerSetupContentView: View {
     // MARK: - Jellyfin Setup
 
     private var jellyfinSetupView: some View {
-        Form {
+        let syncedServers = appState.servers
+        return Form {
             // Show synced servers if any exist (helps debug CloudKit sync issues)
-            if !appState.servers.isEmpty {
+            if !syncedServers.isEmpty {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -75,7 +76,7 @@ private struct ServerSetupContentView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    ForEach(appState.servers) { server in
+                    ForEach(syncedServers, id: \ServerConfiguration.id) { (server: ServerConfiguration) in
                         Button {
                             viewModel.jellyfinServerURL = server.jellyfinURL.absoluteString
                             if let jellyseerrURL = server.jellyseerrURL {
@@ -94,7 +95,7 @@ private struct ServerSetupContentView: View {
                                 }
                                 Spacer()
                                 Image(systemName: "arrow.right.circle")
-                                    .foregroundStyle(.accentColor)
+                                    .foregroundStyle(Color.accentColor)
                             }
                         }
                         .foregroundStyle(.primary)

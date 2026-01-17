@@ -4,7 +4,7 @@ import SwiftData
 /// Stored in SwiftData with CloudKit sync
 /// Non-sensitive metadata synced across devices
 @Model
-public final class ServerConfiguration {
+public final class ServerConfiguration: Identifiable {
     public var id: UUID = UUID()
     public var name: String = ""
     public var emoji: String = "🖥️"
