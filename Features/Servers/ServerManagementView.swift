@@ -82,6 +82,20 @@ struct ServerManagementView: View {
                         .foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                 }
+
+                Section("Help & Feedback") {
+                    NavigationLink {
+                        FeedbackView()
+                    } label: {
+                        Label("Send Feedback", systemImage: "envelope")
+                    }
+
+                    NavigationLink {
+                        PrivacySettingsView()
+                    } label: {
+                        Label("Privacy & Diagnostics", systemImage: "hand.raised")
+                    }
+                }
             }
             .navigationTitle("Manage Servers")
             .navigationBarTitleDisplayMode(.inline)

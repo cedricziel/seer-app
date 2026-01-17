@@ -1,6 +1,7 @@
 import BackgroundTasks
 import DownloadClient
 import NotificationClient
+import SeerCore
 import UIKit
 
 /// App delegate for handling background URL session callbacks and background tasks
@@ -21,6 +22,9 @@ final class SeerAppDelegate: NSObject, UIApplicationDelegate {
         _: UIApplication,
         didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        // Initialize MetricKit reporter for performance and crash diagnostics
+        _ = MetricsReporter.shared
+
         // Register background tasks
         registerBackgroundTasks()
         return true

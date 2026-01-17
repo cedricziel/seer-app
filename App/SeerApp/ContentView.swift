@@ -6,7 +6,9 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject private var appState: AppState
     @StateObject private var onboardingManager = OnboardingManager()
+    @StateObject private var diagnosticsConsent = DiagnosticsConsent.shared
     @State private var showPiPRestorePlayer = false
+    @State private var showDiagnosticsConsent = false
 
     var body: some View {
         Group {
@@ -40,10 +42,17 @@ struct ContentView: View {
                 features: WhatsNewData.features,
                 onContinue: {
                     onboardingManager.markWhatsNewSeen()
+                    // Show diagnostics consent after What's New if needed
+                    if diagnosticsConsent.needsConsentPrompt {
+                        showDiagnosticsConsent = true
+                    }
                 }
             )
             .interactiveDismissDisabled()
             .presentationDetents([.large])
+        }
+        .sheet(isPresented: $showDiagnosticsConsent) {
+            DiagnosticsConsentSheet()
         }
         .onChange(of: PiPPlaybackManager.shared.shouldRestorePlayer) { _, shouldRestore in
             if shouldRestore {
@@ -54,6 +63,10 @@ struct ContentView: View {
         .onAppear {
             if appState.isAuthenticated {
                 onboardingManager.checkAndShowWhatsNew()
+                // If no What's New to show, check if we need consent prompt
+                if !onboardingManager.showWhatsNew && diagnosticsConsent.needsConsentPrompt {
+                    showDiagnosticsConsent = true
+                }
             }
         }
     }
