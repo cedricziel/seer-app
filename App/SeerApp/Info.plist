@@ -79,7 +79,9 @@
     <string>Seer needs location access to detect your WiFi network name so it can automatically switch to your internal server URL and manage WiFi-only downloads, even in the background.</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
-    <key>ErrataDSN</key>
-    <string>$(ERRATA_DSN)</string>
+    <key>OTLPEndpoint</key>
+    <string>$(OTLP_ENDPOINT)</string>
+    <key>OTLPAuthHeader</key>
+    <string>$(OTLP_AUTH_HEADER)</string>
 </dict>
 </plist>

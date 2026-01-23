@@ -104,4 +104,5 @@ public final class AutoDownloadRule {
 
 // MARK: - Sendable Conformance
 
+// SwiftData @Model classes need explicit Sendable conformance for cross-actor use
 extension AutoDownloadRule: @unchecked Sendable {}

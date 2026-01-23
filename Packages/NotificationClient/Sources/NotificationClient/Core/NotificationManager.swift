@@ -129,7 +129,7 @@ public final class NotificationManager: NSObject {
 
 // MARK: - UNUserNotificationCenterDelegate
 
-extension NotificationManager: @preconcurrency UNUserNotificationCenterDelegate {
+extension NotificationManager: UNUserNotificationCenterDelegate {
     public nonisolated func userNotificationCenter(
         _: UNUserNotificationCenter,
         willPresent _: UNNotification

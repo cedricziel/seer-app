@@ -22,8 +22,8 @@ final class SeerAppDelegate: NSObject, UIApplicationDelegate {
         _: UIApplication,
         didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        // Initialize MetricKit reporter for performance and crash diagnostics
-        _ = MetricsReporter.shared
+        // Initialize TelemetryService for OpenTelemetry-based performance and crash diagnostics
+        _ = TelemetryService.shared
 
         // Register background tasks
         registerBackgroundTasks()

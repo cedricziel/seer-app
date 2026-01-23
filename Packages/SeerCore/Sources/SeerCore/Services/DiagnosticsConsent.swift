@@ -127,8 +127,8 @@ public final class DiagnosticsConsent: ObservableObject {
     }
 
     private func notifyConsentChanged() {
-        // Notify MetricsReporter to initialize/update Errata SDK
-        MetricsReporter.shared.onConsentChanged()
+        // Notify TelemetryService to initialize/update OpenTelemetry SDK
+        TelemetryService.shared.onConsentChanged()
     }
 }
 

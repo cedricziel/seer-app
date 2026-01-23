@@ -26,9 +26,12 @@ packages:
     from: "8.0.0"
   JellyseerrAPI:
     path: Packages/JellyseerrAPI
-  ErrataSDK:
-    url: https://github.com/cedricziel/errata
-    branch: main
+  OpenTelemetrySwift:
+    url: https://github.com/open-telemetry/opentelemetry-swift
+    from: "1.10.0"
+  PLCrashReporter:
+    url: https://github.com/microsoft/plcrashreporter
+    from: "1.11.0"
 
 targets:
   SeerApp:
@@ -97,8 +100,18 @@ targets:
         excludes:
           - "**/.DS_Store"
     dependencies:
-      - package: ErrataSDK
-        product: ErrataSDK
+      - package: OpenTelemetrySwift
+        product: OpenTelemetryApi
+      - package: OpenTelemetrySwift
+        product: OpenTelemetrySdk
+      - package: OpenTelemetrySwift
+        product: StdoutExporter
+      - package: OpenTelemetrySwift
+        product: OpenTelemetryProtocolExporterHTTP
+      - package: OpenTelemetrySwift
+        product: ResourceExtension
+      - package: PLCrashReporter
+        product: CrashReporter
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.core

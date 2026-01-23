@@ -152,6 +152,7 @@ struct FeedbackView: View {
 
 // MARK: - Device Info
 
+@MainActor
 private struct DeviceInfo {
     var appVersion: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
