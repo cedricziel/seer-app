@@ -110,6 +110,8 @@ targets:
         product: OpenTelemetryProtocolExporterHTTP
       - package: OpenTelemetrySwift
         product: ResourceExtension
+      - package: OpenTelemetrySwift
+        product: URLSessionInstrumentation
       - package: PLCrashReporter
         product: CrashReporter
     settings:

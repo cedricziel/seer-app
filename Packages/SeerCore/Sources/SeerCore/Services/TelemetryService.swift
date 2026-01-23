@@ -5,6 +5,7 @@ import OpenTelemetryProtocolExporterHttp
 import OpenTelemetrySdk
 import OSLog
 import ResourceExtension
+import URLSessionInstrumentation
 
 /// OpenTelemetry-based telemetry service that collects and reports performance metrics and crash data.
 /// This service replaces the previous Errata SDK implementation while preserving the same consent model.
@@ -50,6 +51,9 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
     /// OpenTelemetry logger for crash reports
     private var otelLogger: (any OpenTelemetryApi.Logger)?
 
+    /// URLSession instrumentation for automatic HTTP request tracing
+    private var urlSessionInstrumentation: URLSessionInstrumentation?
+
     override private init() {
         super.init()
         MXMetricManager.shared.add(self)
@@ -92,8 +96,24 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
     }
 
     private func setupOTEL(endpoint: String) {
-        // Build resource with app metadata
-        let resource = DefaultResources().get().merging(
+        let resource = buildResource()
+        let otlpConfig = buildOtlpConfig()
+
+        guard let tracerProvider = setupTracerProvider(resource: resource, config: otlpConfig, endpoint: endpoint),
+              let meterProvider = setupMeterProvider(resource: resource, config: otlpConfig, endpoint: endpoint),
+              let logProvider = setupLoggerProvider(resource: resource, config: otlpConfig, endpoint: endpoint) else {
+            return
+        }
+
+        setupURLSessionInstrumentation()
+
+        tracer = tracerProvider.get(instrumentationName: "seer-app", instrumentationVersion: Bundle.main.appVersion)
+        stableMeter = meterProvider
+        otelLogger = logProvider.loggerBuilder(instrumentationScopeName: "seer-app").build()
+    }
+
+    private func buildResource() -> Resource {
+        DefaultResources().get().merging(
             other: Resource(
                 attributes: [
                     ResourceAttributes.serviceName.rawValue: AttributeValue.string("seer-ios"),
@@ -103,70 +123,83 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
                 ]
             )
         )
+    }
 
-        // Configure OTLP with optional auth headers
+    private func buildOtlpConfig() -> OtlpConfiguration {
         var headers: [(String, String)]?
         if let authHeader = Self.otlpAuthHeader {
             headers = [authHeader]
             Self.logger.debug("OTLP configured with auth header: \(authHeader.0)")
         }
-        let otlpConfig = OtlpConfiguration(headers: headers)
+        return OtlpConfiguration(headers: headers)
+    }
 
-        // Setup trace exporter and provider
+    private func setupTracerProvider(
+        resource: Resource,
+        config: OtlpConfiguration,
+        endpoint: String
+    ) -> TracerProviderSdk? {
         guard let tracesURL = URL(string: "\(endpoint)/v1/traces") else {
             Self.logger.error("Invalid OTLP traces endpoint URL")
-            return
+            return nil
         }
-
-        let traceExporter = OtlpHttpTraceExporter(endpoint: tracesURL, config: otlpConfig)
-        let spanProcessor = BatchSpanProcessor(spanExporter: traceExporter)
-        let tracerProvider = TracerProviderBuilder()
-            .add(spanProcessor: spanProcessor)
+        let exporter = OtlpHttpTraceExporter(endpoint: tracesURL, config: config)
+        let provider = TracerProviderBuilder()
+            .add(spanProcessor: BatchSpanProcessor(spanExporter: exporter))
             .with(resource: resource)
             .build()
-        OpenTelemetry.registerTracerProvider(tracerProvider: tracerProvider)
+        OpenTelemetry.registerTracerProvider(tracerProvider: provider)
+        return provider
+    }
 
-        // Setup metric exporter and provider using stable APIs
+    private func setupMeterProvider(
+        resource: Resource,
+        config: OtlpConfiguration,
+        endpoint: String
+    ) -> StableMeterProviderSdk? {
         guard let metricsURL = URL(string: "\(endpoint)/v1/metrics") else {
             Self.logger.error("Invalid OTLP metrics endpoint URL")
-            return
+            return nil
         }
-
-        let metricExporter = StableOtlpHTTPMetricExporter(endpoint: metricsURL, config: otlpConfig)
-        let metricReader = StablePeriodicMetricReaderBuilder(exporter: metricExporter)
+        let exporter = StableOtlpHTTPMetricExporter(endpoint: metricsURL, config: config)
+        let reader = StablePeriodicMetricReaderBuilder(exporter: exporter)
             .setInterval(timeInterval: 60.0)
             .build()
-        let stableMeterProvider = StableMeterProviderSdk.builder()
+        let provider = StableMeterProviderSdk.builder()
             .setResource(resource: resource)
-            .registerMetricReader(reader: metricReader)
+            .registerMetricReader(reader: reader)
             .build()
-        OpenTelemetry.registerStableMeterProvider(meterProvider: stableMeterProvider)
+        OpenTelemetry.registerStableMeterProvider(meterProvider: provider)
+        return provider
+    }
 
-        // Setup log exporter and provider
+    private func setupLoggerProvider(
+        resource: Resource,
+        config: OtlpConfiguration,
+        endpoint: String
+    ) -> LoggerProviderSdk? {
         guard let logsURL = URL(string: "\(endpoint)/v1/logs") else {
             Self.logger.error("Invalid OTLP logs endpoint URL")
-            return
+            return nil
         }
+        let exporter = OtlpHttpLogExporter(endpoint: logsURL, config: config)
+        let processor = BatchLogRecordProcessor(logRecordExporter: exporter)
+        let provider = LoggerProviderBuilder().with(resource: resource).with(processors: [processor]).build()
+        OpenTelemetry.registerLoggerProvider(loggerProvider: provider)
+        return provider
+    }
 
-        let logExporter = OtlpHttpLogExporter(endpoint: logsURL, config: otlpConfig)
-        let logProcessor = BatchLogRecordProcessor(logRecordExporter: logExporter)
-        let loggerProvider = LoggerProviderBuilder()
-            .with(resource: resource)
-            .with(processors: [logProcessor])
-            .build()
-        OpenTelemetry.registerLoggerProvider(loggerProvider: loggerProvider)
-
-        // Get tracer, meter, and logger instances
-        // Note: Using nonisolated(unsafe) to access OpenTelemetry.instance on MainActor
-        // This is safe because we're only doing this during initialization
-        tracer = tracerProvider.get(
-            instrumentationName: "seer-app",
-            instrumentationVersion: Bundle.main.appVersion
+    private func setupURLSessionInstrumentation() {
+        urlSessionInstrumentation = URLSessionInstrumentation(
+            configuration: URLSessionInstrumentationConfiguration(
+                shouldInstrument: { request in
+                    // Don't trace OTLP exporter requests to avoid infinite loops
+                    guard let url = request.url?.absoluteString else { return true }
+                    return !url.contains("/v1/traces") && !url.contains("/v1/metrics") && !url.contains("/v1/logs")
+                }
+            )
         )
-        stableMeter = stableMeterProvider
-        otelLogger = loggerProvider
-            .loggerBuilder(instrumentationScopeName: "seer-app")
-            .build()
+        Self.logger.debug("URLSession instrumentation enabled for automatic HTTP tracing")
     }
 
     /// Call this when consent changes to initialize or update OTEL
