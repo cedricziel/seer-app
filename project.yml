@@ -112,6 +112,12 @@ targets:
         product: ResourceExtension
       - package: OpenTelemetrySwift
         product: URLSessionInstrumentation
+      - package: OpenTelemetrySwift
+        product: SignPostIntegration
+      - package: OpenTelemetrySwift
+        product: OTelSwiftLog
+      - package: OpenTelemetrySwift
+        product: PersistenceExporter
       - package: PLCrashReporter
         product: CrashReporter
     settings:

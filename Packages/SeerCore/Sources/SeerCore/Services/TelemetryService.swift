@@ -1,10 +1,15 @@
+import Foundation
+import Logging
 import MetricKit
 import OpenTelemetryApi
 import OpenTelemetryProtocolExporterCommon
 import OpenTelemetryProtocolExporterHttp
 import OpenTelemetrySdk
 import OSLog
+import OTelSwiftLog
+import PersistenceExporter
 import ResourceExtension
+import SignPostIntegration
 import URLSessionInstrumentation
 
 /// OpenTelemetry-based telemetry service that collects and reports performance metrics and crash data.
@@ -53,6 +58,12 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
 
     /// URLSession instrumentation for automatic HTTP request tracing
     private var urlSessionInstrumentation: URLSessionInstrumentation?
+
+    /// Storage URL for persisting telemetry data when offline
+    private static var persistenceStorageURL: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("otel_telemetry", isDirectory: true)
+    }
 
     override private init() {
         super.init()
@@ -143,11 +154,33 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
             Self.logger.error("Invalid OTLP traces endpoint URL")
             return nil
         }
-        let exporter = OtlpHttpTraceExporter(endpoint: tracesURL, config: config)
-        let provider = TracerProviderBuilder()
-            .add(spanProcessor: BatchSpanProcessor(spanExporter: exporter))
+        let httpExporter = OtlpHttpTraceExporter(endpoint: tracesURL, config: config)
+
+        // Wrap with persistence for offline buffering
+        let spanExporter: SpanExporter
+        do {
+            let storageURL = Self.persistenceStorageURL.appendingPathComponent("spans", isDirectory: true)
+            spanExporter = try PersistenceSpanExporterDecorator(
+                spanExporter: httpExporter,
+                storageURL: storageURL
+            )
+            Self.logger.debug("Persistence span exporter enabled at \(storageURL.path)")
+        } catch {
+            Self.logger.warning("Failed to create persistence span exporter: \(error). Using non-persistent exporter.")
+            spanExporter = httpExporter
+        }
+
+        var providerBuilder = TracerProviderBuilder()
+            .add(spanProcessor: BatchSpanProcessor(spanExporter: spanExporter))
             .with(resource: resource)
-            .build()
+
+        // Add SignPost integration for Xcode Instruments visibility
+        #if DEBUG
+            providerBuilder = providerBuilder.add(spanProcessor: SignPostIntegration())
+            Self.logger.debug("SignPost integration enabled for Instruments tracing")
+        #endif
+
+        let provider = providerBuilder.build()
         OpenTelemetry.registerTracerProvider(tracerProvider: provider)
         return provider
     }
@@ -162,6 +195,7 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
             return nil
         }
         let exporter = StableOtlpHTTPMetricExporter(endpoint: metricsURL, config: config)
+        // Note: PersistenceMetricExporterDecorator doesn't support StableMetricExporter yet
         let reader = StablePeriodicMetricReaderBuilder(exporter: exporter)
             .setInterval(timeInterval: 60.0)
             .build()
@@ -186,6 +220,13 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
         let processor = BatchLogRecordProcessor(logRecordExporter: exporter)
         let provider = LoggerProviderBuilder().with(resource: resource).with(processors: [processor]).build()
         OpenTelemetry.registerLoggerProvider(loggerProvider: provider)
+
+        // Bootstrap Swift Logging to route logs through OpenTelemetry
+        LoggingSystem.bootstrap { _ in
+            OTelLogHandler(loggerProvider: provider)
+        }
+        Self.logger.debug("Swift Logging bootstrapped with OpenTelemetry log handler")
+
         return provider
     }
 
@@ -193,8 +234,9 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
         urlSessionInstrumentation = URLSessionInstrumentation(
             configuration: URLSessionInstrumentationConfiguration(
                 shouldInstrument: { request in
+                    // Skip requests with no URL - can't trace without a valid URL
+                    guard let url = request.url?.absoluteString else { return false }
                     // Don't trace OTLP exporter requests to avoid infinite loops
-                    guard let url = request.url?.absoluteString else { return true }
                     return !url.contains("/v1/traces") && !url.contains("/v1/metrics") && !url.contains("/v1/logs")
                 }
             )
