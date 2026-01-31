@@ -299,7 +299,6 @@ private struct ServerSetupContentView: View {
         }
     }
 
-    @ViewBuilder
     private var cloudKitStatusFooter: some View {
         HStack(spacing: 4) {
             Image(systemName: cloudKitStatus.statusIcon)

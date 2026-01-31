@@ -434,10 +434,21 @@ extension JellyfinService {
 // MARK: - Public Accessors
 
 public extension JellyfinService {
-    func getServerURL() -> URL { serverURL }
-    func getAccessToken() -> String? { accessToken }
-    func getUserID() -> String? { userID }
-    func getDeviceID() -> String { deviceID }
+    func getServerURL() -> URL {
+        serverURL
+    }
+
+    func getAccessToken() -> String? {
+        accessToken
+    }
+
+    func getUserID() -> String? {
+        userID
+    }
+
+    func getDeviceID() -> String {
+        deviceID
+    }
 }
 
 // MARK: - User Progress

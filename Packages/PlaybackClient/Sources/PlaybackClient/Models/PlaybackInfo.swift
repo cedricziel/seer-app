@@ -88,7 +88,10 @@ public struct MediaSource: Codable, Sendable, Identifiable {
 // MARK: - MediaStream
 
 public struct MediaStream: Codable, Sendable, Identifiable {
-    public var id: Int { index }
+    public var id: Int {
+        index
+    }
+
     public let index: Int
     public let type: StreamType
     public let codec: String?

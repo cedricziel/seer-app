@@ -434,7 +434,7 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
             }
         }
 
-        // Allow taps to pass through when not on interactive elements
+        /// Allow taps to pass through when not on interactive elements
         override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
             let result = super.hitTest(point, with: event)
             // Only respond to taps on this view, not subviews

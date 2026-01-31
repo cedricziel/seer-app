@@ -93,8 +93,7 @@ public actor DownloadStorage {
         try mutableURL.setResourceValues(resourceValues)
 
         // Return relative path from downloads directory
-        let relativePath = "\(serverID)/\(mediaType)/\(itemID)/\(fileName)"
-        return relativePath
+        return "\(serverID)/\(mediaType)/\(itemID)/\(fileName)"
     }
 
     /// Get full URL for a relative path

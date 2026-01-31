@@ -47,5 +47,5 @@ public final class NotificationPreferences {
     }
 }
 
-// SwiftData @Model classes need explicit Sendable conformance for cross-actor use
+/// SwiftData @Model classes need explicit Sendable conformance for cross-actor use
 extension NotificationPreferences: @unchecked Sendable {}

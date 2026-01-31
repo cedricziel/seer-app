@@ -93,7 +93,6 @@ private struct LibraryContentView: View {
         }
     }
 
-    @ViewBuilder
     private var contentView: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {

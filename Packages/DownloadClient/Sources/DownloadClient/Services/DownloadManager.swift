@@ -57,7 +57,7 @@ public final class DownloadManager {
     private var userID: String?
     private var deviceID: String?
 
-    // WiFi-only downloads setting
+    /// WiFi-only downloads setting
     var wifiOnlyEnabled: Bool = true
 
     // MARK: - Notification Delegate

@@ -177,5 +177,5 @@ public final class Download {
 
 // MARK: - Sendable Conformance
 
-// SwiftData @Model classes need explicit Sendable conformance for cross-actor use
+/// SwiftData @Model classes need explicit Sendable conformance for cross-actor use
 extension Download: @unchecked Sendable {}

@@ -16,7 +16,7 @@
 @_exported import struct Foundation.URL
 @_exported import struct Foundation.UUID
 
-// Re-export public types
+/// Re-export public types
 public typealias DownloadID = UUID
 
 // MARK: - SwiftData Container

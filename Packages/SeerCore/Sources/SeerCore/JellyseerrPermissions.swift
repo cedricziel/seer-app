@@ -27,7 +27,7 @@ public struct JellyseerrPermissions: OptionSet, Sendable {
     public static let request4KMovie = JellyseerrPermissions(rawValue: 2048)
     public static let request4KTV = JellyseerrPermissions(rawValue: 4096)
 
-    // Advanced permissions
+    /// Advanced permissions
     public static let requestAdvanced = JellyseerrPermissions(rawValue: 8192)
 
     // MARK: - Convenience Properties

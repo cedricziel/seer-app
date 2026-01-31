@@ -40,7 +40,7 @@ public final class CachedRequestStatus {
     }
 }
 
-// SwiftData @Model classes need explicit Sendable conformance for cross-actor use
+/// SwiftData @Model classes need explicit Sendable conformance for cross-actor use
 extension CachedRequestStatus: @unchecked Sendable {}
 
 /// Status changes that warrant notifications

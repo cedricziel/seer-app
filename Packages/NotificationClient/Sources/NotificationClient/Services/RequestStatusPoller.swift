@@ -11,7 +11,7 @@ public actor RequestStatusPoller {
     private var jellyseerrService: JellyseerrService?
     private var pollingTask: Task<Void, Never>?
 
-    // Polling configuration
+    /// Polling configuration
     private let pollingInterval: TimeInterval = 15 * 60 // 15 minutes
 
     public init(

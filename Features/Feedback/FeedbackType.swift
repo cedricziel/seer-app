@@ -6,7 +6,9 @@ enum FeedbackType: String, CaseIterable, Identifiable {
     case feature = "Feature Request"
     case general = "General Feedback"
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     /// System image name for the feedback type
     var iconName: String {
