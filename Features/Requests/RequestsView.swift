@@ -17,6 +17,8 @@ private struct RequestsContentView: View {
     @ObservedObject var appState: AppState
     @StateObject private var viewModel: RequestsViewModel
     @State private var selectedRequestDetails: MediaRequest?
+    @State private var showActionError = false
+    @State private var actionErrorMessage: String?
 
     init(appState: AppState) {
         self.appState = appState
@@ -76,15 +78,32 @@ private struct RequestsContentView: View {
                     canManageRequests: viewModel.canManageRequests,
                     onApprove: {
                         Task {
-                            try? await viewModel.approveRequest(request)
+                            do {
+                                try await viewModel.approveRequest(request)
+                            } catch {
+                                actionErrorMessage = error.localizedDescription
+                                showActionError = true
+                            }
                         }
                     },
                     onDecline: {
                         Task {
-                            try? await viewModel.declineRequest(request)
+                            do {
+                                try await viewModel.declineRequest(request)
+                            } catch {
+                                actionErrorMessage = error.localizedDescription
+                                showActionError = true
+                            }
                         }
                     }
                 )
+            }
+            .alert("Request Failed", isPresented: $showActionError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                if let errorMessage = actionErrorMessage {
+                    Text(errorMessage)
+                }
             }
         }
         .task {
@@ -166,17 +185,32 @@ private struct RequestsContentView: View {
                     onViewDetails: { selectedRequestDetails = request },
                     onCancelRequest: {
                         Task {
-                            try? await viewModel.cancelRequest(request)
+                            do {
+                                try await viewModel.cancelRequest(request)
+                            } catch {
+                                actionErrorMessage = error.localizedDescription
+                                showActionError = true
+                            }
                         }
                     },
                     onApproveRequest: {
                         Task {
-                            try? await viewModel.approveRequest(request)
+                            do {
+                                try await viewModel.approveRequest(request)
+                            } catch {
+                                actionErrorMessage = error.localizedDescription
+                                showActionError = true
+                            }
                         }
                     },
                     onDeclineRequest: {
                         Task {
-                            try? await viewModel.declineRequest(request)
+                            do {
+                                try await viewModel.declineRequest(request)
+                            } catch {
+                                actionErrorMessage = error.localizedDescription
+                                showActionError = true
+                            }
                         }
                     }
                 )

@@ -235,9 +235,14 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
             configuration: URLSessionInstrumentationConfiguration(
                 shouldInstrument: { request in
                     // Skip requests with no URL - can't trace without a valid URL
-                    guard let url = request.url?.absoluteString else { return false }
+                    guard let url = request.url?.absoluteString else {
+                        return false
+                    }
+
                     // Don't trace OTLP exporter requests to avoid infinite loops
-                    return !url.contains("/v1/traces") && !url.contains("/v1/metrics") && !url.contains("/v1/logs")
+                    let isOtlpRequest = url.contains("/v1/traces") || url.contains("/v1/metrics") || url
+                        .contains("/v1/logs")
+                    return !isOtlpRequest
                 }
             )
         )
