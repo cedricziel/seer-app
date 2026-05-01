@@ -4,8 +4,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "ci"
@@ -18,8 +17,7 @@ updates:
   - package-ecosystem: "bundler"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
@@ -32,8 +30,7 @@ updates:
   - package-ecosystem: "swift"
     directory: "/Packages/JellyseerrAPI"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
