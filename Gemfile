@@ -3,5 +3,6 @@ source "https://rubygems.org"
 gem "fastlane", "~> 2.226"
 gem "xcodeproj", "~> 1.27"
 
-plugins_path = File.join(File.dirname(__FILE__), 'fastlane', 'Pluginfile')
-eval_gemfile(plugins_path) if File.exist?(plugins_path)
+# Dependabot's bundler parser only accepts a string-literal argument here,
+# so the path is hard-coded. The fastlane/Pluginfile is always tracked.
+eval_gemfile "fastlane/Pluginfile"
