@@ -97,5 +97,5 @@ Uses XcodeGen with `project.yml` to generate the Xcode project. Never edit `.xco
 
 ### Requirements
 - iOS 26.0+
-- Swift 6.0
+- Swift 6.2
 - Xcode 16.0+
