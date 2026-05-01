@@ -1,0 +1,45 @@
+version: 2
+updates:
+  # GitHub Actions workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Fastlane / Ruby toolchain
+  - package-ecosystem: "bundler"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      bundler:
+        patterns: ["*"]
+
+  # Local Swift package (external deps used by JellyseerrAPI)
+  - package-ecosystem: "swift"
+    directory: "/Packages/JellyseerrAPI"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      swift-patches:
+        update-types: ["patch"]
+      swift-minors:
+        update-types: ["minor"]
