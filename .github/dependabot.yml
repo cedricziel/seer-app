@@ -26,6 +26,22 @@ updates:
       bundler:
         patterns: ["*"]
 
+  # Main app SPM dependencies (declared in project.yml, resolved by Xcode).
+  # Dependabot reads the resolved file at the canonical xcodeproj location.
+  - package-ecosystem: "swift"
+    directory: "/SeerApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      swift-app-patches:
+        update-types: ["patch"]
+      swift-app-minors:
+        update-types: ["minor"]
+
   # Local Swift package (external deps used by JellyseerrAPI)
   - package-ecosystem: "swift"
     directory: "/Packages/JellyseerrAPI"
@@ -36,7 +52,7 @@ updates:
       prefix: "chore(deps)"
       include: "scope"
     groups:
-      swift-patches:
+      swift-jellyseerr-patches:
         update-types: ["patch"]
-      swift-minors:
+      swift-jellyseerr-minors:
         update-types: ["minor"]
