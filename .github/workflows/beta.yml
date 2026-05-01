@@ -54,6 +54,8 @@ jobs:
           MATCH_PASSWORD:          ${{ secrets.MATCH_PASSWORD }}
           MATCH_KEYCHAIN_PASSWORD: ${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
           FASTLANE_HIDE_CHANGELOG: "true"
+          FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: "120"
+          FASTLANE_XCODEBUILD_SETTINGS_RETRIES: "5"
         run: |
           if [ -n "${{ inputs.changelog }}" ]; then
             bundle exec fastlane beta changelog:"${{ inputs.changelog }}" allow_dirty:true
