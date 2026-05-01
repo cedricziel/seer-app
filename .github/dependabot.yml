@@ -26,21 +26,14 @@ updates:
       bundler:
         patterns: ["*"]
 
-  # Main app SPM dependencies (declared in project.yml, resolved by Xcode).
-  # Dependabot reads the resolved file at the canonical xcodeproj location.
-  - package-ecosystem: "swift"
-    directory: "/SeerApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: "chore(deps)"
-      include: "scope"
-    groups:
-      swift-app-patches:
-        update-types: ["patch"]
-      swift-app-minors:
-        update-types: ["minor"]
+  # NOTE: The main app's external SPM dependencies (JellyfinAPI, Kingfisher,
+  # OpenTelemetrySwift, PLCrashReporter, etc.) are declared in project.yml
+  # and resolved by Xcode into SeerApp.xcodeproj/.../swiftpm/Package.resolved.
+  # Dependabot's swift ecosystem requires a Package.swift in the target
+  # directory and can't track Xcode-managed SPM directly. We commit the
+  # resolved file for reproducibility; updates to those deps happen via
+  # Xcode's "Update to Latest Package Versions" and ship as a regular PR
+  # showing the lockfile diff.
 
   # Local Swift package (external deps used by JellyseerrAPI)
   - package-ecosystem: "swift"
