@@ -30,7 +30,7 @@ jobs:
       version:         ${{ steps.rp.outputs.version }}
     steps:
       - id: rp
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         with:
           # Prefer a dedicated PAT or GitHub App token (RELEASE_PLEASE_TOKEN)
           # so that releases/tags created here can trigger downstream workflows
