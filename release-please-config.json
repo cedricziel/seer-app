@@ -7,7 +7,7 @@
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": false,
       "draft": false,
-      "prerelease": false,
+      "prerelease": true,
       "extra-files": [
         { "type": "generic", "path": "project.yml" }
       ]

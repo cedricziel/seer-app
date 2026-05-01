@@ -1,29 +1,34 @@
 # Releases
 
-Releases are fully driven by [release-please](https://github.com/googleapis/release-please)
-on every push to `main`. There is **one** path: land semantic commits, merge
-the release PR, the release ships to TestFlight automatically.
+Two channels, both modelled through release-please's GitHub Releases:
 
-## How it works
+- **TestFlight** — every release-please-created release is marked as a
+  pre-release in GitHub. Merging the release PR uploads to TestFlight.
+- **App Store** — explicit graduation. Click "Set as the latest release" on
+  the GitHub release page → that fires `release: released` → the existing
+  TestFlight build is submitted for App Store review (no rebuild).
 
-1. **Land semantic commits on `main`.** Examples:
-   - `feat(playback): add chapter skip` → minor bump
-   - `fix(downloads): retry transient errors` → patch bump
-   - `feat!: drop iOS 25 support` → major (or minor pre-1.0)
-   - `chore:`, `ci:`, `docs:`, `style:`, `test:`, `refactor:` → no bump
-2. **Release-please opens a PR** titled `chore(main): release X.Y.Z`. It bumps
-   `MARKETING_VERSION` across every target in `project.yml`, regenerates
-   `CHANGELOG.md`, and updates `.release-please-manifest.json`.
-3. **CI runs on the PR** — Lint & Format and Build & Test must pass before
-   merge (branch protection enforces this).
-4. **Merge the PR.** Release-please then:
-   - Tags the merge commit `vX.Y.Z`.
-   - Creates a GitHub Release.
-   - The same workflow's `testflight` job (gated on `release_created == true`)
-     checks out the tag, builds, signs via `match`, and uploads to TestFlight.
+Same tag, same artifact for both channels. The GitHub Release's
+prerelease/released flag is the channel state.
 
-That last step replaces the old manual `beta.yml` workflow. There is no
-button to push for a normal release — merging the release PR is the button.
+## Channel mechanics
+
+```
+semantic commits land on main
+   │
+   └─► release-please opens / updates "chore(main): release X.Y.Z" PR
+          │
+          └─► merge ─► tag vX.Y.Z + GitHub Release (prerelease=true)
+                 │
+                 └─► testflight job ─► fastlane beta ─► uploads to TestFlight
+
+[ test in TestFlight, decide this build is App-Store-ready,
+  go to the release page and "Set as the latest release" ]
+   │
+   └─► GitHub fires release: released
+          │
+          └─► app-store workflow ─► fastlane submit_to_app_store ─► review queue
+```
 
 ## Two version components
 
@@ -34,67 +39,70 @@ The App Store binary carries two numbers:
 | Marketing version | `CFBundleShortVersionString` | release-please writes `MARKETING_VERSION` into `project.yml`. |
 | Build number      | `CFBundleVersion`            | `git rev-list --count HEAD` injected at archive time via `xcargs`. |
 
-The build number is **derived from git history** rather than maintained as
-mutable state in `project.yml`. That gives:
+Build number is derived from git history — never written back to
+`project.yml`. Same git state, same build number.
 
-- Reproducible builds — same git state, same build number.
-- No commit-back-to-`main` after each archive.
-- Monotonic across the entire repo lifetime, satisfying Apple's "must be
-  unique within a marketing version" rule trivially.
+## TestFlight (pre-release path)
 
-`project.yml`'s `CURRENT_PROJECT_VERSION` is just a placeholder for
-development builds via the Xcode UI; release builds always override it via
-the fastlane archive `xcargs`.
+Triggered automatically when release-please's PR is merged to `main`. The
+`testflight` job in `release-please.yml`:
 
-## App Store submission
+1. Checks out the tag release-please just created.
+2. Resolves signing via `match` against `cedricziel/certificates`.
+3. Builds with `CURRENT_PROJECT_VERSION = git rev-list --count HEAD`.
+4. Uploads to TestFlight using the App Store Connect API key.
+5. Uploads dSYMs.
+6. Posts the IPA as a workflow artifact for 30 days.
 
-TestFlight is automatic on every release tag. App Store submission stays
-manual — you don't want to ship to review without a human eyeballing it:
+## App Store (graduation path)
 
-```bash
-make fastlane-release          # uploads to App Store, no submission
-make fastlane-release submit:true   # also submits for review
-```
+Every release-please release lands as a GitHub **pre-release**
+(`prerelease: true` in `release-please-config.json`). Promotion to App
+Store is one click in the GitHub UI:
 
-This pulls the latest `MARKETING_VERSION` from `project.yml` and stamps the
-build number from `git rev-list --count HEAD`, same as the auto path.
+1. Open the release on GitHub (e.g. `vX.Y.Z`).
+2. Click **Edit**, uncheck "Set as a pre-release", check "Set as the latest
+   release", click **Update release**.
+3. GitHub fires `release: released`. `app-store.yml` runs and calls
+   `fastlane submit_to_app_store` with the build number computed from the
+   tagged commit. `skip_binary_upload: true` means the **existing**
+   TestFlight build is added to the App Store version and submitted for
+   review — no rebuild, no re-upload.
+4. Apple reviews. On approval, Apple awaits your manual release
+   (`automatic_release: false`).
 
-## Off-cycle / hot-fix builds
+The binary submitted to Apple is byte-identical to what TestFlight testers
+used.
 
-If you need a TestFlight build outside the normal release cadence, the path
-is the same: commit the change as `fix:`, merge the (now-updated) release-
-please PR, ship. The PR appears almost instantly after the `fix:` commit
-lands on `main`.
+## Off-cycle / manual paths
 
-For QA on an in-progress release-please PR before merging, run
-`make fastlane-beta` locally — same lane, just from your machine.
+| Need | Command |
+|---|---|
+| Ad-hoc TestFlight build from local | `make fastlane-beta` |
+| Force-rebuild App Store submission (skips graduation) | `make fastlane-release submit:true` |
+| Inspect what would be built | `make version` |
 
 ## File map
 
 | File | Purpose |
 |------|---------|
-| `release-please-config.json` | Per-package release-please configuration. Uses `simple` release type with the `generic` updater on `project.yml` so `MARKETING_VERSION` lines flagged with `# x-release-please-version` get bumped. |
+| `release-please-config.json` | Per-package release-please config. `prerelease: true` keeps every release marked as pre-release until graduated. |
 | `.release-please-manifest.json` | Source of truth for the current released version. |
-| `.github/workflows/release-please.yml` | Single workflow: opens/updates the release PR; on merge tags, creates a GitHub Release, and uploads to TestFlight. |
-| `CHANGELOG.md` | Auto-generated by release-please. Don't hand-edit. |
+| `.github/workflows/release-please.yml` | Opens/updates the release PR; on merge tags `vX.Y.Z`, creates the GitHub Release, builds and uploads to TestFlight. |
+| `.github/workflows/app-store.yml` | Triggers on `release: released` (graduation). Submits the existing TestFlight build for App Store review. |
+| `CHANGELOG.md` | Auto-generated by release-please. |
 
 ## Conventional commit cheat sheet
 
-| Type | Effect |
+| Type | Effect on version |
 |------|--------|
 | `feat:` | minor |
 | `fix:` | patch |
 | `feat!:` / `fix!:` / footer `BREAKING CHANGE:` | major (or minor pre-1.0) |
 | `perf:` | patch |
-| `revert:` | patch (and removes the reverted commit's effect from changelog) |
-| `chore:`, `ci:`, `docs:`, `style:`, `test:`, `refactor:`, `build:` | no bump, not in changelog |
+| `revert:` | patch |
+| `chore:`, `ci:`, `docs:`, `style:`, `test:`, `refactor:`, `build:` | no version bump → no release PR → no TestFlight build |
 
-While we're pre-1.0 (`MARKETING_VERSION < 1.0.0`), `feat!` produces a minor
-bump rather than a major (`bump-minor-pre-major: true` in the config). Flip
-both knobs in `release-please-config.json` once you cut 1.0.
-
-## Forced override
-
-If the manifest ever drifts from `project.yml`, edit
-`.release-please-manifest.json` directly and push to `main`. release-please
-picks up the new baseline on its next scan.
+While we're pre-1.0, `feat!` produces a minor bump rather than a major
+(`bump-minor-pre-major: true`). Flip that knob in
+`release-please-config.json` once you cut 1.0.

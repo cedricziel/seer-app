@@ -88,6 +88,24 @@ lane :beta do |options|
   upload_symbols(api_key: api_key) unless is_ci && ENV["SKIP_SYMBOL_UPLOAD"]
 end
 
+desc "Submit an existing TestFlight build to App Store review without rebuilding"
+lane :submit_to_app_store do |options|
+  api_key = load_app_store_connect_api_key
+
+  upload_to_app_store(
+    api_key: api_key,
+    app_identifier: APP_IDENTIFIER,
+    skip_binary_upload: true,
+    submit_for_review: options[:submit] != false,
+    automatic_release: options[:auto_release] == true,
+    force: true,
+    precheck_include_in_app_purchases: false,
+    skip_screenshots: true,
+    skip_metadata: options[:metadata] != true,
+    build_number: options[:build]
+  )
+end
+
 desc "Push a release build to App Store Connect (does not submit for review by default)"
 lane :release do |options|
   submit_for_review = options[:submit] == true || ENV["SUBMIT_FOR_REVIEW"] == "true"
