@@ -1,3 +1,4 @@
+--swiftversion 6.0
 --trailingCommas never
 --maxwidth 120
 --indent 4
@@ -5,3 +6,6 @@
 --wrapcollections before-first
 --allman false
 --disable wrapMultilineStatementBraces
+
+--exclude Packages/JellyseerrAPI/Sources/JellyseerrAPI/Generated
+--exclude Packages/JellyseerrAPI/.build
