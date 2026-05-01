@@ -333,9 +333,3 @@ schemes:
       config: Debug
     archive:
       config: Release
-      preActions:
-        - script: |
-            cd "${PROJECT_DIR}"
-            ./scripts/bump-build.sh
-          name: Increment Build Number
-          settingsTarget: SeerApp

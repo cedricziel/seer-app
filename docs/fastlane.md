@@ -94,8 +94,9 @@ Two workflows are provided:
 
 - **`.github/workflows/ci.yml`** — lint, format check, build, run tests on
   every push and PR. No secrets required.
-- **`.github/workflows/beta.yml`** — manual `workflow_dispatch` that builds
-  and uploads to TestFlight.
+- **`.github/workflows/release-please.yml`** — manages release PRs and, when
+  one is merged, automatically builds and uploads to TestFlight. See
+  [`docs/releases.md`](releases.md) for the full flow.
 
 ### Required GitHub Actions secrets
 

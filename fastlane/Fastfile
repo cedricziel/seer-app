@@ -9,6 +9,16 @@ SCHEME          = "SeerApp"
 APP_IDENTIFIER  = "com.cedricziel.seer"
 OUTPUT_DIR      = "build"
 
+# Build number = number of commits reachable from HEAD. Reproducible from git
+# state alone — never committed back to project.yml.
+def commit_count_build_number
+  @commit_count_build_number ||= sh("git rev-list --count HEAD", log: false).strip
+end
+
+def archive_xcargs
+  "CURRENT_PROJECT_VERSION=#{commit_count_build_number}"
+end
+
 before_all do |lane, options|
   Dotenv.load(".env") if File.exist?(".env")
   ensure_xcode_project_generated
@@ -43,7 +53,8 @@ lane :build do
     output_name: "SeerApp.ipa",
     clean: true,
     include_symbols: true,
-    include_bitcode: false
+    include_bitcode: false,
+    xcargs: archive_xcargs
   )
 end
 
@@ -63,7 +74,8 @@ lane :beta do |options|
     output_name: "SeerApp.ipa",
     clean: true,
     include_symbols: true,
-    include_bitcode: false
+    include_bitcode: false,
+    xcargs: archive_xcargs
   )
 
   upload_to_testflight(
@@ -93,7 +105,8 @@ lane :release do |options|
     output_name: "SeerApp.ipa",
     clean: true,
     include_symbols: true,
-    include_bitcode: false
+    include_bitcode: false,
+    xcargs: archive_xcargs
   )
 
   upload_to_app_store(
@@ -136,16 +149,9 @@ lane :refresh_dsyms do |options|
   upload_symbols(api_key: api_key)
 end
 
-desc "Increment the build number using the existing scripts/bump-build.sh"
-lane :bump_build do
-  sh "../scripts/bump-build.sh"
-end
-
-desc "Bump marketing version (pass type:patch|minor|major)"
-lane :bump_version do |options|
-  type = options[:type] || "patch"
-  UI.user_error!("type must be patch, minor, or major") unless %w[patch minor major].include?(type)
-  sh "../scripts/bump-version.sh --#{type}"
+desc "Print the build number that would be used (commit count from HEAD)"
+lane :show_build_number do
+  UI.message("Build number: #{commit_count_build_number}")
 end
 
 # ---------------------------------------------------------------------------

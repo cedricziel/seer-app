@@ -1,4 +1,4 @@
-.PHONY: generate build build-release lint format clean open test bump-build bump-patch bump-minor bump-major version \
+.PHONY: generate build build-release lint format clean open test version \
         fastlane-install fastlane-test fastlane-build fastlane-beta fastlane-release fastlane-match fastlane-bootstrap-signing \
         _ensure-brew-ruby
 
@@ -57,21 +57,12 @@ resolve: generate
 	@echo "Resolving packages..."
 	xcodebuild -resolvePackageDependencies -scheme SeerApp
 
-# Version management
-bump-build:
-	@./scripts/bump-build.sh
-
-bump-patch:
-	@./scripts/bump-version.sh --patch
-
-bump-minor:
-	@./scripts/bump-version.sh --minor
-
-bump-major:
-	@./scripts/bump-version.sh --major
-
+# Version: marketing version comes from project.yml (managed by release-please);
+# build number comes from `git rev-list --count HEAD` at archive time.
 version:
-	@echo "Version: $$(grep -E '^\s+MARKETING_VERSION:' project.yml | head -1 | sed 's/.*MARKETING_VERSION:\s*//' | tr -d ' \"') (Build $$(grep -E '^\s+CURRENT_PROJECT_VERSION:' project.yml | head -1 | sed 's/.*CURRENT_PROJECT_VERSION:\s*//' | tr -d ' '))"
+	@MV=$$(grep -E '^\s+MARKETING_VERSION:' project.yml | head -1 | sed 's/.*MARKETING_VERSION:\s*//' | sed 's/#.*//' | tr -d ' \"'); \
+	BN=$$(git rev-list --count HEAD); \
+	echo "Version: $$MV (Build $$BN)"
 
 # Fastlane
 #
