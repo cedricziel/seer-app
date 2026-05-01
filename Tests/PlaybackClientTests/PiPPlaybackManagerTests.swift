@@ -77,23 +77,20 @@ final class PiPPlaybackManagerTests: XCTestCase {
         let controller = AVPlayerViewController()
         sut.pipDidStart(player: player, item: item, controller: controller, delegate: mockDelegate)
 
-        // Simulate restoration request
-        // Note: In tests, UIKit presentation will fail but state should still be set
-        var completionCalled = false
-        sut.requestRestoreUI { _ in completionCalled = true }
+        // Enter the restoring state directly. The full requestRestoreUI flow
+        // depends on UIKit presentation, which fails synchronously in unit
+        // tests (no window scene); we exercise the state-machine contract here.
+        sut.beginRestoration()
 
-        // The completion may be called immediately with false in test env (no window)
-        // but we can check that isRestoring is initially set
-        // After requestRestoreUI, if no window, it completes immediately
-
-        // Now PiP stops (while restoring might still be true briefly)
         sut.pipDidStop()
 
-        // In test environment without UI, completion is called immediately
-        // so isRestoring will be false, but player should still be there
+        // While restoring, pipDidStop must not clear the player/item/controller —
+        // the restoring code path is responsible for handing them off.
         XCTAssertNotNil(sut.pipPlayer)
         XCTAssertNotNil(sut.pipItem)
         XCTAssertNotNil(sut.pipController)
+        XCTAssertTrue(sut.isRestoring)
+        XCTAssertFalse(sut.isPiPActive)
     }
 
     // MARK: - Restore UI Flow Tests

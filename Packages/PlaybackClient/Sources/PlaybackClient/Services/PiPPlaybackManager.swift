@@ -184,12 +184,20 @@ public final class PiPPlaybackManager {
         shouldRestorePlayer = false
     }
 
+    /// Marks the start of a restoration flow without doing any UIKit presentation.
+    /// While `isRestoring` is true, `pipDidStop()` will preserve the player/item/
+    /// controller so the caller can hand them off. Pair every call with a matching
+    /// `finishRestoration(success:)`.
+    func beginRestoration() {
+        isRestoring = true
+    }
+
     /// Call when user wants to restore UI from PiP.
     /// This method presents the SAME AVPlayerViewController via UIKit.
     /// - Parameter completion: Completion handler to call when the controller is presented
     public func requestRestoreUI(completion: @escaping (Bool) -> Void) {
         print("[PiPManager] requestRestoreUI - hasController: \(pipController != nil)")
-        isRestoring = true
+        beginRestoration()
         restoreCompletionHandler = completion
 
         guard let controller = pipController else {
