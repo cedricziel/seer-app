@@ -5,6 +5,10 @@ TestFlight / App Store releases. The setup is designed to be safe in a public
 repository — no secrets, signing material, or App Store Connect credentials
 are checked in.
 
+> **Releases:** version bumps and tags are managed by [release-please](releases.md).
+> Fastlane's job is just to build and upload — it picks up whatever
+> `MARKETING_VERSION` release-please has already written into `project.yml`.
+
 ## TL;DR
 
 ```bash
