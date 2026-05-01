@@ -8,12 +8,18 @@ are checked in.
 ## TL;DR
 
 ```bash
-make fastlane-install      # bundle install fastlane
+make setup                 # installs xcodegen + swiftlint + swiftformat + ruby (Homebrew)
+make fastlane-install      # bundle install fastlane via Homebrew Ruby
 cp fastlane/.env.example fastlane/.env
 $EDITOR fastlane/.env      # fill in real values (this file is gitignored)
 make fastlane-test         # run the test suite
 make fastlane-beta         # ship a TestFlight build
 ```
+
+> All `fastlane-*` Make targets invoke `$(brew --prefix ruby)/bin/bundle`
+> directly. macOS system Ruby (2.6) is intentionally avoided — it frequently
+> fails to install fastlane's native gems. Targets fail fast if Homebrew Ruby
+> isn't on the machine.
 
 ## Available lanes
 

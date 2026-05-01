@@ -1,5 +1,6 @@
 .PHONY: generate build build-release lint format clean open test bump-build bump-patch bump-minor bump-major version \
-        fastlane-install fastlane-test fastlane-build fastlane-beta fastlane-release fastlane-match fastlane-bootstrap-signing
+        fastlane-install fastlane-test fastlane-build fastlane-beta fastlane-release fastlane-match fastlane-bootstrap-signing \
+        _ensure-brew-ruby
 
 # Default simulator destination
 SIMULATOR ?= iPhone 17
@@ -49,7 +50,7 @@ test: generate
 # Install development dependencies
 setup:
 	@echo "Installing dependencies..."
-	brew install xcodegen swiftlint swiftformat || true
+	brew install xcodegen swiftlint swiftformat ruby || true
 
 # Resolve Swift packages
 resolve: generate
@@ -77,25 +78,38 @@ version:
 # Lanes read configuration from fastlane/.env (gitignored) or from environment
 # variables already set in your shell / CI. See fastlane/.env.example for the
 # variables required by each lane.
-fastlane-install:
-	@echo "Installing fastlane via bundler..."
-	bundle config set --local path 'vendor/bundle'
-	bundle install
+#
+# Locally we always use the bundler shipped with Homebrew Ruby. The macOS
+# system Ruby (2.6) frequently fails to install fastlane's native gems.
+BREW_RUBY_PREFIX := $(shell brew --prefix ruby 2>/dev/null)
+BUNDLE           := $(BREW_RUBY_PREFIX)/bin/bundle
 
-fastlane-test: generate
-	bundle exec fastlane test
+_ensure-brew-ruby:
+	@if [ -z "$(BREW_RUBY_PREFIX)" ] || [ ! -x "$(BUNDLE)" ]; then \
+		echo "ERROR: Homebrew Ruby is required for fastlane targets."; \
+		echo "       Install with: brew install ruby (or run: make setup)"; \
+		exit 1; \
+	fi
 
-fastlane-build: generate
-	bundle exec fastlane build
+fastlane-install: _ensure-brew-ruby
+	@echo "Installing fastlane via $(BUNDLE)..."
+	$(BUNDLE) config set --local path 'vendor/bundle'
+	$(BUNDLE) install
 
-fastlane-beta: generate
-	bundle exec fastlane beta
+fastlane-test: _ensure-brew-ruby generate
+	$(BUNDLE) exec fastlane test
 
-fastlane-release: generate
-	bundle exec fastlane release
+fastlane-build: _ensure-brew-ruby generate
+	$(BUNDLE) exec fastlane build
 
-fastlane-match: generate
-	bundle exec fastlane sync_signing type:$${TYPE:-development}
+fastlane-beta: _ensure-brew-ruby generate
+	$(BUNDLE) exec fastlane beta
 
-fastlane-bootstrap-signing: generate
-	bundle exec fastlane bootstrap_signing
+fastlane-release: _ensure-brew-ruby generate
+	$(BUNDLE) exec fastlane release
+
+fastlane-match: _ensure-brew-ruby generate
+	$(BUNDLE) exec fastlane sync_signing type:$${TYPE:-development}
+
+fastlane-bootstrap-signing: _ensure-brew-ruby generate
+	$(BUNDLE) exec fastlane bootstrap_signing
