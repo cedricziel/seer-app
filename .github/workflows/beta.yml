@@ -1,0 +1,84 @@
+name: TestFlight Beta
+
+on:
+  workflow_dispatch:
+    inputs:
+      changelog:
+        description: "TestFlight changelog (optional)"
+        required: false
+        default: ""
+
+jobs:
+  beta:
+    name: Build & Upload to TestFlight
+    runs-on: macos-15
+    environment: production
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # We may push the build-number bump back to main
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Provide stub Secrets.xcconfig
+        run: |
+          if [ ! -f Config/Secrets.xcconfig ]; then
+            cp Config/Secrets.xcconfig.template Config/Secrets.xcconfig
+          fi
+
+      - name: Configure SSH for match repo
+        if: ${{ env.MATCH_DEPLOY_KEY != '' }}
+        env:
+          MATCH_DEPLOY_KEY: ${{ secrets.MATCH_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$MATCH_DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Run fastlane beta
+        env:
+          ASC_KEY_ID:              ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID:           ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT:         ${{ secrets.ASC_KEY_CONTENT }}
+          MATCH_GIT_URL:           ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD:          ${{ secrets.MATCH_PASSWORD }}
+          MATCH_KEYCHAIN_PASSWORD: ${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
+          FASTLANE_HIDE_CHANGELOG: "true"
+        run: |
+          if [ -n "${{ inputs.changelog }}" ]; then
+            bundle exec fastlane beta changelog:"${{ inputs.changelog }}" allow_dirty:true
+          else
+            bundle exec fastlane beta allow_dirty:true
+          fi
+
+      - name: Commit bumped build number
+        run: |
+          if ! git diff --quiet project.yml; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add project.yml
+            git commit -m "chore: bump build number [skip ci]"
+            git push origin HEAD:main
+          fi
+
+      - name: Upload IPA artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SeerApp-ipa
+          path: build/*.ipa
+          if-no-files-found: ignore
+          retention-days: 14

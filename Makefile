@@ -1,4 +1,5 @@
-.PHONY: generate build build-release lint format clean open test bump-build bump-patch bump-minor bump-major version
+.PHONY: generate build build-release lint format clean open test bump-build bump-patch bump-minor bump-major version \
+        fastlane-install fastlane-test fastlane-build fastlane-beta fastlane-release fastlane-match fastlane-bootstrap-signing
 
 # Default simulator destination
 SIMULATOR ?= iPhone 17
@@ -70,3 +71,31 @@ bump-major:
 
 version:
 	@echo "Version: $$(grep -E '^\s+MARKETING_VERSION:' project.yml | head -1 | sed 's/.*MARKETING_VERSION:\s*//' | tr -d ' \"') (Build $$(grep -E '^\s+CURRENT_PROJECT_VERSION:' project.yml | head -1 | sed 's/.*CURRENT_PROJECT_VERSION:\s*//' | tr -d ' '))"
+
+# Fastlane
+#
+# Lanes read configuration from fastlane/.env (gitignored) or from environment
+# variables already set in your shell / CI. See fastlane/.env.example for the
+# variables required by each lane.
+fastlane-install:
+	@echo "Installing fastlane via bundler..."
+	bundle config set --local path 'vendor/bundle'
+	bundle install
+
+fastlane-test: generate
+	bundle exec fastlane test
+
+fastlane-build: generate
+	bundle exec fastlane build
+
+fastlane-beta: generate
+	bundle exec fastlane beta
+
+fastlane-release: generate
+	bundle exec fastlane release
+
+fastlane-match: generate
+	bundle exec fastlane sync_signing type:$${TYPE:-development}
+
+fastlane-bootstrap-signing: generate
+	bundle exec fastlane bootstrap_signing

@@ -38,6 +38,23 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+fastlane/README.md
+fastlane/.env
+fastlane/.env.local
+fastlane/.env.local.*
+fastlane/.env.*.local
+
+# App Store Connect API keys / signing material — never commit
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+*.certSigningRequest
+AuthKey_*.p8
+
+# Bundler
+.bundle/
+vendor/bundle/
 
 # Code Injection
 iOSInjectionProject/
