@@ -161,7 +161,7 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         )
 
         await MainActor.run { [weak self] in
-            guard let self, let delegate = self.actionDelegate else { return }
+            guard let self, let delegate = actionDelegate else { return }
 
             // Parse category
             guard let category = NotificationCategory(rawValue: categoryID) else { return }

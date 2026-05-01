@@ -35,13 +35,12 @@ public struct WatchProgressIndicator: View {
         height: CGFloat = 3,
         progressColor: Color = .accentColor
     ) {
-        let calculatedProgress: Double
-        if let position = positionTicks,
-           let duration = durationTicks,
-           duration > 0 {
-            calculatedProgress = Double(position) / Double(duration)
+        let calculatedProgress: Double = if let position = positionTicks,
+                                            let duration = durationTicks,
+                                            duration > 0 {
+            Double(position) / Double(duration)
         } else {
-            calculatedProgress = 0
+            0
         }
         self.init(
             progress: calculatedProgress,

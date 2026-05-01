@@ -20,26 +20,23 @@ public struct ConflictResolver {
         serverIsPlayed: Bool?
     ) -> ResolvedProgress {
         // Take the higher playback position (more progress)
-        let resolvedPosition: Int64
-        if let localPos = local?.playbackPositionTicks, let serverPos = serverPosition {
-            resolvedPosition = max(localPos, serverPos)
+        let resolvedPosition: Int64 = if let localPos = local?.playbackPositionTicks, let serverPos = serverPosition {
+            max(localPos, serverPos)
         } else {
-            resolvedPosition = local?.playbackPositionTicks ?? serverPosition ?? 0
+            local?.playbackPositionTicks ?? serverPosition ?? 0
         }
 
         // For favorite/played: if there's a pending local change, keep it; otherwise use server
-        let resolvedFavorite: Bool
-        if let local, local.syncStatus == SyncStatus.pending.rawValue {
-            resolvedFavorite = local.isFavorite
+        let resolvedFavorite: Bool = if let local, local.syncStatus == SyncStatus.pending.rawValue {
+            local.isFavorite
         } else {
-            resolvedFavorite = serverIsFavorite ?? false
+            serverIsFavorite ?? false
         }
 
-        let resolvedPlayed: Bool
-        if let local, local.syncStatus == SyncStatus.pending.rawValue {
-            resolvedPlayed = local.isPlayed
+        let resolvedPlayed: Bool = if let local, local.syncStatus == SyncStatus.pending.rawValue {
+            local.isPlayed
         } else {
-            resolvedPlayed = serverIsPlayed ?? false
+            serverIsPlayed ?? false
         }
 
         return ResolvedProgress(

@@ -46,7 +46,7 @@ struct ServerManagementView: View {
 
                         Spacer()
 
-                        if !cloudKitStatus.isSyncAvailable && !cloudKitStatus.isChecking {
+                        if !cloudKitStatus.isSyncAvailable, !cloudKitStatus.isChecking {
                             Button {
                                 Task { await cloudKitStatus.checkStatus() }
                             } label: {
@@ -58,7 +58,7 @@ struct ServerManagementView: View {
                 } header: {
                     Text("Sync Status")
                 } footer: {
-                    if !cloudKitStatus.isSyncAvailable && !cloudKitStatus.isChecking {
+                    if !cloudKitStatus.isSyncAvailable, !cloudKitStatus.isChecking {
                         Text("Servers won't sync. Check Settings → Apple Account → iCloud → Apps Using iCloud.")
                     } else if cloudKitStatus.isSyncAvailable {
                         Text("\(appState.sortedConfigurations.count) server(s) synced via iCloud")

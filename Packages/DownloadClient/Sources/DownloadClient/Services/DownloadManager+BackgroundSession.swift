@@ -27,7 +27,7 @@ extension DownloadManager: BackgroundSessionDelegate {
 
         Task { @MainActor [weak self] in
             guard let self,
-                  let download = try? await self.store.fetchDownload(id: downloadID)
+                  let download = try? await store.fetchDownload(id: downloadID)
             else {
                 // Clean up intermediate file if we can't process the download
                 try? FileManager.default.removeItem(at: tempFileURL)
@@ -36,7 +36,7 @@ extension DownloadManager: BackgroundSessionDelegate {
 
             do {
                 // Move file from intermediate location to permanent location
-                let relativePath = try await self.storage.moveDownloadedFile(
+                let relativePath = try await storage.moveDownloadedFile(
                     from: tempFileURL,
                     serverID: download.serverID,
                     mediaType: download.mediaType,
@@ -45,39 +45,39 @@ extension DownloadManager: BackgroundSessionDelegate {
                 )
 
                 // Update download record
-                try await self.store.updateFilePath(downloadID: downloadID, relativePath: relativePath)
-                try await self.store.updateState(downloadID: downloadID, state: .completed)
+                try await store.updateFilePath(downloadID: downloadID, relativePath: relativePath)
+                try await store.updateState(downloadID: downloadID, state: .completed)
 
                 // Notify delegate for notifications
-                await self.notificationDelegate?.downloadDidComplete(
+                await notificationDelegate?.downloadDidComplete(
                     downloadID: downloadID,
                     title: download.displayTitle,
                     serverID: download.serverID,
                     isAutoDownload: false // Auto-download tracking to be added
                 )
 
-                await self.queue.markCompleted(downloadID)
-                await self.refresh()
+                await queue.markCompleted(downloadID)
+                await refresh()
             } catch {
                 // Clean up intermediate file on failure
                 try? FileManager.default.removeItem(at: tempFileURL)
 
-                try? await self.store.updateState(
+                try? await store.updateState(
                     downloadID: downloadID,
                     state: .failed,
                     errorMessage: error.localizedDescription
                 )
 
                 // Notify delegate about failure
-                await self.notificationDelegate?.downloadDidFail(
+                await notificationDelegate?.downloadDidFail(
                     downloadID: downloadID,
                     title: download.displayTitle,
                     errorMessage: error.localizedDescription,
                     serverID: download.serverID
                 )
 
-                await self.queue.markCompleted(downloadID)
-                await self.refresh()
+                await queue.markCompleted(downloadID)
+                await refresh()
             }
         }
     }
@@ -90,13 +90,13 @@ extension DownloadManager: BackgroundSessionDelegate {
 
             // Save resume data if available
             if let resumeData {
-                try? await self.store.updateResumeData(downloadID: downloadID, resumeData: resumeData)
-                try? await self.store.updateState(downloadID: downloadID, state: .paused)
+                try? await store.updateResumeData(downloadID: downloadID, resumeData: resumeData)
+                try? await store.updateState(downloadID: downloadID, state: .paused)
             } else {
                 // Get download info for notification
-                let download = try? await self.store.fetchDownload(id: downloadID)
+                let download = try? await store.fetchDownload(id: downloadID)
 
-                try? await self.store.updateState(
+                try? await store.updateState(
                     downloadID: downloadID,
                     state: .failed,
                     errorMessage: error.localizedDescription
@@ -104,7 +104,7 @@ extension DownloadManager: BackgroundSessionDelegate {
 
                 // Notify delegate about failure (only when no resume data - real failure)
                 if let download {
-                    await self.notificationDelegate?.downloadDidFail(
+                    await notificationDelegate?.downloadDidFail(
                         downloadID: downloadID,
                         title: download.displayTitle,
                         errorMessage: error.localizedDescription,
@@ -113,8 +113,8 @@ extension DownloadManager: BackgroundSessionDelegate {
                 }
             }
 
-            await self.queue.markCompleted(downloadID)
-            await self.refresh()
+            await queue.markCompleted(downloadID)
+            await refresh()
         }
     }
 

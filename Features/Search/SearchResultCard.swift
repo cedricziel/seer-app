@@ -66,7 +66,7 @@ struct SearchResultCard: View {
         }
 
         // Request (if not already available or pending)
-        if !result.isAvailable && !result.hasPendingRequest, let onRequest {
+        if !result.isAvailable, !result.hasPendingRequest, let onRequest {
             Button {
                 onRequest()
             } label: {

@@ -57,7 +57,7 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
                 .ignoresSafeArea()
 
                 // Loading indicator (shown while loading, before player is ready)
-                if viewModel.isBuffering && viewModel.player == nil {
+                if viewModel.isBuffering, viewModel.player == nil {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(1.5)
@@ -76,7 +76,7 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
                 // Skip loading if we already have a player (restoration from PiP)
                 // Restoration completion is now handled by signalRestorationComplete() in updateUIViewController
                 guard existingPlayer == nil else {
-                    if viewModel.isReady && viewModel.errorMessage == nil {
+                    if viewModel.isReady, viewModel.errorMessage == nil {
                         viewModel.play()
                     }
                     return
@@ -85,7 +85,7 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
                 Task {
                     await viewModel.loadMedia(startPositionTicks: startPositionTicks)
                     // Auto-play when ready
-                    if viewModel.isReady && viewModel.errorMessage == nil {
+                    if viewModel.isReady, viewModel.errorMessage == nil {
                         viewModel.play()
                     }
                 }
@@ -123,7 +123,7 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
                     Button("Retry") {
                         Task {
                             await viewModel.loadMedia(startPositionTicks: startPositionTicks)
-                            if viewModel.isReady && viewModel.errorMessage == nil {
+                            if viewModel.isReady, viewModel.errorMessage == nil {
                                 viewModel.play()
                             }
                         }

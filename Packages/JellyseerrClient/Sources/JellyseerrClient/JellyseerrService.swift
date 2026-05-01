@@ -739,7 +739,7 @@ public struct DiscoverGenre: Identifiable, Codable, Sendable, Hashable {
 }
 
 /// Raw response from discover endpoints before type conversion
-struct RawDiscoverResponse: Codable, Sendable {
+struct RawDiscoverResponse: Codable {
     let page: Int
     let totalPages: Int
     let totalResults: Int
@@ -747,7 +747,7 @@ struct RawDiscoverResponse: Codable, Sendable {
 }
 
 /// Raw result item before type conversion
-struct RawDiscoverResult: Codable, Sendable {
+struct RawDiscoverResult: Codable {
     let id: Int
     let mediaType: String?
     let title: String?

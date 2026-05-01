@@ -96,16 +96,15 @@ public final class MediaItemSyncService {
     }
 
     public func getCachedItems(for libraryId: String?, serverConfigurationID: UUID) throws -> [CachedMediaItem] {
-        let descriptor: FetchDescriptor<CachedMediaItem>
-        if let libraryId {
-            descriptor = FetchDescriptor<CachedMediaItem>(
+        let descriptor = if let libraryId {
+            FetchDescriptor<CachedMediaItem>(
                 predicate: #Predicate {
                     $0.serverConfigurationID == serverConfigurationID && $0.libraryId == libraryId
                 },
                 sortBy: [SortDescriptor(\.name)]
             )
         } else {
-            descriptor = FetchDescriptor<CachedMediaItem>(
+            FetchDescriptor<CachedMediaItem>(
                 predicate: #Predicate { $0.serverConfigurationID == serverConfigurationID },
                 sortBy: [SortDescriptor(\.name)]
             )

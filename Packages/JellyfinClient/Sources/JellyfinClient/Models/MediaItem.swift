@@ -342,12 +342,12 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
     /// Format resolution from width/height to display string
     private static func formatResolution(width _: Int, height: Int) -> String {
         switch height {
-        case 0 ..< 480: return "SD"
-        case 480 ..< 720: return "480p"
-        case 720 ..< 1080: return "720p"
-        case 1080 ..< 2160: return "1080p"
-        case 2160...: return "4K"
-        default: return "\(height)p"
+        case 0 ..< 480: "SD"
+        case 480 ..< 720: "480p"
+        case 720 ..< 1080: "720p"
+        case 1080 ..< 2160: "1080p"
+        case 2160...: "4K"
+        default: "\(height)p"
         }
     }
 
@@ -388,13 +388,12 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         guard let codec = audioCodec else { return nil }
         let codecDisplay = codec.uppercased()
         if let channels = audioChannels {
-            let channelString: String
-            switch channels {
-            case 1: channelString = "Mono"
-            case 2: channelString = "Stereo"
-            case 6: channelString = "5.1"
-            case 8: channelString = "7.1"
-            default: channelString = "\(channels)ch"
+            let channelString = switch channels {
+            case 1: "Mono"
+            case 2: "Stereo"
+            case 6: "5.1"
+            case 8: "7.1"
+            default: "\(channels)ch"
             }
             return "\(codecDisplay) \(channelString)"
         }

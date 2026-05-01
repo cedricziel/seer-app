@@ -259,11 +259,10 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
         currentPage = 1
 
         do {
-            let response: DiscoverResponse
-            if mediaType == .movie {
-                response = try await service.getMoviesByGenre(genreId: genre.id, page: 1)
+            let response: DiscoverResponse = if mediaType == .movie {
+                try await service.getMoviesByGenre(genreId: genre.id, page: 1)
             } else {
-                response = try await service.getTVByGenre(genreId: genre.id, page: 1)
+                try await service.getTVByGenre(genreId: genre.id, page: 1)
             }
 
             results = response.results
@@ -287,11 +286,10 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
         currentPage += 1
 
         do {
-            let response: DiscoverResponse
-            if mediaType == .movie {
-                response = try await service.getMoviesByGenre(genreId: genre.id, page: currentPage)
+            let response: DiscoverResponse = if mediaType == .movie {
+                try await service.getMoviesByGenre(genreId: genre.id, page: currentPage)
             } else {
-                response = try await service.getTVByGenre(genreId: genre.id, page: currentPage)
+                try await service.getTVByGenre(genreId: genre.id, page: currentPage)
             }
 
             results.append(contentsOf: response.results)

@@ -115,17 +115,16 @@ public actor AutoDownloadService {
                 deviceID: deviceID
             )
 
-            let episodes: [MediaItem]
-            if let seriesID = rule.seriesID {
+            let episodes: [MediaItem] = if let seriesID = rule.seriesID {
                 // Specific series
-                episodes = try await fetchUnwatchedEpisodes(
+                try await fetchUnwatchedEpisodes(
                     seriesID: seriesID,
                     service: service,
                     limit: rule.episodesToKeep
                 )
             } else {
                 // All series - get next up
-                episodes = try await fetchNextUpEpisodes(
+                try await fetchNextUpEpisodes(
                     service: service,
                     limit: rule.episodesToKeep
                 )

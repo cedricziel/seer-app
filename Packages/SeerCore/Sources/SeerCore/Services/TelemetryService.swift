@@ -418,15 +418,15 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
     private func attributeValue(from value: Any) -> AttributeValue {
         switch value {
         case let string as String:
-            return .string(string)
+            .string(string)
         case let int as Int:
-            return .int(int)
+            .int(int)
         case let double as Double:
-            return .double(double)
+            .double(double)
         case let bool as Bool:
-            return .bool(bool)
+            .bool(bool)
         default:
-            return .string(String(describing: value))
+            .string(String(describing: value))
         }
     }
 }

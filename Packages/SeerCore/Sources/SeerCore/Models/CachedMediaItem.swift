@@ -179,13 +179,12 @@ public final class CachedMediaItem {
         guard let codec = audioCodec else { return nil }
         let codecDisplay = codec.uppercased()
         if let channels = audioChannels {
-            let channelString: String
-            switch channels {
-            case 1: channelString = "Mono"
-            case 2: channelString = "Stereo"
-            case 6: channelString = "5.1"
-            case 8: channelString = "7.1"
-            default: channelString = "\(channels)ch"
+            let channelString = switch channels {
+            case 1: "Mono"
+            case 2: "Stereo"
+            case 6: "5.1"
+            case 8: "7.1"
+            default: "\(channels)ch"
             }
             return "\(codecDisplay) \(channelString)"
         }

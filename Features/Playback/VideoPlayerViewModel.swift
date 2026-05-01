@@ -347,11 +347,10 @@ public final class VideoPlayerViewModel {
     /// Creates an AVPlayerItem with appropriate authentication for the stream type
     private func createPlayerItem(from info: StreamInfo) -> AVPlayerItem {
         // Log stream info for debugging
-        let streamTypeStr: String
-        switch info.type {
-        case .hls: streamTypeStr = "HLS"
-        case .directPlay: streamTypeStr = "DirectPlay"
-        case .directStream: streamTypeStr = "DirectStream"
+        let streamTypeStr = switch info.type {
+        case .hls: "HLS"
+        case .directPlay: "DirectPlay"
+        case .directStream: "DirectStream"
         }
         print("🎬 [VideoPlayer] Stream type: \(streamTypeStr)")
         print("🎬 [VideoPlayer] Stream URL: \(info.url.absoluteString)")

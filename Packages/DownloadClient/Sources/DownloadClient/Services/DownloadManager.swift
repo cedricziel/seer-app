@@ -400,13 +400,13 @@ public final class DownloadManager {
     private func convertQuality(_ quality: DownloadQuality) -> StreamURLBuilder.DownloadQualitySettings {
         switch quality {
         case .original:
-            return .original
+            .original
         case .high:
-            return .high
+            .high
         case .medium:
-            return .medium
+            .medium
         case .low:
-            return .low
+            .low
         }
     }
 

@@ -200,7 +200,7 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
     /// Get all currently active task identifiers
     public func activeTaskIdentifiers() async -> Set<Int> {
         let tasks = await session.allTasks
-        return Set(tasks.map { $0.taskIdentifier })
+        return Set(tasks.map(\.taskIdentifier))
     }
 }
 

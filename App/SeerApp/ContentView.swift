@@ -64,7 +64,7 @@ struct ContentView: View {
             if appState.isAuthenticated {
                 onboardingManager.checkAndShowWhatsNew()
                 // If no What's New to show, check if we need consent prompt
-                if !onboardingManager.showWhatsNew && diagnosticsConsent.needsConsentPrompt {
+                if !onboardingManager.showWhatsNew, diagnosticsConsent.needsConsentPrompt {
                     showDiagnosticsConsent = true
                 }
             }
