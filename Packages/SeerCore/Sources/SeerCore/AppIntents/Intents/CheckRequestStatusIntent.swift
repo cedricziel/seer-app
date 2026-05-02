@@ -26,7 +26,7 @@ public struct CheckRequestStatusIntent: AppIntent {
             throw IntentError.needsConfiguration
         }
 
-        let entities = (try? await RequestEntityQuery().suggestedEntities()) ?? []
+        let entities = await (try? RequestEntityQuery().suggestedEntities()) ?? []
 
         if entities.isEmpty {
             return .result(
@@ -37,8 +37,8 @@ public struct CheckRequestStatusIntent: AppIntent {
             )
         }
 
-        let pending = entities.filter { $0.statusRawValue == 1 }.count
-        let dialog: IntentDialog = if pending > 0 {
+        let pending = entities.count(where: { $0.statusRawValue == 1 })
+        let dialog = if pending > 0 {
             IntentDialog("You have \(pending) pending request(s).")
         } else {
             IntentDialog("You have \(entities.count) recent request(s).")
