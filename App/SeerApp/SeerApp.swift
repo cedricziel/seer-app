@@ -13,11 +13,13 @@ struct SeerApp: App {
     @StateObject private var appState: AppState
     @StateObject private var offlineSyncService: OfflineSyncService
     @StateObject private var networkMonitor: NetworkMonitor
+    @StateObject private var flowmarkRouter = FlowmarkURLRouter()
     @State private var downloadManager: DownloadManager?
     @State private var notificationManager: NotificationManager?
     @State private var downloadNotificationService: DownloadNotificationService?
     @State private var requestNotificationService: RequestNotificationService?
     @State private var requestStatusPoller: RequestStatusPoller?
+    @State private var spotlightIndexer: SpotlightIndexer?
 
     let modelContainer: ModelContainer
     let downloadModelContainer: ModelContainer
@@ -72,6 +74,7 @@ struct SeerApp: App {
         // entity queries (MediaItemEntityQuery, RequestEntityQuery,
         // ServerEntityQuery) can read from the same store the app uses.
         AppIntentsContext.modelContainer = modelContainer
+        AppIntentsContext.appState = state
 
         // Initialize OfflineSyncService
         let syncService = OfflineSyncService(modelContext: modelContainer.mainContext)
@@ -87,6 +90,7 @@ struct SeerApp: App {
                 .environmentObject(appState)
                 .environmentObject(offlineSyncService)
                 .environmentObject(networkMonitor)
+                .environmentObject(flowmarkRouter)
                 .modelContainer(modelContainer)
                 .task {
                     await setupServices()
@@ -98,6 +102,12 @@ struct SeerApp: App {
                 }
                 .onChange(of: appState.activeServerID) { _, _ in
                     configureServicesCredentials()
+                }
+                .onChange(of: appState.appIntentsIndexingEnabled) { _, _ in
+                    spotlightIndexer?.reconcile()
+                }
+                .onOpenURL { url in
+                    flowmarkRouter.route(url)
                 }
                 .environment(downloadManager)
                 .environment(notificationManager)
@@ -131,6 +141,15 @@ struct SeerApp: App {
 
     @MainActor
     private func setupServices() async {
+        // Wire up Spotlight indexing — gated behind the per-device
+        // privacy flag (`appIntentsIndexingEnabled`, default off).
+        let indexer = SpotlightIndexer(
+            appState: appState,
+            modelContainer: modelContainer
+        )
+        spotlightIndexer = indexer
+        indexer.reconcile()
+
         // Setup notification manager first
         let notifManager = NotificationManager(modelContainer: notificationModelContainer)
         notifManager.setup()
