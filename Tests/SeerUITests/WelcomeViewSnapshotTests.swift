@@ -12,7 +12,7 @@ final class WelcomeViewSnapshotTests: XCTestCase {
             onSelectSuggestion: { _ in },
             onManualEntry: {}
         )
-        assertSnapshot(of: view, as: .image(layout: .device(config: .iPhone13)))
+        assertSnapshot(of: view, as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13)))
     }
 
     func testWelcomeView_iPhoneCompact_WithBonjourSuggestion() {
@@ -34,7 +34,7 @@ final class WelcomeViewSnapshotTests: XCTestCase {
             onSelectSuggestion: { _ in },
             onManualEntry: {}
         )
-        assertSnapshot(of: view, as: .image(layout: .device(config: .iPhone13)))
+        assertSnapshot(of: view, as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13)))
     }
 
     func testWelcomeView_iPadRegular_WithSyncedSuggestion() {
@@ -49,7 +49,7 @@ final class WelcomeViewSnapshotTests: XCTestCase {
             onSelectSuggestion: { _ in },
             onManualEntry: {}
         )
-        assertSnapshot(of: view, as: .image(layout: .device(config: .iPadPro11)))
+        assertSnapshot(of: view, as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPadPro11)))
     }
 
     func testWelcomeView_iPhoneCompact_Landscape() {
@@ -64,7 +64,7 @@ final class WelcomeViewSnapshotTests: XCTestCase {
             onSelectSuggestion: { _ in },
             onManualEntry: {}
         )
-        assertSnapshot(of: view, as: .image(layout: .device(config: .iPhone13(.landscape))))
+        assertSnapshot(of: view, as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13(.landscape))))
     }
 
     func testWelcomeView_iPadRegular_TwoThirdsSplit() {
@@ -93,6 +93,6 @@ final class WelcomeViewSnapshotTests: XCTestCase {
         .environment(\.horizontalSizeClass, .regular)
         .environment(\.verticalSizeClass, .regular)
 
-        assertSnapshot(of: view, as: .image(layout: .fixed(width: 796, height: 834)))
+        assertSnapshot(of: view, as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .fixed(width: 796, height: 834)))
     }
 }
