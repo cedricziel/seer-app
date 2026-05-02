@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.4](https://github.com/cedricziel/seer-app/compare/v0.2.3...v0.2.4) (2026-05-02)
+
+
+### Bug Fixes
+
+* **release:** call setup_ci to unblock codesign on GitHub runners ([a088aca](https://github.com/cedricziel/seer-app/commit/a088aca2d1a27ecbdaf10a10b7a3e6216bede444))
+
 ## [0.2.3](https://github.com/cedricziel/seer-app/compare/v0.2.2...v0.2.3) (2026-05-02)
 
 
