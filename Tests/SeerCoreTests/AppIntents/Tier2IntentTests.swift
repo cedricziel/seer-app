@@ -1,5 +1,5 @@
-@testable import SeerCore
 import AppIntents
+@testable import SeerCore
 import SwiftData
 import XCTest
 
