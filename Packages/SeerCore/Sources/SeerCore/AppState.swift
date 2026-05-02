@@ -70,6 +70,14 @@ public final class AppState: ObservableObject {
 
     private var modelContext: ModelContext?
 
+    /// Public read-only accessor for the SwiftData context. Allows
+    /// feature-layer view models to upsert records into shared models
+    /// (e.g., `RequestsViewModel` populating `CachedRequest` for the
+    /// AppEntity query). Returns nil before `setModelContext` is called.
+    public var sharedModelContext: ModelContext? {
+        modelContext
+    }
+
     // MARK: - Computed Properties (from SwiftData)
 
     public var servers: [ServerConfiguration] {

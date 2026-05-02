@@ -2,6 +2,7 @@ import Foundation
 import JellyseerrClient
 import os
 import SeerCore
+import SwiftData
 import SwiftUI
 
 /// View model for managing and viewing requests
@@ -142,11 +143,83 @@ public final class RequestsViewModel: ObservableObject {
             Task {
                 await fetchMediaDetails()
             }
+
+            // Opportunistically populate the AppEntity cache so
+            // CheckRequestStatusIntent has data to surface. Errors
+            // during cache write are swallowed to OS log — UI must
+            // never break because of a cache hiccup.
+            Task {
+                await cacheLiveRequestsToSwiftData()
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
 
         isLoading = false
+    }
+
+    /// Upserts the current `requests` array into the `CachedRequest`
+    /// SwiftData store. Removes rows for the active server that are
+    /// no longer in the live response. Cache failures are logged to
+    /// OS log but never surface to the UI.
+    func cacheLiveRequestsToSwiftData() async {
+        guard let context = appState.sharedModelContext,
+              let serverID = appState.activeServerID
+        else { return }
+
+        do {
+            let liveIDs = Set(requests.map { request -> String in
+                "\(serverID.uuidString):\(request.id)"
+            })
+
+            // Fetch existing rows for this server.
+            let existingDescriptor = FetchDescriptor<CachedRequest>(
+                predicate: #Predicate { $0.serverConfigurationID == serverID }
+            )
+            let existing = try context.fetch(existingDescriptor)
+            let existingByID: [String: CachedRequest] = Dictionary(
+                uniqueKeysWithValues: existing.map { ($0.id, $0) }
+            )
+
+            // Upsert: update existing or insert new.
+            for live in requests {
+                let title = live.media.displayTitle ?? "Untitled"
+                if let row = existingByID[
+                    "\(serverID.uuidString):\(live.id)"
+                ] {
+                    row.title = title
+                    row.mediaType = live.type.rawValue
+                    row.statusRawValue = live.status.rawValue
+                    row.mediaTmdbId = live.media.tmdbId
+                    row.availabilityRawValue = live.media.status
+                    row.lastSyncedAt = Date()
+                } else {
+                    context.insert(
+                        CachedRequest(
+                            serverConfigurationID: serverID,
+                            requestID: live.id,
+                            title: title,
+                            mediaType: live.type.rawValue,
+                            statusRawValue: live.status.rawValue,
+                            requestedAt: Date(),
+                            mediaTmdbId: live.media.tmdbId,
+                            availabilityRawValue: live.media.status
+                        )
+                    )
+                }
+            }
+
+            // Delete orphaned rows.
+            for row in existing where !liveIDs.contains(row.id) {
+                context.delete(row)
+            }
+
+            try context.save()
+        } catch {
+            Self.logger.error(
+                "Failed to cache requests for AppEntity query: \(String(describing: error))"
+            )
+        }
     }
 
     func loadMoreRequestsIfNeeded(currentRequest: MediaRequest) async {
@@ -237,6 +310,12 @@ public final class RequestsViewModel: ObservableObject {
             hasMoreItems = requests.count < totalItems
             currentSkip = 0
             errorMessage = nil
+
+            // Refresh the AppEntity cache so CheckRequestStatusIntent
+            // reflects the latest state.
+            Task {
+                await cacheLiveRequestsToSwiftData()
+            }
         } catch {
             // Background refresh failures shouldn't surface — the user will
             // see the next manual refresh attempt if it persists.
