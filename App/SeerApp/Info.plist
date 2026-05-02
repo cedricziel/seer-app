@@ -83,6 +83,19 @@
     <string>Seer needs location access to detect your WiFi network name so it can switch to your internal server URL when you're on your home network.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>Seer needs location access to detect your WiFi network name so it can automatically switch to your internal server URL and manage WiFi-only downloads, even in the background.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>CFBundleURLName</key>
+            <string>com.cedricziel.seer.flowmark</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>flowmark</string>
+            </array>
+        </dict>
+    </array>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>OTLPEndpoint</key>

@@ -32,7 +32,8 @@ struct SeerApp: App {
             ServerConfiguration.self,
             CachedLibrary.self,
             CachedMediaItem.self,
-            CachedUserProgress.self
+            CachedUserProgress.self,
+            CachedRequest.self
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,

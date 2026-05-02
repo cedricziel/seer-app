@@ -11,6 +11,28 @@ public final class AppState: ObservableObject {
     @Published public var isLoading: Bool = false
     @Published public var errorMessage: String?
 
+    // MARK: - App Intents
+
+    /// Whether the user has opted in to Spotlight / Siri semantic indexing
+    /// of cached media items. Per-device (NOT mirrored to iCloud KVS) to
+    /// match the existing `DiagnosticsConsent` posture and the device-local
+    /// nature of `CSSearchableIndex`. Defaults to `false`.
+    @Published public var appIntentsIndexingEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                appIntentsIndexingEnabled,
+                forKey: AppIntentsKeys.indexingEnabled
+            )
+        }
+    }
+
+    /// UserDefaults keys for App Intents preferences. Kept on `AppState`
+    /// for visibility; tests can read these directly to assert per-device
+    /// persistence semantics.
+    public enum AppIntentsKeys {
+        public static let indexingEnabled = "appIntents.indexingEnabled"
+    }
+
     // MARK: - Jellyseerr User State
 
     /// The current Jellyseerr user's permissions (stored as raw value)
@@ -142,6 +164,9 @@ public final class AppState: ObservableObject {
 
     public init() {
         // ModelContext will be set via setModelContext
+        appIntentsIndexingEnabled = UserDefaults.standard.bool(
+            forKey: AppIntentsKeys.indexingEnabled
+        )
     }
 
     /// Set the model context for SwiftData operations
