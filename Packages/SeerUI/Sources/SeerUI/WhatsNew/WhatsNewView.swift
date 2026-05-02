@@ -127,7 +127,7 @@ public struct WhatsNewFeatureRow: View {
 
 #Preview {
     WhatsNewView(
-        appName: "Seer",
+        appName: "Flowmark",
         features: [
             WhatsNewFeature(
                 icon: "sparkles",

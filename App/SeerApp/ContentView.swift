@@ -38,7 +38,7 @@ struct ContentView: View {
         }
         .sheet(isPresented: $onboardingManager.showWhatsNew) {
             WhatsNewView(
-                appName: "Seer",
+                appName: "Flowmark",
                 features: WhatsNewData.features,
                 onContinue: {
                     onboardingManager.markWhatsNewSeen()
