@@ -15,11 +15,8 @@ struct ContentView: View {
             if appState.isAuthenticated {
                 MainTabView()
                     .environmentObject(onboardingManager)
-            } else if appState.streamlinedOnboardingEnabled {
-                OnboardingFlowView(appState: appState, onboardingManager: onboardingManager)
-                    .environmentObject(onboardingManager)
             } else {
-                ServerSetupView()
+                OnboardingFlowView(appState: appState, onboardingManager: onboardingManager)
                     .environmentObject(onboardingManager)
             }
         }

@@ -11,29 +11,6 @@ public final class AppState: ObservableObject {
     @Published public var isLoading: Bool = false
     @Published public var errorMessage: String?
 
-    // MARK: - Feature Flags
-
-    private static let streamlinedOnboardingKey = "streamlinedOnboardingEnabled"
-
-    /// Cutover (section 14.1): default is now `true`. The legacy
-    /// `ServerSetupView` Form-based flow is still in the binary and is
-    /// reachable instantly by setting this `UserDefaults` key to `false`,
-    /// which is the rollback if a TestFlight soak surfaces a regression.
-    /// Once 14.2 (soak) and 14.3 (legacy removal) complete, this flag
-    /// disappears.
-    public var streamlinedOnboardingEnabled: Bool {
-        get {
-            if UserDefaults.standard.object(forKey: Self.streamlinedOnboardingKey) == nil {
-                return true
-            }
-            return UserDefaults.standard.bool(forKey: Self.streamlinedOnboardingKey)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: Self.streamlinedOnboardingKey)
-            objectWillChange.send()
-        }
-    }
-
     // MARK: - Jellyseerr User State
 
     /// The current Jellyseerr user's permissions (stored as raw value)

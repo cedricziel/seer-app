@@ -102,18 +102,15 @@ enum WhatsNewData {
 
 ## User Flows
 
-### New User Flow (streamlined — default)
+### New User Flow
 
-The current default first-run path. Composed of three SwiftUI views in
-SeerUI orchestrated by `OnboardingViewModel` (`Features/Auth/`),
-gated behind `AppState.streamlinedOnboardingEnabled` (default `true`,
-flippable via `UserDefaults` for instant rollback during the cutover
-window).
+The first-run path. Composed of three SwiftUI views in SeerUI
+orchestrated by `OnboardingViewModel` (`Features/Auth/`).
 
 ```
 App Launch
     ↓
-ContentView (not authenticated, flag = true)
+ContentView (not authenticated)
     ↓
 OnboardingFlowView
     ↓
@@ -160,27 +157,6 @@ When `DiagnosticsConsent.performanceMetricsEnabled` is true,
 Payloads carry only the enum rawValues — no hostnames, URLs, or
 usernames.
 
-### Legacy New User Flow (until cutover removal)
-
-The pre-streamlined three-step Form path, kept in the binary as a
-rollback target. Reachable by setting
-`UserDefaults.standard.set(false, forKey: "streamlinedOnboardingEnabled")`.
-
-```
-App Launch
-    ↓
-ServerSetupView (not authenticated, flag = false)
-    ↓
-Complete server setup (Jellyfin → Jellyseerr → Setup Complete)
-    ↓
-"Get Started" button → markOnboardingComplete()
-    ↓
-MainTabView
-    ↓
-LibraryView shows first-time tip (isFirstLaunchAfterSetup = true)
-    ↓
-User dismisses tip → clearFirstLaunchFlag()
-```
 
 ### Returning User Flow (After Update)
 

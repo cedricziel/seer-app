@@ -5,10 +5,8 @@ import SeerCore
 import SeerUI
 import SwiftUI
 
-/// View model for the streamlined first-run onboarding flow. Coordinates
-/// Bonjour discovery, Quick Connect, manual URL entry, and password fallback.
-/// Lives alongside the legacy `AuthViewModel`; both ship behind
-/// `AppState.streamlinedOnboardingEnabled` during the cutover window.
+/// View model for the first-run onboarding flow. Coordinates Bonjour
+/// discovery, Quick Connect, manual URL entry, and password fallback.
 @MainActor
 final class OnboardingViewModel: ObservableObject {
     enum Phase: Equatable {
