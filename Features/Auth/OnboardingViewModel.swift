@@ -111,6 +111,7 @@ final class OnboardingViewModel: ObservableObject {
 
     func start() {
         bonjour.start()
+        TelemetryService.shared.recordOnboardingWelcomeShown()
     }
 
     func stop() {
@@ -162,6 +163,7 @@ final class OnboardingViewModel: ObservableObject {
                 url: discovered.url,
                 discoveredViaBonjour: true
             )
+            TelemetryService.shared.recordOnboardingPathSelected(.bonjour)
             Task { await advanceToAuth() }
         } else if viewSuggestion.id.hasPrefix("synced-") {
             let uuidString = String(viewSuggestion.id.dropFirst("synced-".count))
@@ -173,6 +175,7 @@ final class OnboardingViewModel: ObservableObject {
                 url: config.jellyfinURL,
                 discoveredViaBonjour: false
             )
+            TelemetryService.shared.recordOnboardingPathSelected(.icloud)
             Task { await advanceToAuth() }
         }
     }
@@ -180,6 +183,7 @@ final class OnboardingViewModel: ObservableObject {
     func tapManualEntry() {
         phase = .manualEntry
         manualURLError = nil
+        TelemetryService.shared.recordOnboardingPathSelected(.manual)
     }
 
     // MARK: - Manual entry
@@ -247,6 +251,7 @@ final class OnboardingViewModel: ObservableObject {
         quickConnectIsPolling = true
         phase = .quickConnect(serverDisplay: server.displayName)
         observeQuickConnect(session)
+        TelemetryService.shared.recordOnboardingAuthMethod(.quickConnect)
         await session.start()
     }
 
@@ -293,6 +298,7 @@ final class OnboardingViewModel: ObservableObject {
                 passwordUsername,
                 passwordPassword
             )
+            TelemetryService.shared.recordOnboardingAuthMethod(.password)
             await persistAndComplete(
                 accessToken: result.response.accessToken,
                 userID: result.response.user.id,
@@ -401,6 +407,7 @@ final class OnboardingViewModel: ObservableObject {
         appState.switchServer(to: config.id)
         onboardingManager.markOnboardingComplete()
         appState.isAuthenticated = true
+        TelemetryService.shared.recordOnboardingCompleted()
     }
 
     private func fetchLocalAddress(from baseURL: URL) async -> URL? {

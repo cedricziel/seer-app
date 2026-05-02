@@ -104,4 +104,13 @@ secrets/
 credentials/
 .claude/settings.local.json
 
+# Isolated agent run worktrees — local-only, never committed.
+.claude/worktrees/
+
+# swift-snapshot-testing failure / diff artifacts (the .1.png references
+# ARE committed; *.failure.png and *.diff.png are written on a mismatch
+# and should stay local — CI uploads them as artifacts).
+**/__Snapshots__/**/*.failure.png
+**/__Snapshots__/**/*.diff.png
+
 .playwright-mcp/

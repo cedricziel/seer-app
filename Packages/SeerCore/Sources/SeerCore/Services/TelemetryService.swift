@@ -441,6 +441,44 @@ public enum BreadcrumbLevel: String, Sendable {
     case fatal
 }
 
+// MARK: - Onboarding funnel events
+
+public extension TelemetryService {
+    /// Which welcome-screen suggestion the user picked.
+    enum OnboardingPath: String, Sendable {
+        case bonjour
+        case icloud
+        case manual
+    }
+
+    /// Which authentication method the user used to complete onboarding.
+    enum OnboardingAuthMethod: String, Sendable {
+        case quickConnect = "quickconnect"
+        case password
+    }
+
+    /// Streamlined onboarding funnel events. Emitted only when
+    /// `DiagnosticsConsent.performanceMetricsEnabled` is true (the
+    /// `captureMessage` path already gates on `isInitialized`, which
+    /// itself reflects consent). No PII: server hostnames, URLs, and
+    /// usernames are never attached.
+    func recordOnboardingWelcomeShown() {
+        captureMessage("onboarding_welcome_shown")
+    }
+
+    func recordOnboardingPathSelected(_ path: OnboardingPath) {
+        captureMessage("onboarding_path_selected", context: ["path": path.rawValue])
+    }
+
+    func recordOnboardingAuthMethod(_ method: OnboardingAuthMethod) {
+        captureMessage("onboarding_auth_method", context: ["method": method.rawValue])
+    }
+
+    func recordOnboardingCompleted() {
+        captureMessage("onboarding_completed")
+    }
+}
+
 // MARK: - Bundle Extensions
 
 extension Bundle {

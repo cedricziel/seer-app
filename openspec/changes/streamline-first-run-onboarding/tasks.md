@@ -147,9 +147,9 @@ Audited against live Apple HIG (developer.apple.com/design/human-interface-guide
 
 ## 13. Telemetry
 
-- [ ] 13.1 Add four funnel events to `TelemetryService`: `onboarding_welcome_shown`, `onboarding_path_selected` (`bonjour|icloud|manual`), `onboarding_auth_method` (`quickconnect|password`), `onboarding_completed`.
-- [ ] 13.2 Verify all four events are gated on `DiagnosticsConsent` and emit no PII (server hostnames hashed or omitted).
-- [ ] 13.3 Run `make lint` and `make format`.
+- [x] 13.1 Add four funnel events to `TelemetryService`: `onboarding_welcome_shown`, `onboarding_path_selected` (`bonjour|icloud|manual`), `onboarding_auth_method` (`quickconnect|password`), `onboarding_completed`. — Implemented as a `TelemetryService` extension with `OnboardingPath` and `OnboardingAuthMethod` enums; all four record* methods route through `captureMessage` so they reuse the existing OTEL span/attribute pipeline.
+- [x] 13.2 Verify all four events are gated on `DiagnosticsConsent` and emit no PII (server hostnames hashed or omitted). — `captureMessage` short-circuits on `guard isInitialized` and OTEL is only initialized when `DiagnosticsConsent.crashReportsEnabled || performanceMetricsEnabled` is true. Event payloads carry only enum rawValues (`bonjour|icloud|manual`, `quickconnect|password`) — no URLs, hostnames, or usernames.
+- [x] 13.3 Run `make lint` and `make format`.
 
 ## 14. Cutover
 
