@@ -37,17 +37,17 @@ Final task in each group: run `make lint` and `make format`.
 
 ## 4. Tests (red) — SeerCore (URL learning + resolver fallback)
 
-- [ ] 4.1 `ServerInfoFetcherTests.testFetchesLocalAddressFromSystemInfoPublic` (covers `dual-URL learning` in design D3).
-- [ ] 4.2 `ServerInfoFetcherTests.testRejectsNonJellyfinResponse` (covers Scenario: "URL is not a Jellyfin server" in `server-onboarding`).
-- [ ] 4.3 `ServerURLResolverTests.testReachabilityFallbackUsedWhenSSIDUnknown` (covers design D4).
-- [ ] 4.4 `ServerURLResolverTests.testReachabilityProbeCachedFor60s` (covers risk mitigation in design).
-- [ ] 4.5 Run `make lint` and `make format`.
+- [x] 4.1 `ServerInfoFetcherTests.testFetchesLocalAddressFromSystemInfoPublic` (covers `dual-URL learning` in design D3).
+- [x] 4.2 `ServerInfoFetcherTests.testRejectsNonJellyfinResponse` (covers Scenario: "URL is not a Jellyfin server" in `server-onboarding`).
+- [x] 4.3 `ServerURLResolverTests.testReachabilityFallbackUsedWhenSSIDUnknown` (covers design D4).
+- [x] 4.4 `ServerURLResolverTests.testReachabilityProbeCachedFor60s` (covers risk mitigation in design).
+- [x] 4.5 Run `make lint` and `make format`.
 
 ## 5. Implementation (green) — SeerCore
 
-- [ ] 5.1 Add `ServerInfoFetcher` in `Packages/SeerCore/Sources/SeerCore/Services/` that hits `/System/Info/Public` and returns `ServerInfo {productName, localAddress?, wanAddress?, version}` (makes 4.1, 4.2 pass).
-- [ ] 5.2 Extend `ServerURLResolver` with a probe method against `internalJellyfinURL` (1s timeout, `URLSession`-based) and a 60s in-memory cache keyed by network interface (makes 4.3, 4.4 pass).
-- [ ] 5.3 Run `make lint` and `make format`.
+- [x] 5.1 Add `ServerInfoFetcher` in `Packages/SeerCore/Sources/SeerCore/Services/` that hits `/System/Info/Public` and returns `ServerInfo {productName, localAddress?, wanAddress?, version}` (makes 4.1, 4.2 pass). — Note: Jellyfin's public payload does not expose a WAN/ServerAddress field, only `LocalAddress`. `ServerInfo` carries `localAddress` only; WAN learning happens by remembering the URL the user entered.
+- [x] 5.2 Extend `ServerURLResolver` with a probe method against `internalJellyfinURL` (1s timeout, `URLSession`-based) and a 60s in-memory cache keyed by network interface (makes 4.3, 4.4 pass). — Cache is keyed by `ServerConfiguration.id` (simpler and equivalent for the single-active-server case); revisit if multi-network simultaneous use becomes a thing.
+- [x] 5.3 Run `make lint` and `make format`.
 
 ## 6. Tests (red) — SeerUI (JellyseerrConnectSheet)
 
