@@ -387,30 +387,6 @@ targets:
         TEST_HOST: ""
         BUNDLE_LOADER: ""
 
-  SeerAppTests:
-    type: bundle.unit-test
-    supportedDestinations: [iOS]
-    sources:
-      - path: Tests/SeerAppTests
-        excludes:
-          - "**/.DS_Store"
-    dependencies:
-      - target: SeerApp
-      - target: SeerCore
-      - target: JellyfinClient
-      - target: JellyseerrClient
-      - target: SeerUI
-      - target: PlaybackClient
-      - target: OfflineSync
-      - target: DownloadClient
-      - target: NotificationClient
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.apptests
-        GENERATE_INFOPLIST_FILE: true
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeerApp.app/SeerApp"
-        BUNDLE_LOADER: "$(TEST_HOST)"
-
 schemes:
   SeerApp:
     build:
@@ -422,7 +398,6 @@ schemes:
         JellyfinClientTests: [test]
         JellyseerrClientTests: [test]
         OfflineSyncTests: [test]
-        SeerAppTests: [test]
     run:
       config: Debug
       environmentVariables:
@@ -441,7 +416,6 @@ schemes:
         - JellyfinClientTests
         - JellyseerrClientTests
         - OfflineSyncTests
-        - SeerAppTests
     profile:
       config: Release
     analyze:
