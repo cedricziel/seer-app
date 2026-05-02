@@ -95,8 +95,8 @@ lane :beta do |options|
     skip_waiting_for_build_processing: true,
     changelog: options[:changelog] || "Beta build #{Time.now.strftime('%Y-%m-%d %H:%M')}"
   )
-
-  upload_symbols(api_key: api_key) unless is_ci && ENV["SKIP_SYMBOL_UPLOAD"]
+  # dSYMs are bundled in the IPA via build_app's include_symbols:true and
+  # App Store Connect extracts them automatically — no separate upload step.
 end
 
 desc "Submit an existing TestFlight build to App Store review without rebuilding"
@@ -149,8 +149,6 @@ lane :release do |options|
     skip_screenshots: true,
     skip_metadata: options[:metadata] != true
   )
-
-  upload_symbols(api_key: api_key)
 end
 
 desc "Sync signing certificates and provisioning profiles via match"
@@ -167,7 +165,7 @@ lane :bootstrap_signing do
   match(type: "appstore",    readonly: false, api_key: api_key)
 end
 
-desc "Refresh dSYMs from App Store Connect for the latest build (e.g. after a bitcode rebuild)"
+desc "Download dSYMs from App Store Connect (e.g. after a bitcode rebuild on Apple's side)"
 lane :refresh_dsyms do |options|
   api_key = load_app_store_connect_api_key
   download_dsyms(
@@ -176,7 +174,6 @@ lane :refresh_dsyms do |options|
     version: options[:version] || "latest",
     build_number: options[:build]
   )
-  upload_symbols(api_key: api_key)
 end
 
 desc "Print the build number that would be used (commit count from HEAD)"
