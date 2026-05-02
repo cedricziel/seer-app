@@ -81,6 +81,19 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: true
         DEVELOPMENT_TEAM: WPW3QSLZ2F
+        # Manual signing pinned to the match-managed profiles. Without
+        # these, xcodebuild archive (run by gym) errors with "Automatic
+        # signing is disabled and unable to generate a profile" because
+        # match in readonly mode doesn't write to project.pbxproj and
+        # xcodegen regenerates the project on every CI run.
+        CODE_SIGN_STYLE: Manual
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "Apple Development"
+          PROVISIONING_PROFILE_SPECIFIER: "match Development com.cedricziel.seer"
+        Release:
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          PROVISIONING_PROFILE_SPECIFIER: "match AppStore com.cedricziel.seer"
     preBuildScripts:
       - name: SwiftLint
         runOnlyWhenInstalling: false
