@@ -72,7 +72,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer
-        MARKETING_VERSION: "0.2.1" # x-release-please-version
+        MARKETING_VERSION: "0.2.2" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         INFOPLIST_FILE: App/SeerApp/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -123,7 +123,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.core
-        MARKETING_VERSION: "0.2.1" # x-release-please-version
+        MARKETING_VERSION: "0.2.2" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -143,7 +143,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.jellyfinclient
-        MARKETING_VERSION: "0.2.1" # x-release-please-version
+        MARKETING_VERSION: "0.2.2" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -163,7 +163,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.jellyseerrclient
-        MARKETING_VERSION: "0.2.1" # x-release-please-version
+        MARKETING_VERSION: "0.2.2" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -182,7 +182,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.ui
-        MARKETING_VERSION: "0.2.1" # x-release-please-version
+        MARKETING_VERSION: "0.2.2" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -202,7 +202,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.playbackclient
-        MARKETING_VERSION: "0.2.1" # x-release-please-version
+        MARKETING_VERSION: "0.2.2" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -223,7 +223,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.offlinesync
-        MARKETING_VERSION: "0.2.1" # x-release-please-version
+        MARKETING_VERSION: "0.2.2" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -244,7 +244,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.downloadclient
-        MARKETING_VERSION: "0.2.1" # x-release-please-version
+        MARKETING_VERSION: "0.2.2" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -265,7 +265,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.notificationclient
-        MARKETING_VERSION: "0.2.1" # x-release-please-version
+        MARKETING_VERSION: "0.2.2" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false

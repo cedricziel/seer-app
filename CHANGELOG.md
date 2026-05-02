@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/cedricziel/seer-app/compare/v0.2.1...v0.2.2) (2026-05-02)
+
+
+### Bug Fixes
+
+* **release:** sync both dev and appstore signing in beta lane ([ccf54b3](https://github.com/cedricziel/seer-app/commit/ccf54b3c1797336939c12198fe349bb1b6582518))
+
 ## [0.2.1](https://github.com/cedricziel/seer-app/compare/v0.2.0...v0.2.1) (2026-05-02)
 
 
