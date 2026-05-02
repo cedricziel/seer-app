@@ -103,3 +103,5 @@ App/SeerApp/SeerApp.entitlements
 secrets/
 credentials/
 .claude/settings.local.json
+
+.playwright-mcp/
