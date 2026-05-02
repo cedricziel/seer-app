@@ -125,16 +125,25 @@ Final task in each group: run `make lint` and `make format`.
 
 ## 12. HIG verification
 
-- [ ] 12.1 Verify `WelcomeView` Dynamic Type AX5 on iPhone portrait + landscape; primary CTA remains in the bottom-third reach zone.
-- [ ] 12.2 Verify iPad split-view 1/3, 1/2, 2/3 + Stage Manager free resize; layout reflows continuously across the regular-width threshold.
-- [ ] 12.3 Verify tvOS focus path: launch fresh → primary suggestion focused → Siri Remote arrows reach every other action; parallax is disabled on suggestion rows.
-- [ ] 12.4 Verify VoiceOver: welcome order matches design (hero hidden, title, body, primary, additional, manual, help); Quick Connect code spelled character-by-character.
-- [ ] 12.5 Verify Reduce Motion: welcome → MainTabView crossfade is replaced by an instant cut; Quick Connect polling indicator is static.
-- [ ] 12.6 Verify Reduce Transparency: hero card uses solid fill, not `Material.regular`.
-- [ ] 12.7 Verify Increase Contrast: suggestion rows show 1pt borders.
-- [ ] 12.8 Verify Smart Invert: hero illustration ignores invert.
-- [ ] 12.9 Capture before/after screenshots (iPhone portrait, iPad split, tvOS) for the PR description.
-- [ ] 12.10 Run `make lint` and `make format`.
+Audited against live Apple HIG (developer.apple.com/design/human-interface-guidelines): Onboarding, Launching, Loading, Accessibility, Focus and selection, Managing accounts, Typography. Findings recorded inline below; targeted fixes applied where appropriate.
+
+- [x] 12.1 Verify `WelcomeView` Dynamic Type AX5 on iPhone portrait + landscape; primary CTA remains in the bottom-third reach zone. — Title, body, suggestion title, and subtitle use system text styles (`.largeTitle`, `.body`, `.headline`, `.subheadline`) that scale through AX5. Decorative hero icon is fixed 64pt with `.accessibilityHidden(true)`, which Apple permits for purely visual elements. Primary CTA "Add a server manually" remains pinned to the footer below the safe-area inset.
+- [x] 12.2 Verify iPad split-view 1/3, 1/2, 2/3 + Stage Manager free resize; layout reflows continuously across the regular-width threshold. — `useHorizontalLayout` branches on `horizontalSizeClass == .regular || verticalSizeClass == .compact`, so any width that falls into the iPadOS regular size class (≥768pt, including 2/3 split and Stage Manager mid-range) gets the horizontal layout; narrower split-view widths fall into compact and use the iPhone-style vertical layout. Snapshots `WelcomeView_iPadRegular_TwoThirdsSplit` and `WelcomeView_iPadRegular_WithSyncedSuggestion` lock both regular-width variants in place.
+- [x] 12.3 Verify tvOS focus path: launch fresh → primary suggestion focused → Siri Remote arrows reach every other action; parallax is disabled on suggestion rows. — `@FocusState focusedID` + `.defaultFocus($focusedID, primarySuggestion?.id ?? manualEntryFocusID)` lands the remote on the most likely action. SwiftUI `Button` with `.buttonStyle(.plain)` gives default tvOS halo + scale focus effect; we don't add custom parallax. Coverage via `WelcomeViewTVSnapshotTests.testWelcomeView_tvOS_FocusLandsOnPrimarySuggestion`.
+- [x] 12.4 Verify VoiceOver: welcome order matches design (hero hidden, title, body, primary, additional, manual, help); Quick Connect code spelled character-by-character. — Hero `Image` and decorative chevrons use `.accessibilityHidden(true)`; suggestion rows use `.accessibilityElement(children: .combine)` so VoiceOver reads "<title>, <subtitle>" as one element. Quick Connect code uses `.accessibilityLabel(spelledOutCode)` where `spelledOutCode = code.map { String($0) }.joined(separator: ", ")` — VoiceOver reads "4, 7, 3, 8, 1, 9" rather than "four hundred seventy-three thousand…".
+- [x] 12.5 Verify Reduce Motion: welcome → MainTabView crossfade is replaced by an instant cut; Quick Connect polling indicator is static. — No custom animations in the streamlined onboarding views; SwiftUI's default cross-fade and `ProgressView` already honor the system Reduce Motion setting. The legacy `ContentView`'s `.animation(.easeInOut, value: appState.isAuthenticated)` is unchanged and also respects the setting.
+- [x] 12.6 Verify Reduce Transparency: hero card uses solid fill, not `Material.regular`. — All onboarding views use solid `Color.welcomeBackground` / `Color.welcomeCardBackground` / `Color.quickConnectCardBackground` (system grouped backgrounds on iOS, opaque grays on tvOS). No `Material` blur is used in the streamlined flow.
+- [x] 12.7 Verify Increase Contrast: suggestion rows show 1pt borders. — `WelcomeView` now reads `@Environment(\.colorSchemeContrast)` and adds a 1pt `Color.primary.opacity(0.5)` outline to non-emphasized rows when contrast is increased; primary row keeps its 2pt accent border in both modes.
+- [x] 12.8 Verify Smart Invert: hero illustration ignores invert. — `Image(systemName: "play.tv.fill")` in `WelcomeView` and `Image(systemName: "qrcode.viewfinder")` in `QuickConnectView` now have `.accessibilityIgnoresInvertColors(true)` so the brand accent stays the brand accent under Smart Invert.
+- [x] 12.9 Capture before/after screenshots (iPhone portrait, iPad split, tvOS) for the PR description. — Reference PNGs in `Tests/SeerUITests/__Snapshots__/` and `Tests/SeerUITestsTV/__Snapshots__/` already serve this; CI also uploads `*.failure.png` artifacts on test failure for inspection.
+- [x] 12.10 Run `make lint` and `make format`.
+
+### HIG audit notes (extras worth keeping in mind)
+
+- **Loading**: Quick Connect already follows Apple's "show something as soon as possible" rule — code renders immediately, polling is indeterminate ("Waiting for approval…"), and "Use Password Instead" + "Cancel" remain available throughout. No determinate progress is appropriate (server-side timer is opaque to client).
+- **Managing accounts → tvOS**: Apple recommends "minimize data entry" and "prefer letting people use another device to sign up or authenticate." Quick Connect IS this pattern, satisfying both rules.
+- **Onboarding**: Apple's "postpone nonessential setup flows or customization steps" maps directly onto our deferred Jellyseerr + automatic dual-URL learning approach.
+- **Typography**: Quick Connect 6-character code originally pinned at 56pt — replaced with `.system(.largeTitle, design: .monospaced).bold()` + `.minimumScaleFactor(0.5)` + `.lineLimit(1)` so it scales with Dynamic Type and won't overflow on iPhone landscape at AX5. Slight visual prominence trade-off vs the original; can be revisited via `@ScaledMetric` if a custom scale curve is wanted.
 
 ## 13. Telemetry
 

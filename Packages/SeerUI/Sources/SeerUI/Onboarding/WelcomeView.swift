@@ -28,6 +28,11 @@ public struct WelcomeView: View {
         @Environment(\.verticalSizeClass) private var verticalSizeClass
     #endif
 
+    /// HIG: Increase Contrast adds a visible 1pt accent border to the
+    /// secondary suggestion rows so the visual hierarchy stays legible
+    /// without relying on opacity.
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
     /// Identifier for the initial focus target on tvOS. The Siri Remote
     /// lands here when the welcome screen appears.
     private static let manualEntryFocusID = "welcome.manualEntry"
@@ -123,6 +128,7 @@ public struct WelcomeView: View {
             Image(systemName: "play.tv.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(.tint)
+                .accessibilityIgnoresInvertColors(true)
                 .accessibilityHidden(true)
             Text("Welcome to Flowmark")
                 .font(.largeTitle)
@@ -195,8 +201,22 @@ public struct WelcomeView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(emphasized ? Color.accentColor.opacity(0.6) : Color.clear, lineWidth: 2)
+                .strokeBorder(borderColor(emphasized: emphasized), lineWidth: borderWidth(emphasized: emphasized))
         )
+    }
+
+    private func borderColor(emphasized: Bool) -> Color {
+        if emphasized {
+            return Color.accentColor.opacity(0.6)
+        }
+        // Increase Contrast: outline secondary rows so they don't rely on a
+        // subtle background fill alone for affordance.
+        return colorSchemeContrast == .increased ? Color.primary.opacity(0.5) : Color.clear
+    }
+
+    private func borderWidth(emphasized: Bool) -> CGFloat {
+        if emphasized { return 2 }
+        return colorSchemeContrast == .increased ? 1 : 0
     }
 
     private var emptyStateHint: some View {

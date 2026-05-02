@@ -47,6 +47,7 @@ public struct QuickConnectView: View {
             Image(systemName: "qrcode.viewfinder")
                 .font(.system(size: 48))
                 .foregroundStyle(.tint)
+                .accessibilityIgnoresInvertColors(true)
                 .accessibilityHidden(true)
             Text("Quick Connect")
                 .font(.title)
@@ -60,9 +61,14 @@ public struct QuickConnectView: View {
 
     private var codeCard: some View {
         VStack(spacing: 16) {
+            // HIG / Dynamic Type: scale relative to .largeTitle so AX text
+            // sizes grow the code legibly; minimumScaleFactor protects
+            // against overflow on iPhone landscape at AX5.
             Text(code)
-                .font(.system(size: 56, weight: .bold, design: .monospaced))
+                .font(.system(.largeTitle, design: .monospaced).weight(.bold))
                 .tracking(8)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
                 .accessibilityLabel(spelledOutCode)
                 .accessibilityIdentifier("quickconnect.code")
 
