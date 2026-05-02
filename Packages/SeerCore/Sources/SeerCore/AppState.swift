@@ -11,6 +11,18 @@ public final class AppState: ObservableObject {
     @Published public var isLoading: Bool = false
     @Published public var errorMessage: String?
 
+    // MARK: - Feature Flags
+
+    private static let streamlinedOnboardingKey = "streamlinedOnboardingEnabled"
+
+    public var streamlinedOnboardingEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: Self.streamlinedOnboardingKey) }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Self.streamlinedOnboardingKey)
+            objectWillChange.send()
+        }
+    }
+
     // MARK: - Jellyseerr User State
 
     /// The current Jellyseerr user's permissions (stored as raw value)

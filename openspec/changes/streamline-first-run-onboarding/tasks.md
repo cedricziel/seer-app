@@ -6,10 +6,10 @@ Final task in each group: run `make lint` and `make format`.
 
 ## 1. Setup
 
-- [ ] 1.1 Add `NSLocalNetworkUsageDescription` and `NSBonjourServices = ["_jellyfin._tcp"]` to `App/SeerApp/Info.plist` (or the equivalent xcconfig path under `project.yml`); regenerate via `make generate`.
-- [ ] 1.2 Introduce a runtime feature flag `streamlinedOnboardingEnabled` in `SeerCore` (default `false` initially), readable from `AppState`.
-- [ ] 1.3 Confirm `JellyfinAPI` SDK version pinned in `project.yml` (currently `from: "0.6.0"`) exposes `InitiateQuickConnect`, `GetQuickConnectState`, `AuthenticateWithQuickConnect`; bump if needed.
-- [ ] 1.4 Run `make generate && make build` to confirm scaffolding compiles before adding tests.
+- [x] 1.1 Add `NSLocalNetworkUsageDescription` and `NSBonjourServices = ["_jellyfin._tcp"]` to `App/SeerApp/Info.plist` (or the equivalent xcconfig path under `project.yml`); regenerate via `make generate`.
+- [x] 1.2 Introduce a runtime feature flag `streamlinedOnboardingEnabled` in `SeerCore` (default `false` initially), readable from `AppState`.
+- [x] 1.3 Confirm `JellyfinAPI` SDK version pinned in `project.yml` (currently `from: "0.6.0"`) exposes `InitiateQuickConnect`, `GetQuickConnectState`, `AuthenticateWithQuickConnect`; bump if needed. — verified during exploration; all four endpoint files present in SDK checkout.
+- [x] 1.4 Run `make generate && make build` to confirm scaffolding compiles before adding tests.
 
 ## 2. Tests (red) — JellyfinClient (BonjourDiscovery + QuickConnectSession)
 
