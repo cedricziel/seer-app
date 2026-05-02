@@ -149,3 +149,40 @@ fulfilled requests, sourced from the `CachedRequest` SwiftData store.
   and `CachedRequest` contains rows
 - **THEN** the intent MUST return matching `RequestEntity` values
   ordered by `requestedAt` descending, with status fields populated
+
+### Requirement: RequestsViewModel populates the CachedRequest store
+
+The system SHALL upsert into `CachedRequest` from
+`RequestsViewModel` on every successful fetch from Jellyseerr,
+mapping each live `MediaRequest` to a `CachedRequest` row keyed by
+`<serverConfigurationID>:<requestID>`. Rows for requests that no
+longer appear in the server's response MUST be deleted in the same
+transaction so the cache cannot grow stale-positive. Cache writes
+MUST NOT block the UI render of the Requests tab — the upsert
+happens after the live data is presented.
+
+#### Scenario: Opening Requests tab refreshes the cache
+
+- **WHEN** the user on iPhone opens the Requests tab and
+  `RequestsViewModel` completes a successful fetch returning N rows
+- **THEN** the `CachedRequest` store MUST contain exactly N rows
+  scoped to the active server's id within the same async context,
+  with rows for any previously-cached requests that are no longer
+  in the live response removed
+
+#### Scenario: Cache write failure does not break the UI
+
+- **WHEN** the user on iPhone opens the Requests tab and the
+  `CachedRequest` upsert throws (e.g., SwiftData write error)
+- **THEN** the Requests tab MUST still render the live response,
+  the error MUST be logged to the OS log subsystem, and a
+  subsequent intent invocation MUST gracefully return whatever
+  rows happen to be in the cache (possibly empty, possibly stale)
+
+#### Scenario: Intent works on a fresh install before the cache is populated
+
+- **WHEN** the user on iPhone invokes `CheckRequestStatusIntent` and
+  has never opened the Requests tab on this device since signing in
+- **THEN** the intent MUST return an empty array, MUST surface a
+  result snippet "No cached requests yet — open Seer's Requests tab
+  to populate", and MUST NOT throw

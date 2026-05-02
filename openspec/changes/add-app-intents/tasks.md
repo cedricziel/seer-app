@@ -121,6 +121,17 @@ Final task in each group: run `make lint` and `make format`.
   with a fake `DownloadClient`.
 - [ ] 4.12 `CheckRequestStatusIntentTests.testReturnsListOfPendingAndReady`
   with fixture `CachedRequest` rows.
+- [ ] 4.12a `CheckRequestStatusIntentTests.testReturnsEmptySnippetOnFreshInstall`
+  (covers Scenario: "Intent works on a fresh install before the cache
+  is populated").
+- [ ] 4.12b `RequestsViewModelCacheTests.testUpsertsCachedRequestOnFetch`
+  against an in-memory SwiftData container (covers Scenario:
+  "Opening Requests tab refreshes the cache").
+- [ ] 4.12c `RequestsViewModelCacheTests.testRemovesRowsNoLongerOnServer`
+  (covers same scenario, deletion side).
+- [ ] 4.12d `RequestsViewModelCacheTests.testCacheWriteFailureDoesNotBreakUI`
+  with an injected failing model context (covers Scenario:
+  "Cache write failure does not break the UI").
 - [ ] 4.13 Run `make lint` and `make format`.
 
 ## 5. Implementation (green) — SeerCore (verb intents)
@@ -147,6 +158,16 @@ Final task in each group: run `make lint` and `make format`.
   (makes 4.11 pass).
 - [ ] 5.7 Implement `CheckRequestStatusIntent.perform()` reading
   `CachedRequest` and returning `[RequestEntity]` (makes 4.12 pass).
+  When the cache is empty, return the "No cached requests yet" snippet
+  (makes 4.12a pass).
+- [ ] 5.7a Implement `RequestsViewModel.cacheLiveRequests` extension
+  point that upserts `CachedRequest` rows after a successful
+  Jellyseerr fetch and deletes rows no longer present (makes 4.12b,
+  4.12c pass). Cache write happens after UI render, errors swallowed
+  to OS log (makes 4.12d pass).
+- [ ] 5.7b Wire the new cache step into `RequestsViewModel.refresh()`
+  / `loadInitialData()` so it runs every time the user lands on the
+  Requests tab.
 - [ ] 5.8 Run `make lint` and `make format`.
 
 ## 6. Tests (red) — App target (AppShortcutsProvider + Spotlight)

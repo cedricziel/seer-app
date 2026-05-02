@@ -386,26 +386,51 @@ toggle uses standard Form rendering and reflows automatically.
 
 ## Migration Plan
 
-No on-disk migration. All additions; nothing existing is removed or
-renamed.
+No on-disk migration for existing models. The change adds a new
+SwiftData model (`CachedRequest`) to the existing CloudKit-backed
+schema in `App/SeerApp/SeerApp.swift`; SwiftData auto-migrates the
+local store on first launch with the new schema. Nothing existing is
+removed or renamed.
+
+**CloudKit schema deployment is required before TestFlight / App
+Store release.** Adding `CachedRequest.self` to the schema means the
+CloudKit container needs the new record type deployed in the
+production environment; without that step, production-build users
+will hit a container init error on first launch. This is the same
+"Deploy Schema Changes" step we already perform for new `Cached*`
+models — see CloudKit dashboard → container
+`iCloud.com.cedricziel.seer` → Schema → Deploy Schema Changes.
+Development environment auto-deploys; production does not.
 
 Steps:
 
-1. Land `MediaItemEntity`, `RequestEntity`, `ServerEntity`, and their
+1. Land the Setup section: `appIntentsIndexingEnabled` flag,
+   `CachedRequest` model, `flowmark://` URL scheme registration.
+2. Land `MediaItemEntity`, `RequestEntity`, `ServerEntity`, and their
    `EntityQuery` types in `SeerCore` (with tests).
-2. Land the six intent types in `SeerCore` (with tests).
-3. Land `SeerAppShortcutsProvider` in the app target, register the
+3. Land the six intent types in `SeerCore` (with tests), including
+   the `RequestsViewModel` cache write extension that populates
+   `CachedRequest` opportunistically on every Requests-tab load.
+4. Land `SeerAppShortcutsProvider` in the app target, register the
    Tier 1 trio.
-4. Land Spotlight indexing wired to `appIntentsIndexingEnabled` and
+5. Land Spotlight indexing wired to `appIntentsIndexingEnabled` and
    the privacy settings toggle.
-5. Land AssistantSchema conformance + `INPlayMediaIntent` donation.
-6. Land Focus Filter.
-7. Verify on-device: voice flow on iPhone, Spotlight surface, Action
-   Button, Focus mode pinning.
+6. Land `FlowmarkURLRouter` and wire `ContentView.onOpenURL`.
+7. Land AssistantSchema conformance + `INPlayMediaIntent` donation.
+8. Land Focus Filter.
+9. **Deploy CloudKit schema changes to the production environment**
+   via the CloudKit dashboard. This is a release-time step
+   coordinated with the TestFlight build that ships the new model.
+10. Verify on-device: voice flow on iPhone, Spotlight surface, Action
+    Button, Focus mode pinning.
 
-Rollback: each step is independently revertible. The intents can be
-removed by dropping the `AppShortcutsProvider` registration without
-touching the entity types.
+Rollback: each in-app step (1–8, 10) is independently revertible
+through git. The CloudKit schema deploy (step 9) is forward-only —
+once deployed, the record type stays in the schema. Reverting the
+app code without reverting the schema is safe (SwiftData ignores
+unknown record types from a CloudKit perspective); reverting the
+schema in production is not supported by Apple and would require a
+new container.
 
 ## Open Questions
 
