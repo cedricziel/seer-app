@@ -47,9 +47,6 @@ public final class PiPPlaybackManager {
     /// Image URL for the current item's artwork (used for Now Playing info)
     private var artworkURL: URL?
 
-    /// Observer for playback time updates
-    private var timeObserver: Any?
-
     private init() {
         setupLifecycleObservers()
         setupRemoteCommandCenter()
@@ -285,7 +282,6 @@ public final class PiPPlaybackManager {
     /// Called when playback is fully stopped (view dismissed normally, not PiP)
     public func clearPlayer() {
         print("[PiPManager] clearPlayer")
-        stopTimeObserver()
         clearNowPlayingInfo()
         pipPlayer = nil
         pipItem = nil
@@ -300,14 +296,28 @@ public final class PiPPlaybackManager {
 
     // MARK: - Now Playing Info
 
-    /// Updates the Now Playing info on the lock screen / control center
+    /// Updates the Now Playing info on the lock screen / control center.
+    ///
+    /// This sets the static metadata (title, artist, duration, artwork) and an
+    /// initial elapsed-time / rate snapshot. Live elapsed-time updates are
+    /// driven by the caller via ``updateNowPlayingPlaybackTime(elapsed:rate:)``
+    /// — we deliberately do NOT register a separate periodic time observer
+    /// here. Adding one on top of `VideoPlayerViewModel`'s existing observer
+    /// requires capturing the `AVPlayer` into a non-MainActor `@Sendable`
+    /// closure, which is unsafe under Swift 6.2 strict isolation and was
+    /// crashing Release builds when any media was played.
+    ///
     /// - Parameters:
     ///   - item: The media item being played
-    ///   - player: The AVPlayer instance
+    ///   - duration: Total duration in seconds, or `nil` if unknown
+    ///   - elapsed: Current playback position in seconds
+    ///   - rate: Current playback rate (0 = paused, 1 = playing)
     ///   - imageURL: Optional URL for the artwork image
     public func updateNowPlayingInfo(
         for item: MediaItem,
-        player: AVPlayer,
+        duration: Double?,
+        elapsed: Double,
+        rate: Float,
         imageURL: URL?
     ) {
         print("[PiPManager] Updating Now Playing info for: \(item.name)")
@@ -331,23 +341,19 @@ public final class PiPPlaybackManager {
             }
         }
 
-        // Duration
-        if let duration = player.currentItem?.duration, duration.isNumeric {
-            nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = CMTimeGetSeconds(duration)
+        // Duration — prefer caller-supplied value, fall back to the item's runtime
+        if let duration, duration.isFinite {
+            nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = duration
         } else if let ticks = item.runTimeTicks {
-            // Use media item's duration if player duration not available
             nowPlayingInfo[MPMediaItemPropertyPlaybackDuration] = Double(ticks) / 10_000_000.0
         }
 
-        // Current position
-        if player.currentTime().isNumeric {
-            nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = CMTimeGetSeconds(player.currentTime())
+        if elapsed.isFinite {
+            nowPlayingInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsed
         }
 
-        // Playback rate
-        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = player.rate
+        nowPlayingInfo[MPNowPlayingInfoPropertyPlaybackRate] = rate
 
-        // Set initial info
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
 
         // Store artwork URL and fetch it asynchronously
@@ -355,9 +361,19 @@ public final class PiPPlaybackManager {
         if let url = imageURL {
             loadArtwork(from: url)
         }
+    }
 
-        // Start observing playback time
-        startTimeObserver(player: player)
+    /// Pushes a live elapsed-time / rate update into the Now Playing info.
+    /// Designed to be called from the existing playback time observer in the
+    /// view-model layer, so the singleton never has to capture the player.
+    public func updateNowPlayingPlaybackTime(elapsed: Double, rate: Float) {
+        guard MPNowPlayingInfoCenter.default().nowPlayingInfo != nil else { return }
+        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+        if elapsed.isFinite {
+            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsed
+        }
+        info[MPNowPlayingInfoPropertyPlaybackRate] = rate
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
     /// Clears Now Playing info
@@ -388,40 +404,6 @@ public final class PiPPlaybackManager {
                 print("[PiPManager] Failed to load artwork: \(error)")
             }
         }
-    }
-
-    /// Starts a time observer to keep Now Playing info updated
-    private func startTimeObserver(player: AVPlayer) {
-        // Stop any existing observer
-        stopTimeObserver()
-
-        // Store reference for later cleanup
-        timeObserverPlayer = player
-
-        // Update every second
-        let interval = CMTime(seconds: 1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            guard time.isNumeric else { return }
-            Task { @MainActor in
-                guard self != nil else { return }
-                var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
-                info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = CMTimeGetSeconds(time)
-                info[MPNowPlayingInfoPropertyPlaybackRate] = player.rate
-                MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-            }
-        }
-    }
-
-    /// The player that the time observer is attached to
-    private weak var timeObserverPlayer: AVPlayer?
-
-    /// Stops the time observer
-    private func stopTimeObserver() {
-        if let observer = timeObserver, let player = timeObserverPlayer {
-            player.removeTimeObserver(observer)
-        }
-        timeObserver = nil
-        timeObserverPlayer = nil
     }
 
     // MARK: - Remote Command Center
