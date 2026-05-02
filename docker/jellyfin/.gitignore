@@ -1,0 +1,7 @@
+# Jellyfin runtime state — config, metadata cache, transcodes, logs.
+# Persists across runs locally so the first-run wizard only happens once,
+# but never goes into git.
+data/
+
+# Sample media. Reproducible via seed.sh; downloads on demand.
+media/

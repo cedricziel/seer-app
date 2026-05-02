@@ -1,0 +1,25 @@
+# Local Jellyfin instance used by `make fastlane-screenshots`.
+# Persists config and metadata under ./data so the first-run wizard only
+# has to be completed once. Media files live under ./media — drop any
+# .mp4/.mkv there and Jellyfin will index them.
+
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:10.11.8
+    container_name: seer-screenshots-jellyfin
+    user: "${UID:-501}:${GID:-20}"
+    network_mode: bridge
+    # Bind to loopback only — this Jellyfin runs unauthenticated during
+    # the first-run wizard and we don't want internet scanners (real ones
+    # already showed up in the logs) reaching it. The iOS simulator runs
+    # on the host and shares loopback, so localhost reachability is
+    # preserved.
+    ports:
+      - "127.0.0.1:8096:8096"
+    volumes:
+      - ./data/config:/config
+      - ./data/cache:/cache
+      - ./media:/media:ro
+    restart: "no"
+    environment:
+      JELLYFIN_PublishedServerUrl: http://localhost:8096
