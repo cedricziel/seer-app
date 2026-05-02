@@ -45,11 +45,12 @@ manual URL entry escape hatch.
 
 ### Requirement: Authentication leads straight into the Library tab
 
-After a successful server authentication during onboarding, the system
-SHALL transition directly to `MainTabView` with the Library tab active. It
-MUST NOT present an interstitial "Setup Complete" celebration screen.
-`OnboardingManager.markOnboardingComplete()` MUST be called once before the
-transition so What's New gating and first-run-tip behavior remain intact.
+The system SHALL transition directly to `MainTabView` with the Library
+tab active after a successful server authentication during onboarding.
+It MUST NOT present an interstitial "Setup Complete" celebration screen.
+`OnboardingManager.markOnboardingComplete()` MUST be called once before
+the transition so What's New gating and first-run-tip behavior remain
+intact.
 
 #### Scenario: Successful authentication routes to Library
 
@@ -67,10 +68,11 @@ transition so What's New gating and first-run-tip behavior remain intact.
 
 ### Requirement: Library pre-warm during authentication wait
 
-While the user waits for Quick Connect approval (between code display and
-authenticated callback), the system SHALL pre-warm the library cache so
-that the Library tab is not empty on first display. Pre-warming MUST be
-opportunistic and MUST NOT block the authentication completion handler.
+The system SHALL pre-warm the library cache while the user waits for
+Quick Connect approval (between code display and authenticated callback)
+so that the Library tab is not empty on first display. Pre-warming MUST
+be opportunistic and MUST NOT block the authentication completion
+handler.
 
 #### Scenario: Quick Connect polling pre-warms libraries
 

@@ -37,9 +37,9 @@ when Jellyseerr is not configured.
 
 ### Requirement: Connect prompt on Search "Request" action
 
-When the user taps a "Request" affordance on a search result and
-Jellyseerr is not configured, the system SHALL present the Jellyseerr
-connect sheet rather than executing the request action. After successful
+The system SHALL present the Jellyseerr connect sheet, rather than
+executing the request action, when the user taps a "Request" affordance
+on a search result and Jellyseerr is not configured. After a successful
 connect, the original request action MUST proceed automatically.
 
 #### Scenario: Tapping Request without Jellyseerr opens the sheet
