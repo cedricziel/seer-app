@@ -77,12 +77,11 @@ public final class RequestsViewModel: ObservableObject {
 
     public init(
         appState: AppState,
-        autoRefreshScheduler: RefreshScheduler = RefreshScheduler(
-            interval: RequestsViewModel.defaultAutoRefreshInterval
-        )
+        autoRefreshScheduler: RefreshScheduler? = nil
     ) {
         self.appState = appState
         self.autoRefreshScheduler = autoRefreshScheduler
+            ?? RefreshScheduler(interval: Self.defaultAutoRefreshInterval)
         setupService()
     }
 
