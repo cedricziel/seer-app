@@ -51,19 +51,19 @@ Final task in each group: run `make lint` and `make format`.
 
 ## 6. Tests (red) — SeerUI (JellyseerrConnectSheet)
 
-- [ ] 6.1 `JellyseerrConnectSheetTests.testValidatesCredentialsBeforeDismiss` against a fake `JellyseerrService` (covers Scenario: "Sheet validates credentials before dismissing" in `jellyseerr-on-demand`).
-- [ ] 6.2 `JellyseerrConnectSheetTests.testPersistsCredentialsOnSuccess` (covers Scenario: "Sheet persists credentials on successful auth").
-- [ ] 6.3 `JellyseerrConnectSheetTests.testCancelDoesNotPersist` (covers Scenario: "User dismisses the sheet").
-- [ ] 6.4 Snapshot test `JellyseerrConnectSheet_iPhoneCompact` (portrait).
-- [ ] 6.5 Snapshot test `JellyseerrConnectSheet_iPadRegular` at 1/3 split.
-- [ ] 6.6 Run `make lint` and `make format`.
+- [x] 6.1 `JellyseerrConnectSheetTests.testValidatesCredentialsBeforeDismiss` against a fake `JellyseerrService` (covers Scenario: "Sheet validates credentials before dismissing" in `jellyseerr-on-demand`). — Implemented as `JellyseerrConnectSheetModelTests` against an injected `RecordingConnector` so SeerUI does not depend on JellyseerrClient.
+- [x] 6.2 `JellyseerrConnectSheetTests.testPersistsCredentialsOnSuccess` (covers Scenario: "Sheet persists credentials on successful auth").
+- [x] 6.3 `JellyseerrConnectSheetTests.testCancelDoesNotPersist` (covers Scenario: "User dismisses the sheet").
+- [x] 6.4 Snapshot test `JellyseerrConnectSheet_iPhoneCompact` (portrait).
+- [x] 6.5 Snapshot test `JellyseerrConnectSheet_iPadRegular` at 1/3 split. — Renders against `.iPadPro11` device config; full-window rather than split-view simulation since SnapshotTesting doesn't expose split widths directly.
+- [x] 6.6 Run `make lint` and `make format`.
 
 ## 7. Implementation (green) — SeerUI
 
-- [ ] 7.1 Add `JellyseerrConnectSheet` SwiftUI view in `Packages/SeerUI/Sources/SeerUI/Onboarding/` with own view model exposing a completion callback (makes 6.1, 6.2, 6.3 pass).
-- [ ] 7.2 Layout for iPhone compact portrait (makes 6.4 pass).
-- [ ] 7.3 Layout adaptation for iPad regular and split-view (makes 6.5 pass).
-- [ ] 7.4 Run `make lint` and `make format`.
+- [x] 7.1 Add `JellyseerrConnectSheet` SwiftUI view in `Packages/SeerUI/Sources/SeerUI/Onboarding/` with own view model exposing a completion callback (makes 6.1, 6.2, 6.3 pass). — Connector is an injected `(URL, String) async throws -> Void` closure so SeerUI stays free of JellyseerrClient/AppState dependencies; the calling Feature wires up `JellyseerrService.verifyAuth()` + `appState.saveJellyseerrCredentials`.
+- [x] 7.2 Layout for iPhone compact portrait (makes 6.4 pass).
+- [x] 7.3 Layout adaptation for iPad regular and split-view (makes 6.5 pass).
+- [x] 7.4 Run `make lint` and `make format`. — Also added `SeerUITests` bundle (iOS-only, depends on SnapshotTesting). Compiled cross-platform shims for iOS-only modifiers (`navigationBarTitleDisplayMode`, `keyboardType`, `textInputAutocapitalization`) so SeerUI still builds for tvOS.
 
 ## 8. Tests (red) — Features/Auth (welcome screen + view model)
 

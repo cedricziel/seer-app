@@ -390,6 +390,27 @@ targets:
         TEST_HOST: ""
         BUNDLE_LOADER: ""
 
+  # iOS-only because SnapshotTesting renders via UIKit (UIImage/UIWindow).
+  # SeerUI itself supports tvOS; UI verification on tvOS is via the focus-
+  # engine tests in the SeerApp scheme, not raster snapshots.
+  SeerUITests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS]
+    sources:
+      - path: Tests/SeerUITests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: SeerUI
+      - package: SnapshotTesting
+        product: SnapshotTesting
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.uiunittests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
   # UI test target dedicated to driving the app for fastlane snapshot.
   # Not part of the regular `make test` pipeline because it depends on the
   # public Jellyfin demo server being reachable.
@@ -419,6 +440,7 @@ schemes:
         JellyfinClientTests: [test]
         JellyseerrClientTests: [test]
         OfflineSyncTests: [test]
+        SeerUITests: [test]
     run:
       config: Debug
       environmentVariables:
@@ -437,6 +459,7 @@ schemes:
         - JellyfinClientTests
         - JellyseerrClientTests
         - OfflineSyncTests
+        - SeerUITests
     profile:
       config: Release
     analyze:
