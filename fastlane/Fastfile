@@ -54,6 +54,7 @@ lane :build do
     clean: true,
     include_symbols: true,
     include_bitcode: false,
+    destination: "generic/platform=iOS",
     xcargs: archive_xcargs
   )
 end
@@ -75,6 +76,7 @@ lane :beta do |options|
     clean: true,
     include_symbols: true,
     include_bitcode: false,
+    destination: "generic/platform=iOS",
     xcargs: archive_xcargs
   )
 
@@ -124,6 +126,7 @@ lane :release do |options|
     clean: true,
     include_symbols: true,
     include_bitcode: false,
+    destination: "generic/platform=iOS",
     xcargs: archive_xcargs
   )
 
