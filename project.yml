@@ -390,6 +390,28 @@ targets:
         TEST_HOST: ""
         BUNDLE_LOADER: ""
 
+  # Host-based test bundle for Features/* code (currently OnboardingViewModel).
+  # Uses TEST_HOST so tests can @testable import the SeerApp target. iOS-only
+  # because the SeerApp app bundle is iOS/iPadOS.
+  AuthFeatureTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS]
+    sources:
+      - path: Tests/AuthFeatureTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: SeerApp
+      - target: SeerCore
+      - target: JellyfinClient
+      - target: SeerUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.authfeaturetests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeerApp.app/SeerApp"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
   # iOS-only because SnapshotTesting renders via UIKit (UIImage/UIWindow).
   # SeerUI itself supports tvOS; UI verification on tvOS is via the focus-
   # engine tests in the SeerApp scheme, not raster snapshots.
@@ -441,6 +463,7 @@ schemes:
         JellyseerrClientTests: [test]
         OfflineSyncTests: [test]
         SeerUITests: [test]
+        AuthFeatureTests: [test]
     run:
       config: Debug
       environmentVariables:
@@ -460,6 +483,7 @@ schemes:
         - JellyseerrClientTests
         - OfflineSyncTests
         - SeerUITests
+        - AuthFeatureTests
     profile:
       config: Release
     analyze:

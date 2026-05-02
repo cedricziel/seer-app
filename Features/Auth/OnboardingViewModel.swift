@@ -50,13 +50,24 @@ final class OnboardingViewModel: ObservableObject {
 
     // MARK: - Dependencies
 
+    typealias QuickConnectTransportFactory = @MainActor (URL) -> any QuickConnectTransport
+
+    struct PasswordAuthResult {
+        let response: AuthResponse
+        let deviceID: String
+    }
+
+    typealias PasswordAuthenticator = @MainActor (URL, String, String) async throws -> PasswordAuthResult
+
     private let appState: AppState
     private let onboardingManager: OnboardingManager
     let bonjour: BonjourDiscovery
     private let serverInfoFetcher: ServerInfoFetcher
     private let resolver: WelcomeStateResolver
+    private let quickConnectTransportFactory: QuickConnectTransportFactory
+    private let passwordAuthenticator: PasswordAuthenticator
 
-    private var selectedServer: SelectedServer?
+    private(set) var selectedServer: SelectedServer?
     private var quickConnectSession: QuickConnectSession?
     private var quickConnectStateObservation: AnyCancellable?
 
@@ -66,13 +77,36 @@ final class OnboardingViewModel: ObservableObject {
         appState: AppState,
         onboardingManager: OnboardingManager,
         bonjour: BonjourDiscovery? = nil,
-        serverInfoFetcher: ServerInfoFetcher = ServerInfoFetcher()
+        serverInfoFetcher: ServerInfoFetcher = ServerInfoFetcher(),
+        quickConnectTransportFactory: QuickConnectTransportFactory? = nil,
+        passwordAuthenticator: PasswordAuthenticator? = nil
     ) {
         self.appState = appState
         self.onboardingManager = onboardingManager
         self.bonjour = bonjour ?? BonjourDiscovery()
         self.serverInfoFetcher = serverInfoFetcher
+        self.quickConnectTransportFactory = quickConnectTransportFactory
+            ?? Self.defaultQuickConnectTransportFactory
+        self.passwordAuthenticator = passwordAuthenticator
+            ?? Self.defaultPasswordAuthenticator
         resolver = WelcomeStateResolver()
+    }
+
+    @MainActor
+    private static func defaultQuickConnectTransportFactory(_: URL) -> any QuickConnectTransport {
+        URLSessionQuickConnectTransport(deviceID: ClientIdentity.deviceID)
+    }
+
+    @MainActor
+    private static func defaultPasswordAuthenticator(
+        url: URL,
+        username: String,
+        password: String
+    ) async throws -> PasswordAuthResult {
+        let service = JellyfinService(serverURL: url)
+        let response = try await service.authenticate(username: username, password: password)
+        let deviceID = await service.getDeviceID()
+        return PasswordAuthResult(response: response, deviceID: deviceID)
     }
 
     func start() {
@@ -128,7 +162,7 @@ final class OnboardingViewModel: ObservableObject {
                 url: discovered.url,
                 discoveredViaBonjour: true
             )
-            advanceToAuth()
+            Task { await advanceToAuth() }
         } else if viewSuggestion.id.hasPrefix("synced-") {
             let uuidString = String(viewSuggestion.id.dropFirst("synced-".count))
             guard let uuid = UUID(uuidString: uuidString),
@@ -139,7 +173,7 @@ final class OnboardingViewModel: ObservableObject {
                 url: config.jellyfinURL,
                 discoveredViaBonjour: false
             )
-            advanceToAuth()
+            Task { await advanceToAuth() }
         }
     }
 
@@ -172,7 +206,7 @@ final class OnboardingViewModel: ObservableObject {
                 url: parsed,
                 discoveredViaBonjour: false
             )
-            advanceToAuth()
+            await advanceToAuth()
         } catch let error as ServerInfoFetcher.ServerInfoError {
             manualURLError = error.errorDescription
         } catch {
@@ -182,27 +216,36 @@ final class OnboardingViewModel: ObservableObject {
 
     // MARK: - Auth phase entry
 
-    private func advanceToAuth() {
+    /// Probes Quick Connect availability and routes to the appropriate auth
+    /// phase. If the server has Quick Connect enabled, initiates the session
+    /// and goes to `.quickConnect`. Otherwise falls back to `.password`.
+    private func advanceToAuth() async {
         guard let selected = selectedServer else { return }
-        // For the MVP, default straight to password. Quick Connect probing
-        // will be added once the auth model surfaces it.
-        phase = .password(serverDisplay: selected.displayName)
-        passwordError = nil
-        passwordUsername = ""
-        passwordPassword = ""
+        let transport = quickConnectTransportFactory(selected.url)
+        let isEnabled = await (try? transport.isEnabled(serverURL: selected.url)) ?? false
+        if isEnabled {
+            await beginQuickConnect(server: selected, transport: transport)
+        } else {
+            phase = .password(serverDisplay: selected.displayName)
+            passwordError = nil
+            passwordUsername = ""
+            passwordPassword = ""
+        }
     }
 
     func switchToQuickConnect() async {
         guard let selected = selectedServer else { return }
-        let transport = URLSessionQuickConnectTransport(
-            deviceID: ClientIdentity.deviceID
-        )
-        let session = QuickConnectSession(serverURL: selected.url, transport: transport)
+        let transport = quickConnectTransportFactory(selected.url)
+        await beginQuickConnect(server: selected, transport: transport)
+    }
+
+    private func beginQuickConnect(server: SelectedServer, transport: any QuickConnectTransport) async {
+        let session = QuickConnectSession(serverURL: server.url, transport: transport)
         quickConnectSession = session
         quickConnectError = nil
         quickConnectCode = nil
         quickConnectIsPolling = true
-        phase = .quickConnect(serverDisplay: selected.displayName)
+        phase = .quickConnect(serverDisplay: server.displayName)
         observeQuickConnect(session)
         await session.start()
     }
@@ -244,17 +287,16 @@ final class OnboardingViewModel: ObservableObject {
         passwordError = nil
         defer { isAuthenticating = false }
 
-        let service = JellyfinService(serverURL: selected.url)
         do {
-            let response = try await service.authenticate(
-                username: passwordUsername,
-                password: passwordPassword
+            let result = try await passwordAuthenticator(
+                selected.url,
+                passwordUsername,
+                passwordPassword
             )
-            let deviceID = await service.getDeviceID()
             await persistAndComplete(
-                accessToken: response.accessToken,
-                userID: response.user.id,
-                deviceID: deviceID,
+                accessToken: result.response.accessToken,
+                userID: result.response.user.id,
+                deviceID: result.deviceID,
                 selected: selected
             )
         } catch let error as JellyfinService.JellyfinError {
