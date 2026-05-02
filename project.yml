@@ -413,8 +413,7 @@ targets:
         BUNDLE_LOADER: "$(TEST_HOST)"
 
   # iOS-only because SnapshotTesting renders via UIKit (UIImage/UIWindow).
-  # SeerUI itself supports tvOS; UI verification on tvOS is via the focus-
-  # engine tests in the SeerApp scheme, not raster snapshots.
+  # SeerUI itself supports tvOS; tvOS tests live in SeerUITestsTV.
   SeerUITests:
     type: bundle.unit-test
     supportedDestinations: [iOS]
@@ -429,6 +428,26 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.uiunittests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
+  # tvOS-only counterpart for SeerUI snapshot tests that need tvOS rendering
+  # (focus engine, TV-resolution layouts).
+  SeerUITestsTV:
+    type: bundle.unit-test
+    supportedDestinations: [tvOS]
+    sources:
+      - path: Tests/SeerUITestsTV
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: SeerUI
+      - package: SnapshotTesting
+        product: SnapshotTesting
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.uitestsTV
         GENERATE_INFOPLIST_FILE: true
         TEST_HOST: ""
         BUNDLE_LOADER: ""
@@ -490,6 +509,19 @@ schemes:
       config: Debug
     archive:
       config: Release
+
+  # tvOS-only scheme for SeerUITestsTV. Kept separate from SeerApp because
+  # SeerApp's iOS-only entitlements (wifi-info) prevent it from building for
+  # tvOS. SeerUI itself is platform-clean.
+  SeerUITestsTV:
+    build:
+      targets:
+        SeerUI: all
+        SeerUITestsTV: [test]
+    test:
+      config: Debug
+      targets:
+        - SeerUITestsTV
 
   # Dedicated scheme for fastlane snapshot. Builds the app + UI test target
   # only — kept out of the SeerApp scheme so `make test` doesn't try to talk

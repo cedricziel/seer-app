@@ -193,8 +193,18 @@ public struct SyncStatusView: View {
             }
         }
         .padding()
-        .background(Color(uiColor: .secondarySystemBackground))
+        .background(Color.offlineBannerBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+private extension Color {
+    static var offlineBannerBackground: Color {
+        #if os(iOS)
+            Color(uiColor: .secondarySystemBackground)
+        #else
+            Color.gray.opacity(0.15)
+        #endif
     }
 }
 

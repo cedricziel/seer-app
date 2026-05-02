@@ -14,7 +14,10 @@ final class ManualServerEntryViewSnapshotTests: XCTestCase {
                 onContinue: {}
             )
         }
-        assertSnapshot(of: view, as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13)))
+        assertSnapshot(
+            of: view,
+            as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13))
+        )
     }
 
     func testManualServerEntryView_iPhoneCompact_WithError() {
@@ -26,6 +29,9 @@ final class ManualServerEntryViewSnapshotTests: XCTestCase {
                 onContinue: {}
             )
         }
-        assertSnapshot(of: view, as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13)))
+        assertSnapshot(
+            of: view,
+            as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13))
+        )
     }
 }

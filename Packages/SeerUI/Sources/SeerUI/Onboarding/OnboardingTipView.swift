@@ -41,9 +41,19 @@ public struct OnboardingTipView: View {
             Spacer()
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color.tipBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
+    }
+}
+
+private extension Color {
+    static var tipBackground: Color {
+        #if os(iOS)
+            Color(uiColor: .systemGray6)
+        #else
+            Color.gray.opacity(0.12)
+        #endif
     }
 }
 

@@ -11,7 +11,10 @@ final class JellyseerrConnectSheetSnapshotTests: XCTestCase {
             onSuccess: {},
             onCancel: {}
         )
-        assertSnapshot(of: sheet, as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13)))
+        assertSnapshot(
+            of: sheet,
+            as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13))
+        )
     }
 
     func testJellyseerrConnectSheet_iPadRegular() {
@@ -20,6 +23,9 @@ final class JellyseerrConnectSheetSnapshotTests: XCTestCase {
             onSuccess: {},
             onCancel: {}
         )
-        assertSnapshot(of: sheet, as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPadPro11)))
+        assertSnapshot(
+            of: sheet,
+            as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPadPro11))
+        )
     }
 }

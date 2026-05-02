@@ -14,19 +14,19 @@ public struct SkeletonCard: View {
         VStack(alignment: .leading, spacing: 8) {
             // Poster placeholder
             RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color(.systemGray5))
+                .fill(Color.skeletonFill)
                 .aspectRatio(aspectRatio, contentMode: .fit)
                 .shimmer()
 
             // Title placeholder
             RoundedRectangle(cornerRadius: 4)
-                .fill(Color(.systemGray5))
+                .fill(Color.skeletonFill)
                 .frame(height: 14)
                 .shimmer()
 
             // Subtitle placeholder
             RoundedRectangle(cornerRadius: 4)
-                .fill(Color(.systemGray5))
+                .fill(Color.skeletonFill)
                 .frame(height: 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.trailing, 40)
@@ -71,6 +71,16 @@ public struct SkeletonCardRow: View {
                 .padding(.horizontal)
             }
         }
+    }
+}
+
+private extension Color {
+    static var skeletonFill: Color {
+        #if os(iOS)
+            Color(uiColor: .systemGray5)
+        #else
+            Color.gray.opacity(0.2)
+        #endif
     }
 }
 

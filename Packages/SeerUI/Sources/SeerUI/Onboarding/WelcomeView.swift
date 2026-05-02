@@ -28,6 +28,16 @@ public struct WelcomeView: View {
         @Environment(\.verticalSizeClass) private var verticalSizeClass
     #endif
 
+    /// Identifier for the initial focus target on tvOS. The Siri Remote
+    /// lands here when the welcome screen appears.
+    private static let manualEntryFocusID = "welcome.manualEntry"
+
+    @FocusState private var focusedID: String?
+
+    private var defaultFocusID: String {
+        primarySuggestion?.id ?? Self.manualEntryFocusID
+    }
+
     public init(
         primarySuggestion: Suggestion?,
         secondarySuggestions: [Suggestion] = [],
@@ -52,11 +62,14 @@ public struct WelcomeView: View {
     }
 
     public var body: some View {
-        if useHorizontalLayout {
-            horizontalBody
-        } else {
-            verticalBody
+        Group {
+            if useHorizontalLayout {
+                horizontalBody
+            } else {
+                verticalBody
+            }
         }
+        .defaultFocus($focusedID, defaultFocusID)
     }
 
     private var verticalBody: some View {
@@ -144,41 +157,46 @@ public struct WelcomeView: View {
         Button {
             onSelectSuggestion(suggestion)
         } label: {
-            HStack(spacing: 16) {
-                Image(systemName: suggestion.symbolName)
-                    .font(.title2)
-                    .foregroundStyle(emphasized ? Color.white : Color.accentColor)
-                    .frame(width: 36, height: 36)
-                    .background(emphasized ? Color.accentColor : Color.welcomeIconBackground)
-                    .clipShape(Circle())
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(suggestion.title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                    Text(suggestion.subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
-            }
-            .padding()
-            .background(Color.welcomeCardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(emphasized ? Color.accentColor.opacity(0.6) : Color.clear, lineWidth: 2)
-            )
+            suggestionRowLabel(suggestion, emphasized: emphasized)
         }
         .buttonStyle(.plain)
+        .focused($focusedID, equals: suggestion.id)
         .accessibilityElement(children: .combine)
+    }
+
+    private func suggestionRowLabel(_ suggestion: Suggestion, emphasized: Bool) -> some View {
+        HStack(spacing: 16) {
+            Image(systemName: suggestion.symbolName)
+                .font(.title2)
+                .foregroundStyle(emphasized ? Color.white : Color.accentColor)
+                .frame(width: 36, height: 36)
+                .background(emphasized ? Color.accentColor : Color.welcomeIconBackground)
+                .clipShape(Circle())
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(suggestion.title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                Text(suggestion.subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
+        }
+        .padding()
+        .background(Color.welcomeCardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(emphasized ? Color.accentColor.opacity(0.6) : Color.clear, lineWidth: 2)
+        )
     }
 
     private var emptyStateHint: some View {
@@ -210,11 +228,13 @@ public struct WelcomeView: View {
         if primarySuggestion == nil {
             Button(action: onManualEntry) { label }
                 .buttonStyle(WelcomeProminentButtonStyle())
-                .accessibilityIdentifier("welcome.manualEntry")
+                .focused($focusedID, equals: Self.manualEntryFocusID)
+                .accessibilityIdentifier(Self.manualEntryFocusID)
         } else {
             Button(action: onManualEntry) { label }
                 .buttonStyle(WelcomePlainButtonStyle())
-                .accessibilityIdentifier("welcome.manualEntry")
+                .focused($focusedID, equals: Self.manualEntryFocusID)
+                .accessibilityIdentifier(Self.manualEntryFocusID)
         }
     }
 }

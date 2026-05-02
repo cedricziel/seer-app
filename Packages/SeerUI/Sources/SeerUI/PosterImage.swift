@@ -29,14 +29,14 @@ public struct PosterImage: View {
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         .background(
             RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color(.systemGray5))
+                .fill(Color.posterFill)
         )
         .accessibilityHidden(true)
     }
 
     private var placeholderView: some View {
         Rectangle()
-            .fill(Color(.systemGray5))
+            .fill(Color.posterFill)
             .overlay {
                 Image(systemName: "photo")
                     .font(.title)
@@ -59,7 +59,7 @@ public struct BackdropImage: View {
         KFImage(url)
             .placeholder {
                 Rectangle()
-                    .fill(Color(.systemGray5))
+                    .fill(Color.posterFill)
             }
             .resizable()
             .aspectRatio(contentMode: .fill)
@@ -67,12 +67,32 @@ public struct BackdropImage: View {
             .clipped()
             .overlay {
                 LinearGradient(
-                    colors: [.clear, Color(.systemBackground).opacity(0.8), Color(.systemBackground)],
+                    colors: [.clear, Color.posterScrim.opacity(0.8), Color.posterScrim],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             }
             .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Cross-platform colors
+
+private extension Color {
+    static var posterFill: Color {
+        #if os(iOS)
+            Color(uiColor: .systemGray5)
+        #else
+            Color.gray.opacity(0.2)
+        #endif
+    }
+
+    static var posterScrim: Color {
+        #if os(iOS)
+            Color(uiColor: .systemBackground)
+        #else
+            Color.black
+        #endif
     }
 }
 

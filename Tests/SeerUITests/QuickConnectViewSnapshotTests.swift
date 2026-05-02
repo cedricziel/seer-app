@@ -14,6 +14,9 @@ final class QuickConnectViewSnapshotTests: XCTestCase {
             onCancel: {},
             onCopyCode: {}
         )
-        assertSnapshot(of: view, as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13)))
+        assertSnapshot(
+            of: view,
+            as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13))
+        )
     }
 }
