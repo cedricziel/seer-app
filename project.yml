@@ -32,6 +32,9 @@ packages:
   PLCrashReporter:
     url: https://github.com/microsoft/plcrashreporter
     from: "1.11.0"
+  SnapshotTesting:
+    url: https://github.com/pointfreeco/swift-snapshot-testing
+    from: "1.17.0"
 
 targets:
   SeerApp:
