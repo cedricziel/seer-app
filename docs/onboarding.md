@@ -102,14 +102,76 @@ enum WhatsNewData {
 
 ## User Flows
 
-### New User Flow
+### New User Flow (streamlined — default)
+
+The current default first-run path. Composed of three SwiftUI views in
+SeerUI orchestrated by `OnboardingViewModel` (`Features/Auth/`),
+gated behind `AppState.streamlinedOnboardingEnabled` (default `true`,
+flippable via `UserDefaults` for instant rollback during the cutover
+window).
 
 ```
 App Launch
     ↓
-ServerSetupView (not authenticated)
+ContentView (not authenticated, flag = true)
     ↓
-Complete server setup
+OnboardingFlowView
+    ↓
+WelcomeView (state-aware)
+    Suggestions sourced from:
+      • iCloud-synced ServerConfigurations  → primary
+      • Bonjour-discovered _jellyfin._tcp   → fallback primary
+      • Manual entry                        → footer / fresh-install primary
+    ↓
+ManualServerEntryView   (if user picks manual)
+    URL → ServerInfoFetcher.fetch(/System/Info/Public)
+    ↓
+QuickConnectView        (if server's /QuickConnect/Enabled is true)
+    Initiate → poll → exchange secret for AccessToken
+    "Use Password Instead" + "Cancel" available throughout
+    ↓
+Password form           (fallback or user choice)
+    JellyfinService.authenticate(username:password:)
+    ↓
+persistAndComplete
+    ServerConfiguration written; LAN URL learned for manual paths
+    OnboardingManager.markOnboardingComplete()
+    appState.isAuthenticated = true
+    TelemetryService.recordOnboardingCompleted()
+    ↓
+MainTabView
+    LibraryView shows first-time tip (isFirstLaunchAfterSetup = true)
+    Jellyseerr is NOT requested — the Discover/Search/Requests tabs
+    each surface a JellyseerrConnectPrompt on demand.
+```
+
+### Telemetry funnel
+
+When `DiagnosticsConsent.performanceMetricsEnabled` is true,
+`TelemetryService` records four PII-free events:
+
+| Event | When |
+|---|---|
+| `onboarding_welcome_shown` | First render of `WelcomeView` |
+| `onboarding_path_selected` (`bonjour`/`icloud`/`manual`) | User taps a suggestion or "Add a server manually" |
+| `onboarding_auth_method` (`quickconnect`/`password`) | Authentication attempted |
+| `onboarding_completed` | `appState.isAuthenticated` flips to true |
+
+Payloads carry only the enum rawValues — no hostnames, URLs, or
+usernames.
+
+### Legacy New User Flow (until cutover removal)
+
+The pre-streamlined three-step Form path, kept in the binary as a
+rollback target. Reachable by setting
+`UserDefaults.standard.set(false, forKey: "streamlinedOnboardingEnabled")`.
+
+```
+App Launch
+    ↓
+ServerSetupView (not authenticated, flag = false)
+    ↓
+Complete server setup (Jellyfin → Jellyseerr → Setup Complete)
     ↓
 "Get Started" button → markOnboardingComplete()
     ↓
