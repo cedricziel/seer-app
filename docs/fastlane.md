@@ -189,6 +189,26 @@ release-please body uses heavy markdown, either tighten the
 per-release by editing `release_notes.txt` and committing before the release
 is graduated.
 
+### Fields kept out of git (managed in ASC web UI)
+
+Some fields are sensitive (a personal phone number, support contact details
+in jurisdictions that need to be private) or are easier to manage manually.
+The pattern: leave the file empty (just a newline is fine), and set the
+value once in App Store Connect's web UI. It stays sticky across uploads.
+
+This works because deliver checks `strip_value.empty?` per field before
+including it in the upload payload (see
+`deliver/lib/deliver/upload_metadata.rb` `review_information`). An empty
+file means "leave the existing ASC value alone." A non-empty file means
+"overwrite ASC with this."
+
+Currently kept-empty in this repo (manage in ASC web UI):
+
+- `fastlane/metadata/review_information/phone_number.txt`
+- `fastlane/metadata/review_information/demo_password.txt` — Jellyfin's
+  public demo server doesn't require one; this stays empty so deliver
+  reports `demo_account_required: false` to App Review.
+
 ### What `deliver` doesn't manage
 
 - **App Privacy "Data Types" labels** — managed manually in App Store Connect
