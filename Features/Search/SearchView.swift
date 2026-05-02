@@ -111,7 +111,12 @@ private struct SearchContentView: View {
 
     @ViewBuilder
     private var searchContentView: some View {
-        if viewModel.isSearching, viewModel.searchResults.isEmpty {
+        if viewModel.isDebouncing, viewModel.searchResults.isEmpty {
+            VStack {
+                searchProgressBanner
+                Spacer()
+            }
+        } else if viewModel.isSearching, viewModel.searchResults.isEmpty {
             LoadingView(message: "Searching...")
         } else if let error = viewModel.errorMessage {
             ErrorView(error: error) {
@@ -126,13 +131,87 @@ private struct SearchContentView: View {
                 description: "Try searching for something else"
             )
         } else if !viewModel.hasSearched {
+            searchEmptyState
+        } else {
+            VStack(spacing: 0) {
+                searchProgressBanner
+                searchResultsGrid
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var searchEmptyState: some View {
+        if viewModel.recentQueries.isEmpty {
             EmptyContentView(
                 title: "Search TMDB",
                 systemImage: "magnifyingglass",
                 description: "Search for movies and TV shows to request"
             )
         } else {
-            searchResultsGrid
+            recentQueriesList
+        }
+    }
+
+    private var recentQueriesList: some View {
+        List {
+            Section {
+                ForEach(viewModel.recentQueries, id: \.self) { query in
+                    Button {
+                        Task { await viewModel.runRecentQuery(query) }
+                    } label: {
+                        HStack {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
+                            Text(query)
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: "arrow.up.left")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .accessibilityLabel("Search again for \(query)")
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            viewModel.removeRecentQuery(query)
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
+                }
+            } header: {
+                HStack {
+                    Text("Recent Searches")
+                    Spacer()
+                    Button("Clear") {
+                        viewModel.clearRecentQueries()
+                    }
+                    .font(.subheadline)
+                    .accessibilityIdentifier("search.clearRecents")
+                }
+            }
+        }
+        .listStyle(.plain)
+        .accessibilityIdentifier("search.recentQueries")
+    }
+
+    @ViewBuilder
+    private var searchProgressBanner: some View {
+        if viewModel.isDebouncing || viewModel.isSearching {
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.mini)
+                Text(viewModel.isDebouncing ? "Searching..." : "Loading more results...")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 6)
+            .accessibilityIdentifier("search.progressBanner")
         }
     }
 

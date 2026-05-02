@@ -109,11 +109,17 @@ private struct RequestsContentView: View {
         .task {
             if viewModel.isJellyseerrConfigured {
                 await viewModel.loadRequests()
+                viewModel.startAutoRefresh()
             }
         }
+        .onDisappear {
+            viewModel.stopAutoRefresh()
+        }
         .onChange(of: appState.activeServerID) {
+            viewModel.stopAutoRefresh()
             Task {
                 await viewModel.refresh()
+                viewModel.startAutoRefresh()
             }
         }
     }

@@ -18,6 +18,7 @@ public final class AuthViewModel: ObservableObject {
 
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
+    @Published var errorSuggestion: String?
     @Published var showError: Bool = false
 
     @Published var jellyfinConnected: Bool = false
@@ -47,7 +48,14 @@ public final class AuthViewModel: ObservableObject {
     // MARK: - Jellyfin Authentication
 
     func connectToJellyfin() async {
-        guard let url = URL(string: jellyfinServerURL.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+        let trimmedURL = jellyfinServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let advice = AuthErrorFormatter.validate(urlString: trimmedURL) {
+            showErrorAdvice(advice)
+            return
+        }
+
+        guard let url = URL(string: trimmedURL) else {
             showErrorMessage("Please enter a valid Jellyfin server URL")
             return
         }
@@ -58,54 +66,75 @@ public final class AuthViewModel: ObservableObject {
         }
 
         isLoading = true
-        errorMessage = nil
+        clearError()
 
         do {
-            let service = JellyfinService(serverURL: url)
-            let response = try await service.authenticate(
-                username: jellyfinUsername,
-                password: jellyfinPassword
-            )
-
-            // Create server configuration
-            let config = ServerConfiguration(
-                name: url.host ?? "Server",
-                emoji: "🏠",
-                jellyfinURL: url,
-                jellyfinUserID: response.user.id,
-                lastUsed: Date(),
-                createdAt: Date()
-            )
-
-            // Add to app state
-            appState.addServer(config)
-            serverConfig = config
-
-            // Save credentials
-            let deviceID = await service.getDeviceID()
-            appState.saveJellyfinCredentials(
-                serverID: config.id,
-                accessToken: response.accessToken,
-                userID: response.user.id,
-                deviceID: deviceID
-            )
-
-            jellyfinService = service
+            try await performJellyfinLogin(url: url)
             jellyfinConnected = true
             currentStep = .jellyseerr
         } catch let error as JellyfinService.JellyfinError {
-            showErrorMessage(error.localizedDescription)
+            handleJellyfinError(error, urlString: trimmedURL)
         } catch {
-            showErrorMessage("Failed to connect: \(error.localizedDescription)")
+            showErrorAdvice(AuthErrorFormatter.advice(for: error, urlString: trimmedURL))
         }
 
         isLoading = false
     }
 
+    private func performJellyfinLogin(url: URL) async throws {
+        let service = JellyfinService(serverURL: url)
+        let response = try await service.authenticate(
+            username: jellyfinUsername,
+            password: jellyfinPassword
+        )
+
+        let config = ServerConfiguration(
+            name: url.host ?? "Server",
+            emoji: "🏠",
+            jellyfinURL: url,
+            jellyfinUserID: response.user.id,
+            lastUsed: Date(),
+            createdAt: Date()
+        )
+        appState.addServer(config)
+        serverConfig = config
+
+        let deviceID = await service.getDeviceID()
+        appState.saveJellyfinCredentials(
+            serverID: config.id,
+            accessToken: response.accessToken,
+            userID: response.user.id,
+            deviceID: deviceID
+        )
+
+        jellyfinService = service
+    }
+
+    private func handleJellyfinError(_ error: JellyfinService.JellyfinError, urlString: String) {
+        switch error {
+        case .invalidCredentials:
+            showErrorAdvice(AuthErrorAdvice(
+                message: "Invalid username or password",
+                suggestion: "Check your Jellyfin credentials and try again"
+            ))
+        case let .networkError(underlying):
+            showErrorAdvice(AuthErrorFormatter.advice(for: underlying, urlString: urlString))
+        default:
+            showErrorMessage(error.localizedDescription)
+        }
+    }
+
     // MARK: - Jellyseerr Authentication
 
     func connectToJellyseerr() async {
-        guard let url = URL(string: jellyseerrServerURL.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+        let trimmedURL = jellyseerrServerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let advice = AuthErrorFormatter.validate(urlString: trimmedURL) {
+            showErrorAdvice(advice)
+            return
+        }
+
+        guard let url = URL(string: trimmedURL) else {
             showErrorMessage("Please enter a valid Jellyseerr server URL")
             return
         }
@@ -121,7 +150,7 @@ public final class AuthViewModel: ObservableObject {
         }
 
         isLoading = true
-        errorMessage = nil
+        clearError()
 
         do {
             let service = JellyseerrService(serverURL: url, apiKey: jellyseerrAPIKey)
@@ -144,7 +173,7 @@ public final class AuthViewModel: ObservableObject {
         } catch let error as JellyseerrService.JellyseerrError {
             showErrorMessage(error.localizedDescription)
         } catch {
-            showErrorMessage("Failed to connect: \(error.localizedDescription)")
+            showErrorAdvice(AuthErrorFormatter.advice(for: error, urlString: trimmedURL))
         }
 
         isLoading = false
@@ -166,11 +195,19 @@ public final class AuthViewModel: ObservableObject {
 
     private func showErrorMessage(_ message: String) {
         errorMessage = message
+        errorSuggestion = nil
+        showError = true
+    }
+
+    private func showErrorAdvice(_ advice: AuthErrorAdvice) {
+        errorMessage = advice.message
+        errorSuggestion = advice.suggestion
         showError = true
     }
 
     func clearError() {
         errorMessage = nil
+        errorSuggestion = nil
         showError = false
     }
 }
