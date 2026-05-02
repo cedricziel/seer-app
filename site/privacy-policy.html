@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy — Flowmark Media</title>
+  <meta name="description" content="Privacy policy for Flowmark Media, a Jellyfin and Jellyseerr client for iOS and tvOS.">
+  <link rel="canonical" href="https://cedricziel.github.io/seer-app/privacy-policy.html">
+  <style>
+    :root {
+      --fg: #1d1d1f;
+      --muted: #6e6e73;
+      --bg: #ffffff;
+      --accent: #c87f00;
+      --rule: #e5e5ea;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #f5f5f7;
+        --muted: #98989d;
+        --bg: #000000;
+        --accent: #ffb547;
+        --rule: #2c2c2e;
+      }
+    }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      font-size: 17px;
+      line-height: 1.55;
+      color: var(--fg);
+      background: var(--bg);
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 24px 96px;
+    }
+    header {
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 24px;
+      margin-bottom: 32px;
+    }
+    h1 {
+      font-size: 32px;
+      line-height: 1.2;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+    h2 {
+      font-size: 22px;
+      margin: 40px 0 12px;
+      letter-spacing: -0.01em;
+    }
+    h3 {
+      font-size: 18px;
+      margin: 24px 0 8px;
+    }
+    p, ul { margin: 0 0 16px; }
+    ul { padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    code {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 0.92em;
+      background: var(--rule);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .meta {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0;
+    }
+    .meta strong { color: var(--fg); font-weight: 600; }
+    .footnote {
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--rule);
+      color: var(--muted);
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Privacy Policy</h1>
+    <p class="meta"><strong>Effective:</strong> 2 May 2026 &middot; <strong>App:</strong> Flowmark Media (com.cedricziel.seer) &middot; <strong>Developer:</strong> Cedric Ziel</p>
+  </header>
+
+  <h2>Summary</h2>
+  <p>Flowmark Media is a client app for Jellyfin and Jellyseerr media servers. The app talks only to the servers you explicitly configure. By default, no data is sent anywhere else. Optional diagnostic data is opt-in and never linked to your identity.</p>
+
+  <h2>What we collect</h2>
+
+  <h3>By default: nothing</h3>
+  <p>The app does not collect personal information, browsing history, viewing habits, location, contacts, or any usage data unless you explicitly opt in.</p>
+
+  <h3>Opt-in diagnostics</h3>
+  <p>If you enable Diagnostics in Settings, the app sends anonymous diagnostic data:</p>
+  <ul>
+    <li><strong>Crash reports</strong>: stack traces, exception types, termination reasons.</li>
+    <li><strong>Performance metrics</strong>: app launch time, hang duration, peak memory usage, cumulative CPU usage.</li>
+    <li><strong>Device context</strong>: device model identifier (e.g., <code>iPhone15,2</code>), iOS or tvOS version, app version and build number, locale, timezone.</li>
+  </ul>
+  <p>This data is not linked to your identity, your Apple ID, or your Jellyfin account. It is used solely to identify and fix bugs and performance regressions. You can disable it at any time in <em>Settings &rsaquo; Diagnostics</em>. Because reports are anonymous, already-sent data cannot be retroactively deleted &mdash; there is no link back to you.</p>
+
+  <h3>Server credentials</h3>
+  <p>When you connect to a Jellyfin or Jellyseerr server, your username, password or API token, and the server URL are stored in the iOS Keychain. If you have iCloud Keychain enabled, these credentials sync across your Apple devices using Apple's standard end-to-end-encrypted iCloud Keychain mechanism. Credentials are never sent to the app's developer.</p>
+
+  <h3>Server communication</h3>
+  <p>All communication with your Jellyfin and Jellyseerr servers happens directly between your device and those servers, using the URLs you provide. The app does not proxy, intercept, or relay this traffic through any service operated by the developer.</p>
+
+  <h2>What we don't do</h2>
+  <ul>
+    <li>No advertising SDKs.</li>
+    <li>No third-party analytics SDKs (Google Analytics, Firebase, Mixpanel, etc.).</li>
+    <li>No behavioral tracking across apps or services.</li>
+    <li>No data sharing with brokers or partners.</li>
+    <li>No sale of any data.</li>
+  </ul>
+
+  <h2>Children's privacy</h2>
+  <p>The app is not directed at children under 13 and does not knowingly collect data from children.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>If this policy changes materially, the change will be announced in the app's release notes and reflected in this document. The <em>Effective</em> date above will update accordingly.</p>
+
+  <h2>Contact</h2>
+  <p>Questions, requests, or concerns: <a href="mailto:cedric.ziel@gmail.com">cedric.ziel@gmail.com</a>.</p>
+  <p>Source code is publicly available at <a href="https://github.com/cedricziel/seer-app">github.com/cedricziel/seer-app</a>.</p>
+
+  <p class="footnote"><a href="./">&larr; Back to home</a></p>
+</main>
+</body>
+</html>
