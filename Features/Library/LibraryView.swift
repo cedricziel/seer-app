@@ -96,6 +96,14 @@ private struct LibraryContentView: View {
     private var contentView: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
+                if viewModel.isShowingCachedData {
+                    OfflineBanner(
+                        isOffline: true,
+                        lastSyncDate: viewModel.lastSyncDate,
+                        onRefresh: { Task { await viewModel.refresh() } }
+                    )
+                    .accessibilityIdentifier("library.offlineBanner")
+                }
                 if onboardingManager.isFirstLaunchAfterSetup {
                     firstTimeTipSection
                 }

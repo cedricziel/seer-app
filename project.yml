@@ -285,6 +285,22 @@ targets:
         DEFINES_MODULE: true
         GENERATE_INFOPLIST_FILE: true
 
+  SeerCoreTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, tvOS]
+    sources:
+      - path: Tests/SeerCoreTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: SeerCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.coretests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
   PlaybackClientTests:
     type: bundle.unit-test
     supportedDestinations: [iOS, tvOS]
@@ -315,22 +331,6 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.downloadclienttests
-        GENERATE_INFOPLIST_FILE: true
-        TEST_HOST: ""
-        BUNDLE_LOADER: ""
-
-  SeerCoreTests:
-    type: bundle.unit-test
-    supportedDestinations: [iOS, tvOS]
-    sources:
-      - path: Tests/SeerCoreTests
-        excludes:
-          - "**/.DS_Store"
-    dependencies:
-      - target: SeerCore
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.seercoretests
         GENERATE_INFOPLIST_FILE: true
         TEST_HOST: ""
         BUNDLE_LOADER: ""
@@ -392,9 +392,9 @@ schemes:
     build:
       targets:
         SeerApp: all
+        SeerCoreTests: [test]
         PlaybackClientTests: [test]
         DownloadClientTests: [test]
-        SeerCoreTests: [test]
         JellyfinClientTests: [test]
         JellyseerrClientTests: [test]
         OfflineSyncTests: [test]
@@ -410,9 +410,9 @@ schemes:
     test:
       config: Debug
       targets:
+        - SeerCoreTests
         - PlaybackClientTests
         - DownloadClientTests
-        - SeerCoreTests
         - JellyfinClientTests
         - JellyseerrClientTests
         - OfflineSyncTests

@@ -44,7 +44,7 @@ private struct ServerSetupContentView: View {
                     viewModel.clearError()
                 }
             } message: {
-                Text(viewModel.errorMessage ?? "An unknown error occurred")
+                Text(alertMessage)
             }
         }
         .task {
@@ -144,6 +144,7 @@ private struct ServerSetupContentView: View {
             }
 
             Section {
+                inlineErrorBanner
                 Button(action: {
                     Task {
                         await viewModel.connectToJellyfin()
@@ -211,6 +212,7 @@ private struct ServerSetupContentView: View {
             }
 
             Section {
+                inlineErrorBanner
                 Button(action: {
                     Task {
                         await viewModel.connectToJellyseerr()
@@ -296,6 +298,41 @@ private struct ServerSetupContentView: View {
             Text(isConnected ? "Connected" : "Not Connected")
                 .font(.subheadline)
                 .foregroundStyle(isConnected ? .green : .secondary)
+        }
+    }
+
+    /// Combines the formatted error message with its suggestion (if any) so
+    /// the alert always shows actionable guidance.
+    private var alertMessage: String {
+        let message = viewModel.errorMessage ?? "An unknown error occurred"
+        if let suggestion = viewModel.errorSuggestion, !suggestion.isEmpty {
+            return "\(message)\n\n\(suggestion)"
+        }
+        return message
+    }
+
+    @ViewBuilder
+    private var inlineErrorBanner: some View {
+        if let message = viewModel.errorMessage {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .accessibilityHidden(true)
+                    Text(message)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                if let suggestion = viewModel.errorSuggestion, !suggestion.isEmpty {
+                    Text(suggestion)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("auth.errorSuggestion")
+                }
+            }
+            .padding(.vertical, 4)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("auth.errorBanner")
         }
     }
 
