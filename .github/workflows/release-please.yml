@@ -132,6 +132,10 @@ jobs:
           ASC_KEY_ID:      ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID:   ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          # Plumbed through to fastlane's stage_release_notes! helper, which
+          # writes it to fastlane/metadata/en-US/release_notes.txt before
+          # upload_to_app_store runs. App Store renders this as plain text.
+          RELEASE_NOTES:   ${{ github.event.release.body }}
         run: |
           bundle exec fastlane submit_to_app_store \
             build:${{ steps.build.outputs.number }} \

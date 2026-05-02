@@ -32,7 +32,9 @@ make fastlane-beta         # ship a TestFlight build
 | `test` | Runs unit test bundles on the iOS simulator. |
 | `build` | Builds and exports a Release IPA into `build/` (no upload). |
 | `beta` | Archive + upload to TestFlight. |
-| `release` | Archive + upload to App Store Connect. Pass `submit:true` to also submit for review. |
+| `release` | Archive + upload to App Store Connect. Pass `submit:true` to also submit for review. Uploads metadata by default; pass `metadata:false` to skip. |
+| `submit_to_app_store` | Submits an existing TestFlight build to review without rebuilding. Uploads metadata by default; pass `metadata:false` to skip. |
+| `sync_metadata` | Pushes `fastlane/metadata/` to App Store Connect without touching the binary or screenshots. Useful for copy-only edits. |
 | `sync_signing` | Pulls signing certs/profiles via `match`. Pass `type:development\|appstore`. |
 | `bootstrap_signing` | One-time: creates new certs/profiles in your match repo. |
 | `refresh_dsyms` | Downloads dSYMs from App Store Connect and uploads them to your crash backend. |
@@ -125,6 +127,75 @@ git ls-files | grep -E '(^|/)\.env$'                       # must be empty
 
 The `.gitignore` already excludes all of the above plus any `fastlane/.env*`
 files.
+
+## App Store metadata
+
+Fastlane's `deliver` action manages App Store Connect text fields (description,
+keywords, subtitle, promotional text, release notes, support/privacy/marketing
+URLs, categories, review contact info, age rating, etc.) as plain files under
+`fastlane/metadata/<locale>/`. Screenshots and previews live under
+`fastlane/screenshots/<locale>/` — those PNGs are gitignored, the metadata text
+files are tracked.
+
+### Seeding the tree
+
+If `fastlane/metadata/` doesn't exist yet, pull the current live listing
+once. `deliver` only exposes downloads via its CLI subcommand and expects an
+ASC API key in JSON form, so do this from a shell with your `.env` loaded:
+
+```bash
+# fastlane/metadata/api_key.json (gitignored — DO NOT commit)
+cat > fastlane/metadata/api_key.json <<EOF
+{ "key_id": "$ASC_KEY_ID",
+  "issuer_id": "$ASC_ISSUER_ID",
+  "key": $(jq -Rs . < "$ASC_KEY_PATH"),
+  "duration": 1200,
+  "in_house": false }
+EOF
+
+bundle exec fastlane deliver download_metadata \
+  --api_key_path fastlane/metadata/api_key.json \
+  --app_identifier com.cedricziel.seer \
+  --force
+
+rm fastlane/metadata/api_key.json
+```
+
+Commit the resulting `fastlane/metadata/<locale>/*.txt` files. From there,
+edit text files in git like any other source.
+
+### Pushing copy-only changes
+
+Edited a description or set of keywords without rebuilding the app? Push it:
+
+```bash
+make fastlane-sync-metadata
+```
+
+This skips the binary and screenshots and just syncs the text fields.
+
+### Release notes from release-please
+
+The `app-store` GitHub Actions job (in `.github/workflows/release-please.yml`)
+passes the GitHub release body via the `RELEASE_NOTES` environment variable.
+The Fastfile's `stage_release_notes!` helper writes it to
+`fastlane/metadata/en-US/release_notes.txt` before `upload_to_app_store` runs,
+so each App Store submission inherits the same notes that drove the
+release-please version bump.
+
+App Store release notes are plain text and capped at 4000 characters. If your
+release-please body uses heavy markdown, either tighten the
+`release-notes-section` template in `release-please-config.json` or override
+per-release by editing `release_notes.txt` and committing before the release
+is graduated.
+
+### What `deliver` doesn't manage
+
+- **App Privacy "Data Types" labels** — managed manually in App Store Connect
+  (or via the App Store Connect API directly). See `docs/app-store-privacy.md`.
+- **Pricing & availability** — separate App Store Connect API.
+- **In-app purchases / subscriptions** — N/A for Seer today; would require a
+  separate workflow if added.
 
 ## Troubleshooting
 

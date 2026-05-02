@@ -1,5 +1,6 @@
 .PHONY: generate build build-release lint format clean open test version \
         fastlane-install fastlane-test fastlane-build fastlane-beta fastlane-release fastlane-match fastlane-bootstrap-signing \
+        fastlane-sync-metadata \
         _ensure-brew-ruby
 
 # Default simulator destination
@@ -104,3 +105,6 @@ fastlane-match: _ensure-brew-ruby generate
 
 fastlane-bootstrap-signing: _ensure-brew-ruby generate
 	$(BUNDLE) exec fastlane bootstrap_signing
+
+fastlane-sync-metadata: _ensure-brew-ruby
+	$(BUNDLE) exec fastlane sync_metadata
