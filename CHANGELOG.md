@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.3.0](https://github.com/cedricziel/seer-app/compare/v0.2.5...v0.3.0) (2026-05-02)
+
+
+### Features
+
+* address five quick-win user workflow improvements ([#14](https://github.com/cedricziel/seer-app/issues/14)) ([2ff0752](https://github.com/cedricziel/seer-app/commit/2ff075266b509fcb5750f1d39c6f562f27ffd4b6))
+* **fastlane:** manage App Store metadata via deliver ([6cdafe0](https://github.com/cedricziel/seer-app/commit/6cdafe0a6549bb13778ffc3d3beeadf9cb6f6a70))
+* **jellyfin-client:** add BonjourDiscovery and QuickConnectSession ([ce50f3c](https://github.com/cedricziel/seer-app/commit/ce50f3cb54bcdbe9a8045f402b17077631d0946e))
+* **jellyseerr:** defer connect to on-demand prompts ([afb2525](https://github.com/cedricziel/seer-app/commit/afb252515303734df12daa47f312c11488c8da76))
+* **onboarding:** adapt WelcomeView for landscape and iPad split ([ac5eca5](https://github.com/cedricziel/seer-app/commit/ac5eca5ce9c89522480c4e288a2031db02623c1d))
+* **onboarding:** add Bonjour entitlement + streamlined-onboarding flag ([0f298da](https://github.com/cedricziel/seer-app/commit/0f298da4a853931cd64f40a05943273cba328589))
+* **onboarding:** add WelcomeView, QuickConnectView, ManualServerEntryView ([2c89ff0](https://github.com/cedricziel/seer-app/commit/2c89ff0a4769c650c295211afe92197c4e41dd59))
+* **onboarding:** cutover — flip flag default + docs update ([8c26426](https://github.com/cedricziel/seer-app/commit/8c264263cb77eb2ba770c113346d397e9651c292))
+* **onboarding:** HIG audit pass + accessibility fixes ([59408fe](https://github.com/cedricziel/seer-app/commit/59408fe62263c8b7596b891b8d386a41575146c0))
+* **onboarding:** tvOS adaptation + cross-platform color cleanup ([850ea63](https://github.com/cedricziel/seer-app/commit/850ea636aca0cc7e31ef716ed6d00f58e7169cf7))
+* **onboarding:** wire OnboardingViewModel + flag-gated ContentView ([f2e679b](https://github.com/cedricziel/seer-app/commit/f2e679bde244790122b67c4ceedf7b1861cbf683))
+* **playback:** enable AirPlay routing + Now-Playing metadata ([#17](https://github.com/cedricziel/seer-app/issues/17)) ([8c73a37](https://github.com/cedricziel/seer-app/commit/8c73a37bcac4a2a4be715346210e5d20a706ac23))
+* **screenshots:** add fastlane snapshot setup driving the demo Jellyfin server ([67de04b](https://github.com/cedricziel/seer-app/commit/67de04bd02131ce996dc06b1e2a2344ff8552b52))
+* **screenshots:** add local Jellyfin Docker instance for screenshot runs ([75a8828](https://github.com/cedricziel/seer-app/commit/75a8828bd42f6a16639a64745cad5b1a05e6c590))
+* **screenshots:** make UI test parametric and dismiss Save Password ([0fdeada](https://github.com/cedricziel/seer-app/commit/0fdeadaf1675bbcc6d71b5c51e3b022faf00c4ef))
+* **seer-core:** add ServerInfoFetcher and reachability fallback ([3bfef9c](https://github.com/cedricziel/seer-app/commit/3bfef9c94bf5d46c95b5da60580d2dcdea8df3e2))
+* **seer-ui:** add JellyseerrConnectSheet with snapshot coverage ([b3bf7cd](https://github.com/cedricziel/seer-app/commit/b3bf7cd6822e0c067d3e8535edb142181229adde))
+* **site:** publish privacy policy and landing page via GitHub Pages ([e2e2cda](https://github.com/cedricziel/seer-app/commit/e2e2cdab13f68681cf53baab7ed05cc032a2a178))
+* **telemetry:** onboarding funnel events + gitignore housekeeping ([0119e89](https://github.com/cedricziel/seer-app/commit/0119e8965faaa8682da7e27495d985a9e632d052))
+
+
+### Bug Fixes
+
+* **auth:** never show raw HTTP response bodies in auth error alerts ([7d9c9b1](https://github.com/cedricziel/seer-app/commit/7d9c9b1b1be9b454af4eec1614578e6cd6b37382))
+* **fastlane:** clear stray hex-dump content from demo_password.txt ([4595b14](https://github.com/cedricziel/seer-app/commit/4595b1412cdac4359b20bb6b502d538a5bd08569))
+* **screenshots:** work around iOS 26.4.1 simulator destination mismatch ([8a0dbfb](https://github.com/cedricziel/seer-app/commit/8a0dbfb3c2c2bd62ff1eadd4436c340e07c058be))
+
 ## [0.2.5](https://github.com/cedricziel/seer-app/compare/v0.2.4...v0.2.5) (2026-05-02)
 
 
