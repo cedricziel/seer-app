@@ -4,8 +4,8 @@ import XCTest
 final class UserInfoTests: XCTestCase {
     // MARK: - displayName
 
-    func testDisplayName_prefersJellyfinUsername() {
-        let user = makeUser(
+    func testDisplayName_prefersJellyfinUsername() throws {
+        let user = try makeUser(
             email: "user@example.com",
             plexUsername: "plexuser",
             jellyfinUsername: "jelly",
@@ -14,8 +14,8 @@ final class UserInfoTests: XCTestCase {
         XCTAssertEqual(user.displayName, "jelly")
     }
 
-    func testDisplayName_fallsBackToPlexUsername() {
-        let user = makeUser(
+    func testDisplayName_fallsBackToPlexUsername() throws {
+        let user = try makeUser(
             email: "user@example.com",
             plexUsername: "plexuser",
             jellyfinUsername: nil,
@@ -24,8 +24,8 @@ final class UserInfoTests: XCTestCase {
         XCTAssertEqual(user.displayName, "plexuser")
     }
 
-    func testDisplayName_fallsBackToUsername() {
-        let user = makeUser(
+    func testDisplayName_fallsBackToUsername() throws {
+        let user = try makeUser(
             email: "user@example.com",
             plexUsername: nil,
             jellyfinUsername: nil,
@@ -34,8 +34,8 @@ final class UserInfoTests: XCTestCase {
         XCTAssertEqual(user.displayName, "user")
     }
 
-    func testDisplayName_fallsBackToEmail() {
-        let user = makeUser(
+    func testDisplayName_fallsBackToEmail() throws {
+        let user = try makeUser(
             email: "user@example.com",
             plexUsername: nil,
             jellyfinUsername: nil,
@@ -44,8 +44,8 @@ final class UserInfoTests: XCTestCase {
         XCTAssertEqual(user.displayName, "user@example.com")
     }
 
-    func testDisplayName_allNil_returnsUser() {
-        let user = makeUser(
+    func testDisplayName_allNil_returnsUser() throws {
+        let user = try makeUser(
             email: nil,
             plexUsername: nil,
             jellyfinUsername: nil,
@@ -56,62 +56,62 @@ final class UserInfoTests: XCTestCase {
 
     // MARK: - userTypeDescription
 
-    func testUserTypeDescription_plex_returnsPlexUser() {
-        XCTAssertEqual(makeUser(userType: 1).userTypeDescription, "Plex User")
+    func testUserTypeDescription_plex_returnsPlexUser() throws {
+        XCTAssertEqual(try makeUser(userType: 1).userTypeDescription, "Plex User")
     }
 
-    func testUserTypeDescription_local_returnsLocalUser() {
-        XCTAssertEqual(makeUser(userType: 2).userTypeDescription, "Local User")
+    func testUserTypeDescription_local_returnsLocalUser() throws {
+        XCTAssertEqual(try makeUser(userType: 2).userTypeDescription, "Local User")
     }
 
-    func testUserTypeDescription_jellyfin_returnsJellyfinUser() {
-        XCTAssertEqual(makeUser(userType: 3).userTypeDescription, "Jellyfin User")
+    func testUserTypeDescription_jellyfin_returnsJellyfinUser() throws {
+        XCTAssertEqual(try makeUser(userType: 3).userTypeDescription, "Jellyfin User")
     }
 
-    func testUserTypeDescription_unknownValue_returnsUnknown() {
-        XCTAssertEqual(makeUser(userType: 99).userTypeDescription, "Unknown")
+    func testUserTypeDescription_unknownValue_returnsUnknown() throws {
+        XCTAssertEqual(try makeUser(userType: 99).userTypeDescription, "Unknown")
     }
 
     // MARK: - Permission Helpers
 
-    func testIsAdmin_adminPermission_returnsTrue() {
-        XCTAssertTrue(makeUser(permissions: 2).isAdmin)
+    func testIsAdmin_adminPermission_returnsTrue() throws {
+        XCTAssertTrue(try makeUser(permissions: 2).isAdmin)
     }
 
-    func testIsAdmin_nonAdmin_returnsFalse() {
-        XCTAssertFalse(makeUser(permissions: 32).isAdmin) // request only
+    func testIsAdmin_nonAdmin_returnsFalse() throws {
+        XCTAssertFalse(try makeUser(permissions: 32).isAdmin) // request only
     }
 
-    func testCanManageRequests_admin_returnsTrue() {
-        XCTAssertTrue(makeUser(permissions: 2).canManageRequests)
+    func testCanManageRequests_admin_returnsTrue() throws {
+        XCTAssertTrue(try makeUser(permissions: 2).canManageRequests)
     }
 
-    func testCanManageRequests_manageRequestsPermission_returnsTrue() {
-        XCTAssertTrue(makeUser(permissions: 16).canManageRequests)
+    func testCanManageRequests_manageRequestsPermission_returnsTrue() throws {
+        XCTAssertTrue(try makeUser(permissions: 16).canManageRequests)
     }
 
-    func testCanManageRequests_basicRequest_returnsFalse() {
-        XCTAssertFalse(makeUser(permissions: 32).canManageRequests)
+    func testCanManageRequests_basicRequest_returnsFalse() throws {
+        XCTAssertFalse(try makeUser(permissions: 32).canManageRequests)
     }
 
-    func testCanRequest4K_basicUser_returnsFalse() {
-        XCTAssertFalse(makeUser(permissions: 32).canRequest4K)
+    func testCanRequest4K_basicUser_returnsFalse() throws {
+        XCTAssertFalse(try makeUser(permissions: 32).canRequest4K)
     }
 
-    func testCanRequest4K_request4KPermission_returnsTrue() {
-        XCTAssertTrue(makeUser(permissions: 1024).canRequest4K)
+    func testCanRequest4K_request4KPermission_returnsTrue() throws {
+        XCTAssertTrue(try makeUser(permissions: 1024).canRequest4K)
     }
 
-    func testCanUseAdvancedRequest_admin_returnsTrue() {
-        XCTAssertTrue(makeUser(permissions: 2).canUseAdvancedRequest)
+    func testCanUseAdvancedRequest_admin_returnsTrue() throws {
+        XCTAssertTrue(try makeUser(permissions: 2).canUseAdvancedRequest)
     }
 
-    func testCanUseAdvancedRequest_advancedPermission_returnsTrue() {
-        XCTAssertTrue(makeUser(permissions: 8192).canUseAdvancedRequest)
+    func testCanUseAdvancedRequest_advancedPermission_returnsTrue() throws {
+        XCTAssertTrue(try makeUser(permissions: 8192).canUseAdvancedRequest)
     }
 
-    func testCanUseAdvancedRequest_basic_returnsFalse() {
-        XCTAssertFalse(makeUser(permissions: 32).canUseAdvancedRequest)
+    func testCanUseAdvancedRequest_basic_returnsFalse() throws {
+        XCTAssertFalse(try makeUser(permissions: 32).canUseAdvancedRequest)
     }
 
     // MARK: - Decoding
@@ -160,7 +160,7 @@ final class UserInfoTests: XCTestCase {
         username: String? = nil,
         userType: Int = 3,
         permissions: Int = 0
-    ) -> UserInfo {
+    ) throws -> UserInfo {
         let json = """
         {
           "id": \(id),
@@ -181,6 +181,6 @@ final class UserInfoTests: XCTestCase {
           "requestCount": 0
         }
         """.data(using: .utf8)!
-        return try! JSONDecoder().decode(UserInfo.self, from: json)
+        return try JSONDecoder().decode(UserInfo.self, from: json)
     }
 }

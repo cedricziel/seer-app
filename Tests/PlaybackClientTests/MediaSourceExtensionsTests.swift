@@ -88,9 +88,10 @@ final class MediaSourceExtensionsTests: XCTestCase {
 
     // MARK: - Runtime
 
-    func testRuntimeSeconds_oneHour() {
+    func testRuntimeSeconds_oneHour() throws {
         let source = makeSource(streams: nil, runTimeTicks: 36_000_000_000)
-        XCTAssertEqual(source.runtimeSeconds, 3600.0, accuracy: 0.001)
+        let seconds = try XCTUnwrap(source.runtimeSeconds)
+        XCTAssertEqual(seconds, 3600.0, accuracy: 0.001)
     }
 
     func testRuntimeSeconds_nilTicks_returnsNil() {
