@@ -21,6 +21,11 @@ end
 
 before_all do |lane, options|
   Dotenv.load(".env") if File.exist?(".env")
+  # Without setup_ci, codesign on macOS runners hangs forever waiting for
+  # an interactive keychain unlock when signing SPM-derived frameworks.
+  # setup_ci creates a temp keychain, imports certs, and bless the private
+  # key for non-interactive use.
+  setup_ci if is_ci
   ensure_xcode_project_generated
 end
 
