@@ -33,8 +33,8 @@ public final class SearchViewModel: ObservableObject {
     // MARK: - Configuration
 
     /// Debounce window before issuing a search request. Exposed so tests can
-    /// drive a short interval.
-    static let defaultDebounceMilliseconds: Int = 300
+    /// drive a short interval. Public so the `init` default arg can reach it.
+    public static let defaultDebounceMilliseconds: Int = 300
 
     // MARK: - Private Properties
 
