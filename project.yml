@@ -405,6 +405,8 @@ targets:
       - target: SeerCore
       - target: JellyfinClient
       - target: SeerUI
+      - package: SnapshotTesting
+        product: SnapshotTesting
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.authfeaturetests

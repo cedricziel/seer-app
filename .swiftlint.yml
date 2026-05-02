@@ -2,6 +2,10 @@ excluded:
   - Packages/JellyseerrAPI
   - vendor
   - Tests/SeerAppUITests/SnapshotHelper.swift
+  # Stale checkouts created by isolated agent runs / git worktrees. They
+  # live under the project root so SwiftLint would otherwise lint their
+  # generated code.
+  - .claude/worktrees
 
 line_length:
   warning: 120
