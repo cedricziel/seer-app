@@ -125,17 +125,17 @@ final class SearchResultTests: XCTestCase {
     // MARK: - MediaType decoding
 
     func testDecode_movieMediaType() throws {
-        let json = """
+        let json = Data("""
         {"id": 1, "mediaType": "movie", "title": "X"}
-        """.data(using: .utf8)!
+        """.utf8)
         let result = try JSONDecoder().decode(SearchResult.self, from: json)
         XCTAssertEqual(result.mediaType, .movie)
     }
 
     func testDecode_tvShowMediaType() throws {
-        let json = """
+        let json = Data("""
         {"id": 1, "mediaType": "tv", "name": "X"}
-        """.data(using: .utf8)!
+        """.utf8)
         let result = try JSONDecoder().decode(SearchResult.self, from: json)
         XCTAssertEqual(result.mediaType, .tvShow)
     }

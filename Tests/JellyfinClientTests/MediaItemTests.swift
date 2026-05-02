@@ -137,7 +137,7 @@ final class MediaItemTests: XCTestCase {
     // MARK: - Decoding from JSON with MediaSources
 
     func testDecode_extractsContainerAndCodecsFromMediaSources() throws {
-        let json = """
+        let json = Data("""
         {
           "Id": "abc",
           "Name": "Test Movie",
@@ -152,7 +152,7 @@ final class MediaItemTests: XCTestCase {
             }
           ]
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let item = try JSONDecoder().decode(MediaItem.self, from: json)
 
@@ -173,7 +173,7 @@ final class MediaItemTests: XCTestCase {
             (2160, "4K"),
             (4320, "4K")
         ] {
-            let json = """
+            let json = Data("""
             {
               "Id": "abc",
               "Name": "Test",
@@ -187,22 +187,22 @@ final class MediaItemTests: XCTestCase {
                 }
               ]
             }
-            """.data(using: .utf8)!
+            """.utf8)
             let item = try JSONDecoder().decode(MediaItem.self, from: json)
             XCTAssertEqual(item.videoResolution, expected, "Height \(height) should map to \(expected)")
         }
     }
 
     func testDecode_unknownMediaType_fallsBackToUnknown() throws {
-        let json = """
+        let json = Data("""
         {"Id": "abc", "Name": "Test", "Type": "SomethingNew"}
-        """.data(using: .utf8)!
+        """.utf8)
         let item = try JSONDecoder().decode(MediaItem.self, from: json)
         XCTAssertEqual(item.type, .unknown)
     }
 
     func testDecode_directProperties_takePrecedenceOverMediaSources() throws {
-        let json = """
+        let json = Data("""
         {
           "Id": "abc",
           "Name": "Test",
@@ -213,7 +213,7 @@ final class MediaItemTests: XCTestCase {
             {"Container": "mkv", "MediaStreams": [{"Type": "Video", "Codec": "h264"}]}
           ]
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let item = try JSONDecoder().decode(MediaItem.self, from: json)
 

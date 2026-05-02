@@ -164,7 +164,7 @@ final class MediaRequestTests: XCTestCase {
         name: String? = nil,
         originalTitle: String? = nil
     ) throws -> MediaRequest.MediaDetails {
-        let json = """
+        let json = Data("""
         {
           "id": \(id),
           "tmdbId": \(tmdbId.map(String.init) ?? "null"),
@@ -178,7 +178,7 @@ final class MediaRequestTests: XCTestCase {
           "originalTitle": \(originalTitle.map { "\"\($0)\"" } ?? "null"),
           "posterPath": null
         }
-        """.data(using: .utf8)!
+        """.utf8)
         return try JSONDecoder().decode(MediaRequest.MediaDetails.self, from: json)
     }
 
@@ -189,7 +189,7 @@ final class MediaRequestTests: XCTestCase {
         username: String? = nil,
         email: String? = nil
     ) throws -> MediaRequest.User {
-        let json = """
+        let json = Data("""
         {
           "id": \(id),
           "email": \(email.map { "\"\($0)\"" } ?? "null"),
@@ -204,12 +204,12 @@ final class MediaRequestTests: XCTestCase {
           "updatedAt": null,
           "requestCount": null
         }
-        """.data(using: .utf8)!
+        """.utf8)
         return try JSONDecoder().decode(MediaRequest.User.self, from: json)
     }
 
     private func makeRequest(createdAt: String) throws -> MediaRequest {
-        let json = """
+        let json = Data("""
         {
           "id": 1,
           "status": 1,
@@ -235,7 +235,7 @@ final class MediaRequestTests: XCTestCase {
           "modifiedBy": null,
           "seasons": null
         }
-        """.data(using: .utf8)!
+        """.utf8)
         return try JSONDecoder().decode(MediaRequest.self, from: json)
     }
 }

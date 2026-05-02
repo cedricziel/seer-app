@@ -39,9 +39,9 @@ final class PlaybackStateTests: XCTestCase {
 
     func testWithPosition_updatesPositionOnly() {
         let original = makeState(positionTicks: 100, isPaused: true, volumeLevel: 50)
-        let updated = original.withPosition(ticks: 5_000)
+        let updated = original.withPosition(ticks: 5000)
 
-        XCTAssertEqual(updated.positionTicks, 5_000)
+        XCTAssertEqual(updated.positionTicks, 5000)
         XCTAssertEqual(updated.isPaused, true)
         XCTAssertEqual(updated.volumeLevel, 50)
         XCTAssertEqual(updated.itemId, original.itemId)

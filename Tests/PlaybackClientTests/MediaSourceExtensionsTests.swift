@@ -102,13 +102,13 @@ final class MediaSourceExtensionsTests: XCTestCase {
     // MARK: - StreamType decoding falls back to unknown
 
     func testStreamType_unknownValue_decodesToUnknown() throws {
-        let json = """
+        let json = Data("""
         {
           "Index": 0,
           "Type": "Magic",
           "Codec": "x"
         }
-        """.data(using: .utf8)!
+        """.utf8)
         let stream = try JSONDecoder().decode(MediaStream.self, from: json)
         XCTAssertEqual(stream.type, .unknown)
     }

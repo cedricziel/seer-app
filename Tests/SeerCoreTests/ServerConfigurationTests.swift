@@ -62,8 +62,8 @@ final class ServerConfigurationTests: XCTestCase {
         XCTAssertEqual(config.jellyfinHost, "jellyfin.example.com")
     }
 
-    func testJellyfinHost_urlWithPort_returnsHostOnly() {
-        let url = URL(string: "http://192.168.1.10:8096")!
+    func testJellyfinHost_urlWithPort_returnsHostOnly() throws {
+        let url = try XCTUnwrap(URL(string: "http://192.168.1.10:8096"))
         let config = ServerConfiguration(name: "Test", jellyfinURL: url)
         XCTAssertEqual(config.jellyfinHost, "192.168.1.10")
     }

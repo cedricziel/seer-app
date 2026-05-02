@@ -117,7 +117,7 @@ final class UserInfoTests: XCTestCase {
     // MARK: - Decoding
 
     func testDecode_validJSON_decodesCorrectly() throws {
-        let json = """
+        let json = Data("""
         {
           "id": 5,
           "email": "test@example.com",
@@ -136,7 +136,7 @@ final class UserInfoTests: XCTestCase {
           "updatedAt": "2024-06-01T00:00:00.000Z",
           "requestCount": 42
         }
-        """.data(using: .utf8)!
+        """.utf8)
 
         let user = try JSONDecoder().decode(UserInfo.self, from: json)
 
@@ -161,7 +161,7 @@ final class UserInfoTests: XCTestCase {
         userType: Int = 3,
         permissions: Int = 0
     ) throws -> UserInfo {
-        let json = """
+        let json = Data("""
         {
           "id": \(id),
           "email": \(email.map { "\"\($0)\"" } ?? "null"),
@@ -180,7 +180,7 @@ final class UserInfoTests: XCTestCase {
           "updatedAt": "2024-01-01T00:00:00.000Z",
           "requestCount": 0
         }
-        """.data(using: .utf8)!
+        """.utf8)
         return try JSONDecoder().decode(UserInfo.self, from: json)
     }
 }
