@@ -10,3 +10,4 @@
 --exclude Packages/JellyseerrAPI/Sources/JellyseerrAPI/Generated
 --exclude Packages/JellyseerrAPI/.build
 --exclude vendor
+--exclude Tests/SeerAppUITests/SnapshotHelper.swift

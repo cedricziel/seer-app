@@ -1,6 +1,7 @@
 excluded:
   - Packages/JellyseerrAPI
   - vendor
+  - Tests/SeerAppUITests/SnapshotHelper.swift
 
 line_length:
   warning: 120

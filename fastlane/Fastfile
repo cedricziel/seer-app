@@ -172,6 +172,11 @@ lane :release do |options|
   )
 end
 
+desc "Generate App Store screenshots via the SeerAppUITests UI test (uses the public Jellyfin demo)"
+lane :screenshots do
+  capture_ios_screenshots
+end
+
 desc "Sync signing certificates and provisioning profiles via match"
 lane :sync_signing do |options|
   type = options[:type] || "development"

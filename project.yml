@@ -390,6 +390,24 @@ targets:
         TEST_HOST: ""
         BUNDLE_LOADER: ""
 
+  # UI test target dedicated to driving the app for fastlane snapshot.
+  # Not part of the regular `make test` pipeline because it depends on the
+  # public Jellyfin demo server being reachable.
+  SeerAppUITests:
+    type: bundle.ui-testing
+    supportedDestinations: [iOS]
+    sources:
+      - path: Tests/SeerAppUITests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: SeerApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.uitests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_TARGET_NAME: SeerApp
+
 schemes:
   SeerApp:
     build:
@@ -425,3 +443,18 @@ schemes:
       config: Debug
     archive:
       config: Release
+
+  # Dedicated scheme for fastlane snapshot. Builds the app + UI test target
+  # only — kept out of the SeerApp scheme so `make test` doesn't try to talk
+  # to the public Jellyfin demo on every run.
+  SeerAppUITests:
+    build:
+      targets:
+        SeerApp: all
+        SeerAppUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - SeerAppUITests

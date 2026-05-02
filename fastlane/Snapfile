@@ -1,0 +1,39 @@
+# fastlane snapshot configuration. Run via `make fastlane-screenshots`.
+# Output lands in `fastlane/screenshots/<locale>/<device>/`.
+
+devices([
+  "iPhone 17 Pro Max",
+  "iPad Pro 13-inch (M4)"
+])
+
+languages([
+  "en-US"
+])
+
+scheme("SeerAppUITests")
+project("SeerApp.xcodeproj")
+
+# Pre-clean the screenshots directory each run so deleted screenshots
+# don't linger. Combined with overwrite_screenshots in the lane, this
+# guarantees fastlane/screenshots/ reflects the latest UI test state only.
+clear_previous_screenshots(true)
+
+# Skip the auto-opening summary HTML — irrelevant in CI and noisy locally.
+skip_open_summary(true)
+
+# Reset every simulator before runs so Keychain credentials and onboarding
+# state from the last run don't leak into this one. Without this, the test
+# would skip onboarding because credentials are already saved, and the
+# screenshots would land on whichever screen the previous run ended on.
+erase_simulator(true)
+
+# Run device passes serially. Concurrent simulator runs occasionally
+# clobber each other's screenshots when both target the same locale.
+concurrent_simulators(false)
+
+# Run with the simulator window visible — useful for spotting UI bugs
+# during local runs. CI doesn't have a display so it ignores this.
+headless(false)
+
+# UI tests against a slow public demo server need generous timeouts.
+test_without_building(false)
