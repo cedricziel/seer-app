@@ -37,3 +37,10 @@ headless(false)
 
 # UI tests against a slow public demo server need generous timeouts.
 test_without_building(false)
+
+# Connection details for the test live in SnapshotTests.swift. Defaults
+# (http://localhost:8096, demo/demo) match the Docker setup at
+# docker/jellyfin/. To override against a different server, edit those
+# constants — env-var propagation through xcodebuild → simulator test
+# process is fiddly enough that hardcoded defaults are the pragmatic
+# choice for now.

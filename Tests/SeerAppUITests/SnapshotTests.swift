@@ -14,6 +14,13 @@ import XCTest
 /// reliability, consider a launch-arg-driven fixture mode instead.
 @MainActor
 final class SnapshotTests: XCTestCase {
+    private static let serverURL: String = ProcessInfo.processInfo.environment["SCREENSHOT_JELLYFIN_URL"]
+        ?? "http://localhost:8096"
+
+    private static let username: String = ProcessInfo.processInfo.environment["SCREENSHOT_JELLYFIN_USER"] ?? "demo"
+
+    private static let password: String = ProcessInfo.processInfo.environment["SCREENSHOT_JELLYFIN_PASS"] ?? "demo"
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
@@ -43,16 +50,23 @@ final class SnapshotTests: XCTestCase {
         }
 
         serverField.tap()
-        serverField.typeText("https://demo.jellyfin.org/stable")
+        serverField.typeText(Self.serverURL)
 
         let usernameField = app.textFields["Username"]
         XCTAssertTrue(usernameField.waitForExistence(timeout: 5))
         usernameField.tap()
-        usernameField.typeText("demo")
+        usernameField.typeText(Self.username)
 
-        // Password is intentionally left empty — the public demo doesn't require one.
+        if !Self.password.isEmpty {
+            let passwordField = app.secureTextFields["Password"]
+            if passwordField.waitForExistence(timeout: 5) {
+                passwordField.tap()
+                passwordField.typeText(Self.password)
+            }
+        }
 
         app.buttons["Connect"].tap()
+        dismissSavePasswordPrompt()
     }
 
     private func skipJellyseerr(app: XCUIApplication) {
@@ -60,6 +74,24 @@ final class SnapshotTests: XCTestCase {
         // Wait generously — Jellyfin connection can be slow against the public demo.
         if skipButton.waitForExistence(timeout: 45) {
             skipButton.tap()
+        }
+    }
+
+    /// iOS 18+ shows a Springboard "Save Password?" sheet whenever a
+    /// SecureField is submitted. Without dismissing it, every screenshot
+    /// from Library onward is overlaid with the sheet. Tap "Not Now" /
+    /// "Später" / equivalents from outside the app process.
+    private func dismissSavePasswordPrompt() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        // Apple uses different button labels across iOS versions and locales.
+        // "Not Now" is the canonical English copy; "Später" is German.
+        let candidates = ["Not Now", "Später", "Nicht jetzt", "Later", "Cancel", "Abbrechen"]
+        for label in candidates {
+            let button = springboard.buttons[label]
+            if button.waitForExistence(timeout: 3) {
+                button.tap()
+                return
+            }
         }
     }
 
