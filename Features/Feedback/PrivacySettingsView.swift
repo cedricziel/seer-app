@@ -4,15 +4,43 @@ import SwiftUI
 /// Settings view for managing privacy and diagnostics preferences
 struct PrivacySettingsView: View {
     @StateObject private var consent = DiagnosticsConsent.shared
+    @EnvironmentObject private var appState: AppState
 
     var body: some View {
         List {
             diagnosticsSection
+            spotlightIndexSection
             dataCollectionInfoSection
             privacyLinksSection
         }
         .navigationTitle("Privacy")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var spotlightIndexSection: some View {
+        Section {
+            Toggle(isOn: $appState.appIntentsIndexingEnabled) {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Index for Spotlight & Siri")
+                        Text("Surface library titles in system search and voice shortcuts")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.purple)
+                }
+            }
+        } header: {
+            Text("App Intents")
+        } footer: {
+            Text(
+                "When enabled, Spotlight semantically indexes the title, year, and "
+                    + "type of items in your library — not posters, descriptions, or "
+                    + "watched state. Applies only to this device; not synced via iCloud."
+            )
+        }
     }
 
     // MARK: - Sections
