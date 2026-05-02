@@ -59,6 +59,10 @@ public final class SearchViewModel: ObservableObject {
     }
 
     private func setupService() {
+        // Always clear first so a switch to an unconfigured server doesn't
+        // leak the previous Jellyseerr client into the next session.
+        jellyseerrService = nil
+
         guard let serverURL = appState.jellyseerrServerURL,
               let apiKey = appState.jellyseerrAPIKey
         else {
@@ -98,6 +102,7 @@ public final class SearchViewModel: ObservableObject {
             hasSearched = false
             isSearching = false
             isDebouncing = false
+            errorMessage = nil
             return
         }
 

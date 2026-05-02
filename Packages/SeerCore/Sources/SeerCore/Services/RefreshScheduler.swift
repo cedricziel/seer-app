@@ -34,6 +34,10 @@ public final class RefreshScheduler {
                 do {
                     try await clock.sleep(for: interval)
                 } catch {
+                    // Reset state so a later start() call isn't ignored
+                    // because we still look "running" after sleep failed.
+                    self?.task = nil
+                    self?.isRunning = false
                     return
                 }
                 guard !Task.isCancelled, let self else { return }

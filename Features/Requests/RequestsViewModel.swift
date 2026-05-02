@@ -86,6 +86,10 @@ public final class RequestsViewModel: ObservableObject {
     }
 
     private func setupService() {
+        // Always clear first so a switch to an unconfigured server doesn't
+        // leak the previous Jellyseerr client into the next session.
+        jellyseerrService = nil
+
         guard let serverURL = appState.jellyseerrServerURL,
               let apiKey = appState.jellyseerrAPIKey
         else {
@@ -93,6 +97,20 @@ public final class RequestsViewModel: ObservableObject {
         }
 
         jellyseerrService = JellyseerrService(serverURL: serverURL, apiKey: apiKey)
+    }
+
+    /// Tear down auto-refresh, rebuild the Jellyseerr client against the
+    /// new active server, then refresh and resume polling.
+    func handleActiveServerChange() async {
+        stopAutoRefresh()
+        setupService()
+        currentSkip = 0
+        hasMoreItems = true
+        requests = []
+        mediaTitles = [:]
+        mediaPosterPaths = [:]
+        await loadRequests()
+        startAutoRefresh()
     }
 
     // MARK: - Public Methods
@@ -202,6 +220,10 @@ public final class RequestsViewModel: ObservableObject {
     /// Refreshes without flipping `isLoading` so we don't yank the list
     /// from under the user mid-scroll.
     func silentRefresh() async {
+        // Skip if a manual load is already in flight — otherwise the poll
+        // could finish last and reset `requests`/`currentSkip`, dropping
+        // freshly-loaded rows or yanking the list mid-scroll.
+        guard !isLoading, !isLoadingMore else { return }
         guard let service = jellyseerrService else { return }
         do {
             let response = try await service.getRequests(

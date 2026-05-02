@@ -116,10 +116,8 @@ private struct RequestsContentView: View {
             viewModel.stopAutoRefresh()
         }
         .onChange(of: appState.activeServerID) {
-            viewModel.stopAutoRefresh()
             Task {
-                await viewModel.refresh()
-                viewModel.startAutoRefresh()
+                await viewModel.handleActiveServerChange()
             }
         }
     }

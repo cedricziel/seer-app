@@ -63,14 +63,13 @@ public enum AuthErrorFormatter {
     /// Maps a thrown error into actionable advice. Falls back to the
     /// localized description when no specific suggestion fits.
     public static func advice(for error: Error, urlString: String? = nil) -> AuthErrorAdvice {
+        // Apple's `as? URLError` already bridges from NSError when the
+        // domain is NSURLErrorDomain, so an explicit NSError fallback
+        // isn't necessary (and is awkward to write portably because
+        // URLError.Code's failable/non-failable init differs across
+        // Apple's Foundation and swift-corelibs-foundation).
         if let urlError = error as? URLError {
             return advice(for: urlError, urlString: urlString)
-        }
-
-        let nsError = error as NSError
-        if nsError.domain == NSURLErrorDomain,
-           let code = URLError.Code(rawValue: nsError.code) {
-            return advice(for: URLError(code), urlString: urlString)
         }
 
         return AuthErrorAdvice(

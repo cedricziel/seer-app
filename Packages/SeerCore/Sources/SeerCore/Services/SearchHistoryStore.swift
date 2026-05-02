@@ -4,7 +4,11 @@ import Foundation
 ///
 /// Backed by `UserDefaults` (not Keychain — these are non-sensitive). Keys are
 /// scoped per server to avoid leaking history across multi-server households.
-public final class SearchHistoryStore: @unchecked Sendable {
+///
+/// Not declared `Sendable` because `record(_:scope:)` and `remove(_:scope:)`
+/// do unsynchronized read-modify-write against `UserDefaults`. Use from a
+/// single actor (the view models hold this on `@MainActor`).
+public final class SearchHistoryStore {
     /// Maximum number of recent queries kept per scope.
     public static let maxItems: Int = 10
 
