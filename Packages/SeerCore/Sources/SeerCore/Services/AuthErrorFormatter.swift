@@ -78,6 +78,52 @@ public enum AuthErrorFormatter {
         )
     }
 
+    /// Friendly advice for an HTTP status code returned by an upstream
+    /// server. Callers must NEVER pass the raw response body into a
+    /// user-facing alert — proxies and edge networks (Cloudflare, Kestrel)
+    /// frequently return styled HTML 5xx pages whose contents are wholly
+    /// inappropriate to surface in UI. Log the body separately for
+    /// diagnostics.
+    public static func advice(forServerStatusCode code: Int) -> AuthErrorAdvice {
+        switch code {
+        case 400, 422:
+            AuthErrorAdvice(
+                message: "The server didn't accept that request",
+                suggestion: "Verify the URL points at a Jellyfin or Jellyseerr server"
+            )
+        case 401:
+            AuthErrorAdvice(
+                message: "Invalid credentials",
+                suggestion: "Check your username, password, or API key and try again"
+            )
+        case 403:
+            AuthErrorAdvice(
+                message: "The server refused access",
+                suggestion: "Your account may not have permission to sign in here"
+            )
+        case 404:
+            AuthErrorAdvice(
+                message: "No server found at that URL",
+                suggestion: "Check the path — the URL should be the server root, not a sub-page"
+            )
+        case 429:
+            AuthErrorAdvice(
+                message: "Too many requests",
+                suggestion: "Wait a moment and try again"
+            )
+        case 500 ... 599:
+            AuthErrorAdvice(
+                message: "The server is having trouble",
+                suggestion: "Try again in a moment, or check the server's logs"
+            )
+        default:
+            AuthErrorAdvice(
+                message: "The server returned an unexpected response (HTTP \(code))",
+                suggestion: nil
+            )
+        }
+    }
+
     private static func advice(for error: URLError, urlString: String?) -> AuthErrorAdvice {
         switch error.code {
         case .cannotFindHost, .dnsLookupFailed:

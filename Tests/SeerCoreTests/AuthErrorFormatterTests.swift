@@ -152,4 +152,54 @@ final class AuthErrorFormatterTests: XCTestCase {
         XCTAssertEqual(advice.message, "Something specific went wrong")
         XCTAssertNil(advice.suggestion)
     }
+
+    // MARK: - Server status code advice
+
+    func testAdvice_status401_suggestsCredentials() {
+        let advice = AuthErrorFormatter.advice(forServerStatusCode: 401)
+        XCTAssertEqual(advice.message, "Invalid credentials")
+        XCTAssertNotNil(advice.suggestion)
+    }
+
+    func testAdvice_status404_explainsURLPath() {
+        let advice = AuthErrorFormatter.advice(forServerStatusCode: 404)
+        XCTAssertEqual(advice.message, "No server found at that URL")
+    }
+
+    func testAdvice_status500_returnsServerTroubleAdvice() {
+        let advice = AuthErrorFormatter.advice(forServerStatusCode: 500)
+        XCTAssertEqual(advice.message, "The server is having trouble")
+    }
+
+    func testAdvice_status503_alsoTreatedAs5xx() {
+        let advice = AuthErrorFormatter.advice(forServerStatusCode: 503)
+        XCTAssertEqual(advice.message, "The server is having trouble")
+    }
+
+    func testAdvice_status599_isUpperBoundOf5xx() {
+        let advice = AuthErrorFormatter.advice(forServerStatusCode: 599)
+        XCTAssertEqual(advice.message, "The server is having trouble")
+    }
+
+    func testAdvice_status429_suggestsBackoff() {
+        let advice = AuthErrorFormatter.advice(forServerStatusCode: 429)
+        XCTAssertEqual(advice.message, "Too many requests")
+    }
+
+    func testAdvice_unknownStatusCode_includesCodeForDebuggability() {
+        let advice = AuthErrorFormatter.advice(forServerStatusCode: 418)
+        XCTAssertTrue(advice.message.contains("418"))
+        XCTAssertNil(advice.suggestion)
+    }
+
+    /// Regression guard: the whole point of this method is that the user
+    /// never sees the raw HTML response body the formatter doesn't accept.
+    /// Verify by inspection — no body parameter exists at all.
+    func testAdvice_serverStatusAPI_doesNotAcceptResponseBody() {
+        // If this test starts failing because the API now takes a body,
+        // pause and make sure the body never reaches AuthErrorAdvice.
+        let advice = AuthErrorFormatter.advice(forServerStatusCode: 500)
+        XCTAssertFalse(advice.message.contains("<html"))
+        XCTAssertFalse(advice.message.contains("<style"))
+    }
 }

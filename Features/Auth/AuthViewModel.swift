@@ -1,6 +1,7 @@
 import Foundation
 import JellyfinClient
 import JellyseerrClient
+import os
 import SeerCore
 import SwiftUI
 
@@ -119,10 +120,46 @@ public final class AuthViewModel: ObservableObject {
             ))
         case let .networkError(underlying):
             showErrorAdvice(AuthErrorFormatter.advice(for: underlying, urlString: urlString))
+        case let .serverError(code, body):
+            logServerErrorBody(scope: "Jellyfin", url: urlString, code: code, body: body)
+            showErrorAdvice(AuthErrorFormatter.advice(forServerStatusCode: code))
         default:
             showErrorMessage(error.localizedDescription)
         }
     }
+
+    private func handleJellyseerrError(_ error: JellyseerrService.JellyseerrError, urlString: String) {
+        switch error {
+        case .invalidAPIKey, .unauthorized:
+            showErrorAdvice(AuthErrorAdvice(
+                message: "Invalid API key",
+                suggestion: "Check the API key in your Jellyseerr user settings and try again"
+            ))
+        case let .networkError(underlying):
+            showErrorAdvice(AuthErrorFormatter.advice(for: underlying, urlString: urlString))
+        case let .serverError(code, body):
+            logServerErrorBody(scope: "Jellyseerr", url: urlString, code: code, body: body)
+            showErrorAdvice(AuthErrorFormatter.advice(forServerStatusCode: code))
+        default:
+            showErrorMessage(error.localizedDescription)
+        }
+    }
+
+    /// The body is intentionally tagged `.private` — server responses can
+    /// contain styled 5xx HTML pages or upstream debug text that has no
+    /// place in user-visible alerts. The Logger keeps it for local
+    /// diagnostics (visible to developers via Console with the right
+    /// privacy settings) while the user sees clean advice from
+    /// `AuthErrorFormatter`.
+    private func logServerErrorBody(scope: String, url: String, code: Int, body: String?) {
+        guard let body, !body.isEmpty else { return }
+        Self.logger.error("""
+        \(scope, privacy: .public) server returned HTTP \(code, privacy: .public) at \
+        \(url, privacy: .private(mask: .hash)): \(body, privacy: .private)
+        """)
+    }
+
+    private static let logger = Logger(subsystem: "com.cedricziel.seer", category: "AuthViewModel")
 
     // MARK: - Jellyseerr Authentication
 
@@ -171,7 +208,7 @@ public final class AuthViewModel: ObservableObject {
             jellyseerrConnected = true
             currentStep = .complete
         } catch let error as JellyseerrService.JellyseerrError {
-            showErrorMessage(error.localizedDescription)
+            handleJellyseerrError(error, urlString: trimmedURL)
         } catch {
             showErrorAdvice(AuthErrorFormatter.advice(for: error, urlString: trimmedURL))
         }
