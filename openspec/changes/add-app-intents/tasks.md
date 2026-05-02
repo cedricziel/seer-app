@@ -6,25 +6,50 @@ Final task in each group: run `make lint` and `make format`.
 
 ## 1. Setup
 
-- [ ] 1.1 Confirm `AppIntents.framework` and `Intents.framework` are
+- [x] 1.1 Confirm `AppIntents.framework` and `Intents.framework` are
   linked to the SeerApp target and to `SeerCore` via `project.yml`
   (system frameworks, no SwiftPM dep needed); regenerate via
-  `make generate`.
-- [ ] 1.2 Add an `appIntentsIndexingEnabled: Bool` flag to `AppState` in
+  `make generate`. — Both are system frameworks that auto-link via
+  Swift `import AppIntents` / `import Intents`. xcodegen handles them
+  automatically; no `project.yml` declaration needed for system
+  frameworks. Confirmed `SeerApp` and `SeerCore` targets carry no
+  `system` framework declarations today; this stays the same.
+- [x] 1.2 Add an `appIntentsIndexingEnabled: Bool` flag to `AppState` in
   `Packages/SeerCore/Sources/SeerCore/AppState.swift`. Backed by
   `UserDefaults.standard` only (per-device, NOT mirrored to iCloud KVS
   — see design D5), default `false`. Matches the existing
-  `DiagnosticsConsent` pattern.
-- [ ] 1.3 Add a new `CachedRequest` SwiftData model under
+  `DiagnosticsConsent` pattern. — Added `@Published` with UserDefaults
+  `didSet`, key `appIntents.indexingEnabled`, exposed via
+  `AppState.AppIntentsKeys.indexingEnabled` so tests can assert
+  persistence semantics directly.
+- [x] 1.3 Add a new `CachedRequest` SwiftData model under
   `Packages/SeerCore/Sources/SeerCore/Models/` mirroring the Jellyseerr
   request shape used by `RequestsView` (id, title, type, status,
-  requestedAt, mediaTmdbId).
-- [ ] 1.4 Register the `flowmark://` URL scheme in `project.yml`'s
+  requestedAt, mediaTmdbId). — Added with composite id
+  (`<serverID>:<requestID>`) so two servers don't collide on numeric
+  ids. Registered in the existing CloudKit-backed `Schema` in
+  `App/SeerApp/SeerApp.swift` alongside the other `Cached*` models;
+  matches the existing precedent (`CachedMediaItem` is also
+  server-derived and CloudKit-synced).
+- [x] 1.4 Register the `flowmark://` URL scheme in `project.yml`'s
   `infoPlist` block: `CFBundleURLTypes` with one entry naming
   `CFBundleURLSchemes = ["flowmark"]` and `CFBundleURLName =
-  "com.cedricziel.seer.flowmark"`. Regenerate via `make generate`.
-- [ ] 1.5 Run `make generate && make build` to confirm scaffolding
-  compiles before adding tests.
+  "com.cedricziel.seer.flowmark"`. Regenerate via `make generate`. —
+  Info.plist is hand-managed in this project (`GENERATE_INFOPLIST_FILE:
+  false`, `INFOPLIST_FILE: App/SeerApp/Info.plist`), so the
+  `CFBundleURLTypes` entry was added directly to
+  `App/SeerApp/Info.plist` rather than to a `project.yml` `infoPlist`
+  block. No `make generate` needed for plist-only edits.
+- [x] 1.5 Run `make generate && make build` to confirm scaffolding
+  compiles before adding tests. — `make generate` succeeded after
+  bootstrapping `Config/Secrets.xcconfig` from the template (the file
+  is not checked in). `make build SIMULATOR="iPhone 17 Pro"` succeeded
+  (the default `iPhone 17` simulator is not available on this Xcode
+  install — only `iPhone 17 Pro`, `iPhone 17 Pro Max`, `iPhone 17e`,
+  `iPhone Air`). Build emits a benign "No AppIntents.framework
+  dependency found" warning during metadata extraction; this clears
+  once any `AppIntent`-conforming type is added in section 5.
+
 
 ## 2. Tests (red) — SeerCore (AppEntity foundation)
 
