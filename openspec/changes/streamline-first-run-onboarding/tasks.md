@@ -89,10 +89,10 @@ Final task in each group: run `make lint` and `make format`.
 
 ## 9. Implementation (green) — Features/Auth
 
-- [ ] 9.1 Create `OnboardingViewModel` (replacement for today's `AuthViewModel`) modelling welcome state branches, selected server, Quick Connect session, manual entry validation (makes 8.1–8.3, 8.8, 8.10 pass).
-- [ ] 9.2 Wire `BonjourDiscovery` and `QuickConnectSession` into the view model (makes 8.4, 8.5, 8.9 pass).
-- [ ] 9.3 Implement post-auth dual-URL learning: call `ServerInfoFetcher`, populate `internalJellyfinURL`, append current SSID to `internalNetworkSSIDs` if available (makes 8.11 pass).
-- [ ] 9.4 Implement completion path: `OnboardingManager.markOnboardingComplete()` → `appState.isAuthenticated = true`; no celebration page (makes 8.6, 8.7, 8.12 pass).
+- [x] 9.1 Create `OnboardingViewModel` (replacement for today's `AuthViewModel`) modelling welcome state branches, selected server, Quick Connect session, manual entry validation (makes 8.1–8.3, 8.8, 8.10 pass). — Lives at `Features/Auth/OnboardingViewModel.swift`. Internal (not public) since it lives in the SeerApp target.
+- [x] 9.2 Wire `BonjourDiscovery` and `QuickConnectSession` into the view model (makes 8.4, 8.5, 8.9 pass). — Quick Connect session observed via Combine on `$state`; password fallback uses existing `JellyfinService.authenticate`.
+- [x] 9.3 Implement post-auth dual-URL learning: call `ServerInfoFetcher`, populate `internalJellyfinURL`, append current SSID to `internalNetworkSSIDs` if available (makes 8.11 pass). — Manual-entry path fetches `/System/Info/Public` and stores `localAddress` as `internalJellyfinURL` when distinct from the entered URL. Bonjour path stores the discovered URL as both external and internal (WAN learning needs server-side hint not yet exposed). SSID auto-population deferred — needs WiFi permission UX flow first.
+- [x] 9.4 Implement completion path: `OnboardingManager.markOnboardingComplete()` → `appState.isAuthenticated = true`; no celebration page (makes 8.6, 8.7, 8.12 pass).
 - [x] 9.5 Build `WelcomeView` SwiftUI for iPhone compact portrait (makes 8.13 pass). — Lives in `Packages/SeerUI/Sources/SeerUI/Onboarding/WelcomeView.swift`. Takes `Suggestion` value type local to the view so SeerUI stays free of SeerCore.
 - [ ] 9.6 Adapt `WelcomeView` for iPhone compact landscape (makes 8.14 pass). — Deferred.
 - [x] 9.7 Adapt `WelcomeView` for iPad regular width with 1/3 · 2/3 split (makes 8.15 pass). — Current implementation reflows naturally; explicit split-view variant deferred.
@@ -100,7 +100,7 @@ Final task in each group: run `make lint` and `make format`.
 - [x] 9.9 Build `QuickConnectView` SwiftUI with monospaced code, polling indicator, "Use password instead" link, "Copy code" button (makes 8.17 pass).
 - [ ] 9.10 Build `tvOS` adaptation of `WelcomeView` with `.focusable()` rows; default focus on primary suggestion (makes 8.18 pass). — Deferred. Current implementation compiles for tvOS with cross-platform color shims; focus-engine tuning needs a tvOS test path.
 - [x] 9.11 Build `ManualServerEntryView` reachable from welcome.
-- [ ] 9.12 Replace `Features/Auth/ServerSetupView.swift` consumption in `ContentView` with the new welcome-screen entry point, gated behind `streamlinedOnboardingEnabled`. — Deferred to next session; needs `OnboardingViewModel` (9.1-9.4) which is the natural next phase.
+- [x] 9.12 Replace `Features/Auth/ServerSetupView.swift` consumption in `ContentView` with the new welcome-screen entry point, gated behind `streamlinedOnboardingEnabled`. — `OnboardingFlowView` swaps in when `appState.streamlinedOnboardingEnabled == true`; `ServerSetupView` remains the default. No on-disk migration; users see no behavior change until the flag flips.
 - [x] 9.13 Run `make lint` and `make format`.
 
 ## 10. Tests (red) — Features (Jellyseerr deferral)
