@@ -95,9 +95,9 @@ public struct RequestMediaIntent: AppIntent {
         )
 
         switch outcome {
-        case .created(let title):
+        case let .created(title):
             return .result(dialog: IntentDialog("Requested \(title)."))
-        case .pendingApproval(let title):
+        case let .pendingApproval(title):
             return .result(
                 dialog: IntentDialog(
                     "Request for \(title) submitted. Waiting for admin approval."

@@ -37,19 +37,23 @@ public struct SearchMediaIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ReturnsValue<[MediaItemEntity]> {
-        let local = (try? await MediaItemEntityQuery().entities(matching: query)) ?? []
+        let local = await (try? MediaItemEntityQuery().entities(matching: query)) ?? []
 
         guard local.count < Self.localHitThreshold else {
             return .result(value: Array(local.prefix(10)))
         }
 
-        let supplement = (try? await Self.discoverSupplement(query)) ?? []
+        let supplement = await (try? Self.discoverSupplement(query)) ?? []
 
         // Dedup: prefer local entries (which carry library state) over
         // discover hits with the same id.
         var byID: [String: MediaItemEntity] = [:]
-        for item in local { byID[item.id] = item }
-        for item in supplement where byID[item.id] == nil { byID[item.id] = item }
+        for item in local {
+            byID[item.id] = item
+        }
+        for item in supplement where byID[item.id] == nil {
+            byID[item.id] = item
+        }
 
         let merged = local + supplement.filter { hit in
             !local.contains(where: { $0.id == hit.id })
