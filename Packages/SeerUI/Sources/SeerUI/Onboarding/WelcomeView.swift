@@ -23,6 +23,11 @@ public struct WelcomeView: View {
     public let onSelectSuggestion: (Suggestion) -> Void
     public let onManualEntry: () -> Void
 
+    #if os(iOS)
+        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+        @Environment(\.verticalSizeClass) private var verticalSizeClass
+    #endif
+
     public init(
         primarySuggestion: Suggestion?,
         secondarySuggestions: [Suggestion] = [],
@@ -35,7 +40,26 @@ public struct WelcomeView: View {
         self.onManualEntry = onManualEntry
     }
 
+    /// Side-by-side hero + suggestions layout when there is wide horizontal
+    /// space (iPad regular width) or limited vertical space (iPhone
+    /// landscape). On tvOS the layout is always wide.
+    private var useHorizontalLayout: Bool {
+        #if os(iOS)
+            horizontalSizeClass == .regular || verticalSizeClass == .compact
+        #else
+            true
+        #endif
+    }
+
     public var body: some View {
+        if useHorizontalLayout {
+            horizontalBody
+        } else {
+            verticalBody
+        }
+    }
+
+    private var verticalBody: some View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 32) {
@@ -48,6 +72,35 @@ public struct WelcomeView: View {
             }
             footer
                 .padding()
+        }
+        .background(Color.welcomeBackground)
+    }
+
+    private var horizontalBody: some View {
+        HStack(spacing: 0) {
+            // Leading 40% — hero
+            VStack(spacing: 16) {
+                Spacer(minLength: 0)
+                hero
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 24)
+
+            // Trailing 60% — suggestions + footer in a stack
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        suggestionList
+                            .padding(.top, 24)
+                    }
+                    .padding(.horizontal)
+                    .frame(maxWidth: .infinity)
+                }
+                footer
+                    .padding()
+            }
+            .frame(maxWidth: .infinity)
         }
         .background(Color.welcomeBackground)
     }

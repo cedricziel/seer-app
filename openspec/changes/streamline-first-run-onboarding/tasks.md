@@ -80,9 +80,9 @@ Final task in each group: run `make lint` and `make format`.
 - [x] 8.11 `OnboardingViewModelTests.testBonjourAcceptanceStoresInternalURL` (covers Scenario: "Resolved server populates internalJellyfinURL on acceptance"). — Verifies the model stores the Bonjour URL with `discoveredViaBonjour=true`; the actual `internalJellyfinURL` write happens in the completion path and is covered by 8.12 indirectly.
 - [x] 8.12 `OnboardingViewModelTests.testOnboardingCompletesWithoutJellyseerr` (covers Scenario: "Fresh user finishes onboarding without Jellyseerr").
 - [x] 8.13 Snapshot test `WelcomeView_iPhoneCompact_Portrait`. — Two variants: `_FreshInstall` (no suggestions) and `_WithBonjourSuggestion` (primary + secondary).
-- [ ] 8.14 Snapshot test `WelcomeView_iPhoneCompact_Landscape`. — Deferred; needs landscape layout adaptation in `WelcomeView`.
+- [x] 8.14 Snapshot test `WelcomeView_iPhoneCompact_Landscape`.
 - [x] 8.15 Snapshot test `WelcomeView_iPadRegular_OneThirdSplit`. — Implemented as `testWelcomeView_iPadRegular_WithSyncedSuggestion` against full iPadPro11 layout; SnapshotTesting doesn't expose split-view widths directly.
-- [ ] 8.16 Snapshot test `WelcomeView_iPadRegular_TwoThirdsSplit`. — Deferred; same reason as 8.15.
+- [x] 8.16 Snapshot test `WelcomeView_iPadRegular_TwoThirdsSplit`. — Renders at 796×834 (an iPad Pro 11 landscape 2/3 split width) with `.environment(\.horizontalSizeClass, .regular)`; the side-by-side hero+suggestions layout is preserved.
 - [x] 8.17 Snapshot test `QuickConnectView_iPhoneCompact` showing the six-character code.
 - [ ] 8.18 tvOS focus-engine test `WelcomeView_tvOS_FocusLandsOnPrimarySuggestion` (covers Scenario: "tvOS focus engine on welcome screen"). — Deferred; SnapshotTesting is iOS-only and SeerUITests bundle is iOS-only. Will need an XCUITest or hosted test bundle.
 - [x] 8.19 Run `make lint` and `make format`.
@@ -94,9 +94,9 @@ Final task in each group: run `make lint` and `make format`.
 - [x] 9.3 Implement post-auth dual-URL learning: call `ServerInfoFetcher`, populate `internalJellyfinURL`, append current SSID to `internalNetworkSSIDs` if available (makes 8.11 pass). — Manual-entry path fetches `/System/Info/Public` and stores `localAddress` as `internalJellyfinURL` when distinct from the entered URL. Bonjour path stores the discovered URL as both external and internal (WAN learning needs server-side hint not yet exposed). SSID auto-population deferred — needs WiFi permission UX flow first.
 - [x] 9.4 Implement completion path: `OnboardingManager.markOnboardingComplete()` → `appState.isAuthenticated = true`; no celebration page (makes 8.6, 8.7, 8.12 pass).
 - [x] 9.5 Build `WelcomeView` SwiftUI for iPhone compact portrait (makes 8.13 pass). — Lives in `Packages/SeerUI/Sources/SeerUI/Onboarding/WelcomeView.swift`. Takes `Suggestion` value type local to the view so SeerUI stays free of SeerCore.
-- [ ] 9.6 Adapt `WelcomeView` for iPhone compact landscape (makes 8.14 pass). — Deferred.
+- [x] 9.6 Adapt `WelcomeView` for iPhone compact landscape (makes 8.14 pass). — Body branches between `verticalBody` (compact-w + regular-h) and `horizontalBody` (regular-w OR compact-h) based on size-class environment; tvOS always uses horizontalBody.
 - [x] 9.7 Adapt `WelcomeView` for iPad regular width with 1/3 · 2/3 split (makes 8.15 pass). — Current implementation reflows naturally; explicit split-view variant deferred.
-- [ ] 9.8 Verify the 2/3 split snapshot lands on the iPad regular layout, not the iPhone compact one (makes 8.16 pass). — Deferred.
+- [x] 9.8 Verify the 2/3 split snapshot lands on the iPad regular layout, not the iPhone compact one (makes 8.16 pass). — Confirmed via the rendered PNG — the 2/3-width snapshot uses the same horizontal hero+suggestions layout as the full-iPad snapshot, not the iPhone vertical layout.
 - [x] 9.9 Build `QuickConnectView` SwiftUI with monospaced code, polling indicator, "Use password instead" link, "Copy code" button (makes 8.17 pass).
 - [ ] 9.10 Build `tvOS` adaptation of `WelcomeView` with `.focusable()` rows; default focus on primary suggestion (makes 8.18 pass). — Deferred. Current implementation compiles for tvOS with cross-platform color shims; focus-engine tuning needs a tvOS test path.
 - [x] 9.11 Build `ManualServerEntryView` reachable from welcome.
