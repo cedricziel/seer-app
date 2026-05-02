@@ -103,6 +103,11 @@ struct PlayerControlsOverlay: View {
                 .accessibilityLabel("Audio and subtitles")
                 .accessibilityHint("Double tap to choose audio track and subtitles")
             }
+
+            #if os(iOS)
+                AirPlayRouteButton()
+                    .frame(width: 44, height: 44)
+            #endif
         }
         .foregroundStyle(.white)
     }

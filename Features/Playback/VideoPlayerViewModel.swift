@@ -67,7 +67,9 @@ public final class VideoPlayerViewModel {
             isBuffering = false
             hasReportedStart = true
             setupAudioSession()
+            Self.configureForExternalPlayback(existingPlayer)
             observePlayer(existingPlayer)
+            updateNowPlayingInfo(player: existingPlayer)
             if let currentItem = existingPlayer.currentItem {
                 let dur = currentItem.duration.seconds
                 if dur.isFinite { duration = dur }
@@ -142,7 +144,9 @@ public final class VideoPlayerViewModel {
             let playerItem = createPlayerItem(from: info)
             let newPlayer = AVPlayer(playerItem: playerItem)
             player = newPlayer
+            Self.configureForExternalPlayback(newPlayer)
             observePlayer(newPlayer)
+            updateNowPlayingInfo(player: newPlayer)
 
             if startPositionTicks > 0 {
                 let startSeconds = Double(startPositionTicks) / 10_000_000.0
@@ -194,9 +198,11 @@ public final class VideoPlayerViewModel {
         let playerItem = AVPlayerItem(url: url)
         let newPlayer = AVPlayer(playerItem: playerItem)
         player = newPlayer
+        Self.configureForExternalPlayback(newPlayer)
 
         // Observe player status
         observePlayer(newPlayer)
+        updateNowPlayingInfo(player: newPlayer)
 
         // Get duration from file
         let asset = AVURLAsset(url: url)
@@ -341,6 +347,15 @@ public final class VideoPlayerViewModel {
             } catch {
                 // Audio session setup failed, playback may not work in background
             }
+        #endif
+    }
+
+    /// Enables AirPlay / external-screen playback on the given player. iOS only;
+    /// `AVRoutePickerView` and external-display playback are not available on tvOS.
+    private static func configureForExternalPlayback(_ player: AVPlayer) {
+        #if os(iOS)
+            player.allowsExternalPlayback = true
+            player.usesExternalPlaybackWhileExternalScreenIsActive = true
         #endif
     }
 
