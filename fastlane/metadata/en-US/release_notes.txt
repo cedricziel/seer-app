@@ -1,1 +1,12 @@
+Welcome to Flowmark Media — the native Jellyfin and Jellyseerr client for iPhone, iPad, and Apple TV.
 
+This first release includes:
+• Stream and continue watching across your Jellyfin library
+• Search, library browse, and per-genre discovery
+• Picture-in-Picture playback on iPhone and iPad
+• Background downloads for offline viewing
+• Multi-server support with iCloud sync
+• Browse and request new titles via Jellyseerr
+• VoiceOver and Reduce Motion support
+
+Thanks for trying it out. Source and feedback at github.com/cedricziel/seer-app.

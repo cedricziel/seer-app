@@ -1,1 +1,30 @@
+Flowmark Media is a native client for Jellyfin and Jellyseerr, built for iPhone, iPad, and Apple TV.
 
+Browse your library, search across servers, watch in Picture-in-Picture, and download episodes for the flight. Pair it with Jellyseerr to discover what's trending and request new movies and shows without leaving the app.
+
+Designed for people who self-host their media and want a fast, focused, native streaming experience on Apple devices.
+
+FEATURES
+
+• Stream movies, shows, and music from any Jellyfin server
+• Continue watching across devices with up-to-the-second progress sync
+• Search your full library with instant results
+• Picture-in-Picture playback on iPhone and iPad
+• Background downloads for offline viewing — even on Apple TV
+• Multi-server support: switch between home, family, and friends' servers in one tap
+• iCloud sync keeps your servers and credentials in step across devices
+• Browse trending and discover new titles via Jellyseerr
+• Request movies and shows directly from the discover feed
+• Full VoiceOver support and Reduce Motion compliance
+
+PRIVACY
+
+Flowmark Media talks only to the Jellyfin and Jellyseerr servers you configure. Diagnostic data (crashes, performance) is fully opt-in and never linked to your identity. No tracking, no ads, no third-party analytics.
+
+REQUIREMENTS
+
+• A Jellyfin server (10.8+) you have access to
+• Optionally, a Jellyseerr instance for media requests
+• iOS 26 or tvOS 26 or later
+
+Source available on GitHub. Feedback welcome.

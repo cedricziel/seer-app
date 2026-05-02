@@ -1,1 +1,13 @@
+Flowmark Media is a client app — it requires a Jellyfin media server to function. To exercise the app, please connect to the public Jellyfin demo server during onboarding:
 
+  Server URL: https://demo.jellyfin.org/stable
+  Username:   demo
+  Password:   (leave blank)
+
+After connecting, the home tab will populate with sample media. You can browse, search, play (Picture-in-Picture supported on iPhone/iPad), and start a download from any item's detail screen.
+
+The Jellyseerr-powered Discover and Requests tabs require a separate Jellyseerr server. They are optional — the app is fully usable as a Jellyfin-only client. If you'd like demo Jellyseerr credentials, please contact the developer at cedric.ziel@gmail.com.
+
+The app does not collect any user data unless the user explicitly opts in via Settings > Diagnostics. No third-party tracking, ads, or analytics are present.
+
+Source code: https://github.com/cedricziel/seer-app

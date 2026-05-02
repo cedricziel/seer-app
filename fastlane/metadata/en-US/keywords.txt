@@ -1,1 +1,1 @@
-
+jellyfin,jellyseerr,media,streaming,server,player,downloads,library,plex,emby

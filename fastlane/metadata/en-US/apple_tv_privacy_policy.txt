@@ -1,1 +1,12 @@
+Privacy Policy
 
+Flowmark Media is a client for Jellyfin and Jellyseerr media servers. The app communicates only with the servers you configure — no data is sent anywhere else by default.
+
+Server credentials are stored in the system Keychain and synced via iCloud Keychain across your Apple devices when iCloud is enabled. They are never shared with any third party.
+
+Diagnostic data (crash reports and performance measurements) is fully opt-in. Nothing is sent unless you enable it in Settings > Diagnostics. When enabled, only anonymous device model, OS version, app version, locale, crash stack traces, and aggregate performance metrics are collected. Diagnostic data is never linked to your identity and is never used for tracking or advertising.
+
+The app contains no third-party SDKs for advertising, analytics, or behavioral tracking.
+
+Contact: cedric.ziel@gmail.com
+Source: https://github.com/cedricziel/seer-app
