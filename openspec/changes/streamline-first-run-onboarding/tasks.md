@@ -13,27 +13,27 @@ Final task in each group: run `make lint` and `make format`.
 
 ## 2. Tests (red) — JellyfinClient (BonjourDiscovery + QuickConnectSession)
 
-- [ ] 2.1 `BonjourDiscoveryTests.testEmitsDiscoveredServerWithin1500ms` using a stub `NWBrowser` (covers Scenario: "Browser emits discovered server within 1.5 seconds" in `local-server-discovery`).
-- [ ] 2.2 `BonjourDiscoveryTests.testStopsBrowserOnDeinit` (covers Scenario: "Browser stops on deinit").
-- [ ] 2.3 `BonjourDiscoveryTests.testPermissionDeniedFlag` (covers Scenario: "Permission denied on first browse").
-- [ ] 2.4 `BonjourDiscoveryTests.testRestartIsIdempotent` (covers Scenario: "Restart after stop").
-- [ ] 2.5 `QuickConnectSessionTests.testQuickConnectDisabledFallsBackImmediately` against a fake transport returning `{Enabled: false}` (covers Scenario: "Server has Quick Connect disabled" in `quick-connect-auth`).
-- [ ] 2.6 `QuickConnectSessionTests.testApprovedFlowExchangesSecretForToken` against a fake transport scripted with pending → approved → token (covers Scenario: "User approves Quick Connect on Jellyfin web").
-- [ ] 2.7 `QuickConnectSessionTests.testExpiryStopsPolling` (covers Scenario: "Code expires without approval").
-- [ ] 2.8 `QuickConnectSessionTests.testCancelStopsPollingAndDoesNotExchange` (covers Scenario: "User cancels Quick Connect").
-- [ ] 2.9 `QuickConnectSessionTests.testPollingCadenceBackoffAt30s` using injected clock (covers Scenario: "Backoff after 30 seconds").
-- [ ] 2.10 `QuickConnectSessionTests.testStateMachineExposesPendingApprovedExpiredFailedCancelled` (covers the "explicit states" requirement).
-- [ ] 2.11 Run `make lint` and `make format`.
+- [x] 2.1 `BonjourDiscoveryTests.testEmitsDiscoveredServerWithin1500ms` using a stub `NWBrowser` (covers Scenario: "Browser emits discovered server within 1.5 seconds" in `local-server-discovery`).
+- [x] 2.2 `BonjourDiscoveryTests.testStopsBrowserOnDeinit` (covers Scenario: "Browser stops on deinit").
+- [x] 2.3 `BonjourDiscoveryTests.testPermissionDeniedFlag` (covers Scenario: "Permission denied on first browse").
+- [x] 2.4 `BonjourDiscoveryTests.testRestartIsIdempotent` (covers Scenario: "Restart after stop").
+- [x] 2.5 `QuickConnectSessionTests.testQuickConnectDisabledFallsBackImmediately` against a fake transport returning `{Enabled: false}` (covers Scenario: "Server has Quick Connect disabled" in `quick-connect-auth`).
+- [x] 2.6 `QuickConnectSessionTests.testApprovedFlowExchangesSecretForToken` against a fake transport scripted with pending → approved → token (covers Scenario: "User approves Quick Connect on Jellyfin web").
+- [x] 2.7 `QuickConnectSessionTests.testExpiryStopsPolling` (covers Scenario: "Code expires without approval").
+- [x] 2.8 `QuickConnectSessionTests.testCancelStopsPollingAndDoesNotExchange` (covers Scenario: "User cancels Quick Connect").
+- [x] 2.9 `QuickConnectSessionTests.testPollingCadenceBackoffAt30s` using injected clock (covers Scenario: "Backoff after 30 seconds").
+- [x] 2.10 `QuickConnectSessionTests.testStateMachineExposesPendingApprovedExpiredFailedCancelled` (covers the "explicit states" requirement).
+- [x] 2.11 Run `make lint` and `make format`.
 
 ## 3. Implementation (green) — JellyfinClient
 
-- [ ] 3.1 Add `DiscoveredJellyfinServer` value type (`name`, `host`, `port`, `URL`) in `Packages/JellyfinClient/Sources/JellyfinClient/`.
-- [ ] 3.2 Implement `BonjourDiscovery` (`@MainActor` `ObservableObject`, `discoveredServers`, `permissionDenied`, `start()`, `stop()`) wrapping `NWBrowser` for `_jellyfin._tcp` (makes 2.1, 2.2, 2.3, 2.4 pass).
-- [ ] 3.3 Add `QuickConnectSession` state machine type with `pending(code, secret)`, `approved(token)`, `expired`, `failed(Error)`, `cancelled` (makes 2.10 pass).
-- [ ] 3.4 Implement `QuickConnectSession.start(against:)` calling `GetQuickConnectEnabledAPI` + `InitiateQuickConnectAPI` (makes 2.5 setup work).
-- [ ] 3.5 Implement polling loop with injected clock at 1s × 30 then 3s thereafter, terminating on `approved` / `expired` / `cancelled` (makes 2.6, 2.7, 2.8, 2.9 pass).
-- [ ] 3.6 Implement secret-to-token exchange via `AuthenticateWithQuickConnectAPI` returning the same `AuthResponse` shape today's `JellyfinService.authenticate` returns (makes 2.6 pass).
-- [ ] 3.7 Run `make lint` and `make format`.
+- [x] 3.1 Add `DiscoveredJellyfinServer` value type (`name`, `host`, `port`, `URL`) in `Packages/JellyfinClient/Sources/JellyfinClient/`.
+- [x] 3.2 Implement `BonjourDiscovery` (`@MainActor` `ObservableObject`, `discoveredServers`, `permissionDenied`, `start()`, `stop()`) wrapping `NWBrowser` for `_jellyfin._tcp` (makes 2.1, 2.2, 2.3, 2.4 pass).
+- [x] 3.3 Add `QuickConnectSession` state machine type with `pending(code, secret)`, `approved(token)`, `expired`, `failed(Error)`, `cancelled` (makes 2.10 pass).
+- [x] 3.4 Implement `QuickConnectSession.start(against:)` calling `GetQuickConnectEnabledAPI` + `InitiateQuickConnectAPI` (makes 2.5 setup work). — Implemented at HTTP layer (URLSession + injectable transport) for consistency with existing `JellyfinService` instead of binding to SDK types.
+- [x] 3.5 Implement polling loop with injected clock at 1s × 30 then 3s thereafter, terminating on `approved` / `expired` / `cancelled` (makes 2.6, 2.7, 2.8, 2.9 pass).
+- [x] 3.6 Implement secret-to-token exchange via `AuthenticateWithQuickConnectAPI` returning the same `AuthResponse` shape today's `JellyfinService.authenticate` returns (makes 2.6 pass).
+- [x] 3.7 Run `make lint` and `make format`.
 
 ## 4. Tests (red) — SeerCore (URL learning + resolver fallback)
 
