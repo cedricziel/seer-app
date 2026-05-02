@@ -16,7 +16,8 @@ final class RefreshSchedulerTests: XCTestCase {
         await clock.advance()
         await counter.waitForCount(1)
 
-        XCTAssertEqual(await counter.count, 1)
+        let count = await counter.count
+        XCTAssertEqual(count, 1)
         scheduler.stop()
     }
 
@@ -33,7 +34,8 @@ final class RefreshSchedulerTests: XCTestCase {
             await counter.waitForCount(expected)
         }
 
-        XCTAssertEqual(await counter.count, 3)
+        let count = await counter.count
+        XCTAssertEqual(count, 3)
         scheduler.stop()
     }
 
@@ -53,7 +55,8 @@ final class RefreshSchedulerTests: XCTestCase {
         // Failing the next sleep shouldn't trigger any further increments.
         await clock.failPendingSleep()
         try? await Task.sleep(nanoseconds: 50_000_000)
-        XCTAssertEqual(await counter.count, 1)
+        let count = await counter.count
+        XCTAssertEqual(count, 1)
     }
 
     func testStart_isIdempotentWhileRunning() async {
@@ -69,15 +72,19 @@ final class RefreshSchedulerTests: XCTestCase {
         await counter.waitForCount(1)
 
         // Both calls share the same loop -> one tick yields one increment.
-        XCTAssertEqual(await counter.count, 1)
+        let count = await counter.count
+        XCTAssertEqual(count, 1)
         scheduler.stop()
     }
 
-    func testInit_rejectsNonPositiveInterval() {
-        // Just confirm preconditions are documented; can't easily catch a
-        // precondition failure in XCTest without trapping. Keep this as a
-        // compile-time existence check.
-        _ = RefreshScheduler(interval: 0.1)
+    func testInit_acceptsPositiveInterval() async {
+        // Forced async satisfies @MainActor test-discovery on Linux while
+        // documenting that the init shape stays callable. Precondition
+        // failure on a non-positive interval is intentional and not
+        // exercised here.
+        await Task.yield()
+        let scheduler = RefreshScheduler(interval: 0.1)
+        XCTAssertFalse(scheduler.isRunning)
     }
 }
 
@@ -113,7 +120,9 @@ private actor ManualRefreshClock: RefreshClock {
             pending.append(continuation)
             let waiters = sleepWaiters
             sleepWaiters.removeAll()
-            for waiter in waiters { waiter.resume() }
+            for waiter in waiters {
+                waiter.resume()
+            }
         }
     }
 

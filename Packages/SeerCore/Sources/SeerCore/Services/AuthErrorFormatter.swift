@@ -31,18 +31,22 @@ public enum AuthErrorFormatter {
             )
         }
 
+        // Detect scheme via string prefix rather than URL.scheme — Foundation
+        // on Linux parses bare "host:port" as a custom scheme, which would
+        // otherwise hide the missing-prefix case from users.
+        let lower = trimmed.lowercased()
+        let hasHTTP = lower.hasPrefix("http://") || lower.hasPrefix("https://")
+        if !hasHTTP {
+            return AuthErrorAdvice(
+                message: "Missing http:// or https:// prefix",
+                suggestion: "Try \"https://\(trimmed)\" or \"http://\(trimmed)\" for a local server"
+            )
+        }
+
         guard let url = URL(string: trimmed) else {
             return AuthErrorAdvice(
                 message: "That doesn't look like a valid URL",
                 suggestion: "Check for typos and include the scheme, e.g. https://your-server.com"
-            )
-        }
-
-        let scheme = url.scheme?.lowercased()
-        if scheme == nil || (scheme != "http" && scheme != "https") {
-            return AuthErrorAdvice(
-                message: "Missing http:// or https:// prefix",
-                suggestion: "Try \"https://\(trimmed)\" or \"http://\(trimmed)\" for a local server"
             )
         }
 
@@ -64,9 +68,9 @@ public enum AuthErrorFormatter {
         }
 
         let nsError = error as NSError
-        if nsError.domain == NSURLErrorDomain {
-            let urlError = URLError(URLError.Code(rawValue: nsError.code))
-            return advice(for: urlError, urlString: urlString)
+        if nsError.domain == NSURLErrorDomain,
+           let code = URLError.Code(rawValue: nsError.code) {
+            return advice(for: URLError(code), urlString: urlString)
         }
 
         return AuthErrorAdvice(
@@ -78,43 +82,43 @@ public enum AuthErrorFormatter {
     private static func advice(for error: URLError, urlString: String?) -> AuthErrorAdvice {
         switch error.code {
         case .cannotFindHost, .dnsLookupFailed:
-            return AuthErrorAdvice(
+            AuthErrorAdvice(
                 message: "Couldn't find that server",
                 suggestion: "Check the address for typos. For local servers try the IP, e.g. 192.168.1.10:8096"
             )
         case .cannotConnectToHost:
-            return AuthErrorAdvice(
+            AuthErrorAdvice(
                 message: "Can't reach the server",
                 suggestion: portSuggestion(for: urlString) ?? "Verify the port and that the server is running"
             )
         case .timedOut:
-            return AuthErrorAdvice(
+            AuthErrorAdvice(
                 message: "Connection timed out",
                 suggestion: "Check the server is online and reachable from this network"
             )
         case .secureConnectionFailed, .serverCertificateUntrusted, .serverCertificateHasBadDate,
              .serverCertificateHasUnknownRoot, .serverCertificateNotYetValid:
-            return AuthErrorAdvice(
+            AuthErrorAdvice(
                 message: "Couldn't establish a secure connection",
                 suggestion: "If your server uses a self-signed certificate, try http:// for testing"
             )
         case .appTransportSecurityRequiresSecureConnection:
-            return AuthErrorAdvice(
+            AuthErrorAdvice(
                 message: "Insecure connections aren't allowed by default",
                 suggestion: "Use https:// or configure App Transport Security for this domain"
             )
         case .notConnectedToInternet, .networkConnectionLost:
-            return AuthErrorAdvice(
+            AuthErrorAdvice(
                 message: "No internet connection",
                 suggestion: "Reconnect to Wi-Fi or cellular and try again"
             )
         case .userAuthenticationRequired:
-            return AuthErrorAdvice(
+            AuthErrorAdvice(
                 message: "The server rejected the credentials",
                 suggestion: "Double-check your username and password"
             )
         default:
-            return AuthErrorAdvice(
+            AuthErrorAdvice(
                 message: error.localizedDescription,
                 suggestion: nil
             )

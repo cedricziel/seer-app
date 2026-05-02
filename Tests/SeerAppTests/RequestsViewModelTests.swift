@@ -26,8 +26,10 @@ final class RequestsViewModelTests: XCTestCase {
 
         viewModel.startAutoRefresh()
 
-        XCTAssertFalse(scheduler.isRunning,
-                       "Scheduler must stay idle until Jellyseerr is configured")
+        XCTAssertFalse(
+            scheduler.isRunning,
+            "Scheduler must stay idle until Jellyseerr is configured"
+        )
     }
 
     func testStopAutoRefresh_isSafeWhenNotRunning() {

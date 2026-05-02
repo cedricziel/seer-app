@@ -11,8 +11,10 @@ final class LibraryOfflineBannerTests: XCTestCase {
         let appState = AppState()
         let viewModel = LibraryViewModel(appState: appState)
 
-        XCTAssertFalse(viewModel.isShowingCachedData,
-                       "Banner should be hidden until we discover we're offline or cached")
+        XCTAssertFalse(
+            viewModel.isShowingCachedData,
+            "Banner should be hidden until we discover we're offline or cached"
+        )
         XCTAssertNil(viewModel.lastSyncDate)
     }
 

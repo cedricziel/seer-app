@@ -27,8 +27,8 @@ public final class RefreshScheduler {
     public func start(action: @MainActor @escaping () async -> Void) {
         guard !isRunning else { return }
         isRunning = true
-        let clock = self.clock
-        let interval = self.interval
+        let clock = clock
+        let interval = interval
         task = Task { [weak self] in
             while !Task.isCancelled {
                 do {
@@ -37,7 +37,7 @@ public final class RefreshScheduler {
                     return
                 }
                 guard !Task.isCancelled, let self else { return }
-                self.tickCount += 1
+                tickCount += 1
                 await action()
             }
         }

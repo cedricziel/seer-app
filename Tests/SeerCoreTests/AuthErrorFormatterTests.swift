@@ -119,7 +119,9 @@ final class AuthErrorFormatterTests: XCTestCase {
 
     func testAdvice_unknownError_fallsBackToLocalizedDescription() {
         struct CustomError: LocalizedError {
-            var errorDescription: String? { "Something specific went wrong" }
+            var errorDescription: String? {
+                "Something specific went wrong"
+            }
         }
         let advice = AuthErrorFormatter.advice(for: CustomError())
         XCTAssertEqual(advice.message, "Something specific went wrong")
