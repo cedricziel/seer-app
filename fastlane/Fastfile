@@ -172,6 +172,39 @@ lane :release do |options|
   )
 end
 
+# Workaround for an iOS 26.4.1-era fastlane bug: `xcrun simctl list devices`
+# emits section headers like `-- iOS 26.4 --` even when the runtime is
+# actually 26.4.1. fastlane's DeviceManager parses that string for the OS
+# version and ends up building destinations like
+# `OS=26.4`, which xcodebuild rejects against a 26.4.1 simulator. Patch
+# the parsed os_version with the full runtime version from
+# `xcrun simctl list runtimes -j` so the destination string xcodebuild
+# sees actually matches what's installed.
+require 'fastlane_core/device_manager'
+require 'json'
+::FastlaneCore::DeviceManager.singleton_class.class_eval do
+  unless method_defined?(:_orig_simulators)
+    alias_method :_orig_simulators, :simulators
+
+    def simulators(requested_os_type = "")
+      sims = _orig_simulators(requested_os_type)
+      runtimes = JSON.parse(`xcrun simctl list -j runtimes`)['runtimes']
+        .select { |r| r['isAvailable'] != false }
+      full_versions = runtimes.each_with_object({}) do |r, h|
+        short = r['version'].split('.').first(2).join('.')
+        h[short] = r['version']
+      end
+      sims.each do |sim|
+        full = full_versions[sim.os_version]
+        next unless full && full != sim.os_version
+        sim.os_version = full
+        sim.ios_version = full
+      end
+      sims
+    end
+  end
+end
+
 desc "Generate App Store screenshots via the SeerAppUITests UI test (uses the public Jellyfin demo)"
 lane :screenshots do
   capture_ios_screenshots
