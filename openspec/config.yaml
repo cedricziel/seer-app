@@ -1,0 +1,74 @@
+schema: seer-tdd-hig
+
+context: |
+  Project: Seer — iOS / tvOS app for Jellyfin (media server) and Jellyseerr
+  (request management). Multi-server, offline-capable, video playback with PiP.
+
+  Stack:
+  - Swift 6.2, SwiftUI, Xcode 16.0+
+  - iOS 26.0+ / tvOS 26.0+
+  - SwiftData for local cache, CloudKit container `iCloud.com.cedricziel.seer`,
+    iCloud KVS for cross-device prefs.
+  - XcodeGen drives the project; never hand-edit .xcodeproj.
+  - Local SwiftPM packages under Packages/: SeerCore, JellyfinClient,
+    JellyseerrClient (wraps generated JellyseerrAPI — do NOT hand-edit
+    Generated/), SeerUI, PlaybackClient, OfflineSync, DownloadClient,
+    NotificationClient.
+  - Feature modules under Features/ are part of the SeerApp target.
+  - Dependency direction is one-way: features → clients → SeerCore.
+
+  Architecture:
+  - MVVM. ViewModels are `@MainActor` classes with `@Published` state.
+  - `AppState` (in SeerCore) is the single source of truth for auth,
+    credentials (Keychain via KeychainManager), multi-server config.
+    Injected via `@Environment`.
+  - Services (JellyfinService, JellyseerrService, PlaybackService) are
+    constructed by ViewModels, not singletons.
+  - Telemetry via OpenTelemetry OTLP/HTTP, crashes via PLCrashReporter.
+    Both gate on DiagnosticsConsent — nothing leaves the device without
+    explicit user opt-in.
+
+  Testing:
+  - XCTest in Packages/<name>/Tests/. Existing examples: PlaybackClientTests,
+    DownloadClientTests.
+  - Snapshot / preview tests for SwiftUI when feasible.
+  - Single test: `xcodebuild test -scheme SeerApp -destination
+    'platform=iOS Simulator,name=iPhone 17' -only-testing:<Suite>/<Case>`.
+
+  Tooling gates (CI enforces):
+  - `make lint`  — `swiftlint --strict` (line ≤120 warn / 150 err,
+    function_body 60/80, type_body 550, file 800; nesting 2).
+  - `make format` — `swiftformat --lint .`.
+  - Packages/JellyseerrAPI is excluded from both linters.
+  - `make build` and `make test` use iPhone 17 simulator by default.
+  - Always run lint + format before committing.
+
+  Releases:
+  - MARKETING_VERSION in project.yml is managed by release-please
+    (look for `# x-release-please-version` markers — do not bump manually).
+  - CFBundleVersion is `git rev-list --count HEAD`, injected via xcargs at
+    archive time. Never written to project.yml.
+  - Continuous TestFlight on every main commit; App Store via "Set as
+    latest release" on a release-please prerelease.
+
+rules:
+  proposal:
+    - "State which platforms are affected (iOS / tvOS / both) — they have different focus and input models."
+    - "If the change touches networking, name which client wraps it (JellyfinClient, JellyseerrClient) — features never call APIs directly."
+
+  specs:
+    - "Scenarios MUST use exactly four hashtags (`#### Scenario:`); three will silently fail at archive time."
+    - "Use SHALL / MUST in normative text. Avoid should/may."
+    - "For UI scenarios, name the size class and platform in the WHEN clause (e.g. \"WHEN user on iPhone compact width opens Library\")."
+
+  design:
+    - "The HIG & Layout section is REQUIRED for any user-facing change. The only acceptable opt-out is an explicit \"N/A — non-UI change (<reason>)\" line."
+    - "Cite the specific HIG section(s) you're following — link or quote. Generic \"follows HIG\" is not acceptable."
+    - "For any new SwiftUI view, name which size class adapts how (compact → stack, regular → split-view, tvOS → focusable rows)."
+    - "Call out the dependency direction explicitly if the change introduces a new module relationship (must stay features → clients → SeerCore)."
+
+  tasks:
+    - "TDD ordering is mandatory: a Tests (red) group MUST precede the Implementation (green) group. Implementation tasks MUST cite which test they make pass (\"makes 2.1 pass\")."
+    - "For UI work, include a HIG verification group covering iPhone compact portrait + landscape, iPad regular + split-view 1/3·1/2·2/3, tvOS focus path (when applicable), and accessibility (VoiceOver, Dynamic Type AX5, Reduce Motion)."
+    - "The only TDD opt-out is a top-of-file marker `<!-- TDD-EXEMPT: <reason> -->` for pure refactor / docs / config-only changes."
+    - "Final task in any group MUST be \"run `make lint` and `make format`\" before considering implementation complete."
