@@ -319,6 +319,74 @@ targets:
         TEST_HOST: ""
         BUNDLE_LOADER: ""
 
+  SeerCoreTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, tvOS]
+    sources:
+      - path: Tests/SeerCoreTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: SeerCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.seercoretests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
+  JellyfinClientTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, tvOS]
+    sources:
+      - path: Tests/JellyfinClientTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: JellyfinClient
+      - target: SeerCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.jellyfinclienttests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
+  JellyseerrClientTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, tvOS]
+    sources:
+      - path: Tests/JellyseerrClientTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: JellyseerrClient
+      - target: SeerCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.jellyseerrclienttests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
+  OfflineSyncTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, tvOS]
+    sources:
+      - path: Tests/OfflineSyncTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: OfflineSync
+      - target: SeerCore
+      - target: JellyfinClient
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.offlinesynctests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
 schemes:
   SeerApp:
     build:
@@ -326,6 +394,10 @@ schemes:
         SeerApp: all
         PlaybackClientTests: [test]
         DownloadClientTests: [test]
+        SeerCoreTests: [test]
+        JellyfinClientTests: [test]
+        JellyseerrClientTests: [test]
+        OfflineSyncTests: [test]
     run:
       config: Debug
       environmentVariables:
@@ -340,6 +412,10 @@ schemes:
       targets:
         - PlaybackClientTests
         - DownloadClientTests
+        - SeerCoreTests
+        - JellyfinClientTests
+        - JellyseerrClientTests
+        - OfflineSyncTests
     profile:
       config: Release
     analyze:
