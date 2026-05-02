@@ -19,4 +19,10 @@ public enum AppIntentsContext {
     @MainActor public static var mainContext: ModelContext? {
         modelContainer?.mainContext
     }
+
+    /// The shared `AppState` instance. Set at app launch, read by
+    /// intent `perform()` methods to check auth and resolve server
+    /// credentials. Tests inject a freshly-constructed `AppState`
+    /// before each test.
+    @MainActor public static var appState: AppState?
 }
