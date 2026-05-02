@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/cedricziel/seer-app/compare/v0.2.4...v0.2.5) (2026-05-02)
+
+
+### Bug Fixes
+
+* **release:** drop bogus upload_symbols calls ([a369590](https://github.com/cedricziel/seer-app/commit/a369590d763ba25a5c1bd82026d5a2a573a351a2))
+
 ## [0.2.4](https://github.com/cedricziel/seer-app/compare/v0.2.3...v0.2.4) (2026-05-02)
 
 
