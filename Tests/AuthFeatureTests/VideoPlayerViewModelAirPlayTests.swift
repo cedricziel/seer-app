@@ -36,9 +36,9 @@
             player.allowsExternalPlayback = false
             XCTAssertFalse(player.usesExternalPlaybackWhileExternalScreenIsActive)
 
-            _ = VideoPlayerViewModel(
+            _ = try VideoPlayerViewModel(
                 item: makeMediaItem(),
-                appState: try XCTUnwrap(appState),
+                appState: XCTUnwrap(appState),
                 existingPlayer: player
             )
 
