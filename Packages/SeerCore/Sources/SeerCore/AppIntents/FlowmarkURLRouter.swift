@@ -71,13 +71,13 @@ public final class FlowmarkURLRouter: ObservableObject {
     public func route(_ url: URL) -> RouteResult {
         let result = Self.parse(url)
         switch result {
-        case .openMedia(let id):
+        case let .openMedia(id):
             selectedTab = .library
             pendingMediaID = id
         case .openLibrary:
             selectedTab = .library
             pendingMediaID = nil
-        case .unknown(let url):
+        case let .unknown(url):
             Self.logger.info("Unknown flowmark route: \(url.absoluteString)")
         }
         return result
