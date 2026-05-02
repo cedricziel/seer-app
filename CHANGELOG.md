@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/cedricziel/seer-app/compare/v0.2.0...v0.2.1) (2026-05-02)
+
+
+### Bug Fixes
+
+* **release:** restrict archive to iOS + split GitHub environments ([eafb1a9](https://github.com/cedricziel/seer-app/commit/eafb1a9c3a0d16afd73a1642c7cc5c9f42348d63))
+
 ## [0.2.0](https://github.com/cedricziel/seer-app/compare/v0.1.0...v0.2.0) (2026-05-01)
 
 
