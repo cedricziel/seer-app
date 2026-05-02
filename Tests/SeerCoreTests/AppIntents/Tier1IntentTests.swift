@@ -1,7 +1,18 @@
-@testable import SeerCore
 import AppIntents
+@testable import SeerCore
 import SwiftData
 import XCTest
+
+private extension URL {
+    /// Test-only URL helper that traps on bad strings — only used for
+    /// the static URL literals scattered through these tests.
+    static func test(_ string: String) -> URL {
+        guard let url = URL(string: string) else {
+            preconditionFailure("Bad test URL: \(string)")
+        }
+        return url
+    }
+}
 
 /// Coverage for the three Tier 1 intents: Request, Search, Resume.
 @MainActor
@@ -40,7 +51,7 @@ final class Tier1IntentTests: XCTestCase {
         // needed (e.g., to assert which server's URL is captured).
         RequestMediaIntent.credentialsProvider = { _ in
             JellyseerrCredentials(
-                url: URL(string: "https://jellyseerr.example.com")!,
+                url: URL.test("https://jellyseerr.example.com"),
                 apiKey: "fake-api-key"
             )
         }
@@ -62,7 +73,7 @@ final class Tier1IntentTests: XCTestCase {
         let server = ServerConfiguration(
             id: serverID,
             name: "Test",
-            jellyfinURL: URL(string: "https://jellyfin.example.com")!,
+            jellyfinURL: URL.test("https://jellyfin.example.com"),
             jellyseerrURL: jellyseerr ? URL(string: "https://jellyseerr.example.com") : nil,
             jellyfinUserID: "user-1",
             isActive: true
@@ -163,7 +174,7 @@ final class Tier1IntentTests: XCTestCase {
         let second = ServerConfiguration(
             id: secondID,
             name: "Family",
-            jellyfinURL: URL(string: "https://family.example.com")!,
+            jellyfinURL: URL.test("https://family.example.com"),
             jellyseerrURL: URL(string: "https://family-seerr.example.com"),
             isActive: false
         )
@@ -174,7 +185,7 @@ final class Tier1IntentTests: XCTestCase {
         RequestMediaIntent.credentialsProvider = { serverID in
             capturedID.set(serverID)
             return JellyseerrCredentials(
-                url: URL(string: "https://family-seerr.example.com")!,
+                url: URL.test("https://family-seerr.example.com"),
                 apiKey: "k"
             )
         }
