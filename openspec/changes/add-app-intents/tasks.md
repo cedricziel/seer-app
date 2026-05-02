@@ -106,27 +106,27 @@ Final task in each group: run `make lint` and `make format`.
 
 ## 4. Tests (red) — SeerCore (verb intents)
 
-- [ ] 4.1 `RequestMediaIntentTests.testRequestsViaJellyseerr`
+- [x] 4.1 `RequestMediaIntentTests.testRequestsViaJellyseerr`
   with a fake `JellyseerrService` recording the call (covers Scenario:
   "Voice-triggered request reaches Jellyseerr" in `app-intents-actions`).
-- [ ] 4.2 `RequestMediaIntentTests.testThrowsNeedsConfigurationWhenSignedOut`
+- [x] 4.2 `RequestMediaIntentTests.testThrowsNeedsConfigurationWhenSignedOut`
   (covers Scenario: "Intent invoked while signed out").
-- [ ] 4.3 `RequestMediaIntentTests.testReturnsAlreadyOwnedSnippetWhenInLibrary`
+- [x] 4.3 `RequestMediaIntentTests.testReturnsAlreadyOwnedSnippetWhenInLibrary`
   with a `CachedMediaItem` matching by tmdbId (covers Scenario:
   "Requesting an already-owned title surfaces the library result").
-- [ ] 4.4 `RequestMediaIntentTests.testHonorsServerParameterOverride`
+- [x] 4.4 `RequestMediaIntentTests.testHonorsServerParameterOverride`
   (covers Scenario: "Server parameter overrides active server").
-- [ ] 4.5 `SearchMediaIntentTests.testReturnsLocalCacheHitsFirst`
+- [x] 4.5 `SearchMediaIntentTests.testReturnsLocalCacheHitsFirst`
   (covers Scenario: "Search prefers local library hits").
-- [ ] 4.6 `SearchMediaIntentTests.testMergesJellyseerrDiscoveryWhenSparse`
+- [x] 4.6 `SearchMediaIntentTests.testMergesJellyseerrDiscoveryWhenSparse`
   (covers Scenario: "Search supplements with Jellyseerr discovery when local hits are few").
-- [ ] 4.7 `SearchMediaIntentTests.testDeduplicatesByTmdbId`
+- [x] 4.7 `SearchMediaIntentTests.testDeduplicatesByTmdbId`
   (covers Scenario: "Local and discover hits with same TMDB id deduplicate").
-- [ ] 4.8 `ResumeWatchingIntentTests.testReturnsMostRecentInProgressItem`
+- [x] 4.8 `ResumeWatchingIntentTests.testReturnsMostRecentInProgressItem`
   (covers Scenario: "Resume returns most recent in-progress item").
-- [ ] 4.9 `ResumeWatchingIntentTests.testReturnsNothingWhenNoneInProgress`
+- [x] 4.9 `ResumeWatchingIntentTests.testReturnsNothingWhenNoneInProgress`
   (covers Scenario: "Resume with empty Continue Watching list").
-- [ ] 4.9a `ResumeWatchingIntentTests.testOpensIntentTargetsFlowmarkMediaURL`
+- [x] 4.9a `ResumeWatchingIntentTests.testOpensIntentTargetsFlowmarkMediaURL`
   — asserts the returned `OpensIntent` carries `flowmark://media/<id>`
   for the resolved item, and `flowmark://library` for the empty case
   (covers Scenario: "Resume opens flowmark:// route" in
@@ -152,18 +152,18 @@ Final task in each group: run `make lint` and `make format`.
 
 ## 5. Implementation (green) — SeerCore (verb intents)
 
-- [ ] 5.1 Implement `IntentError` (LocalizedError + AppIntentError) in
+- [x] 5.1 Implement `IntentError` (LocalizedError + AppIntentError) in
   `Packages/SeerCore/Sources/SeerCore/AppIntents/IntentError.swift` with
   cases `needsConfiguration`, `serverNotReachable`, `notFound`.
-- [ ] 5.2 Implement `RequestMediaIntent.perform()`: check
+- [x] 5.2 Implement `RequestMediaIntent.perform()`: check
   `appState.isAuthenticated`, dedupe against library cache by tmdbId,
   resolve `ServerEntity` via hybrid rule, call existing
   `JellyseerrService.createRequest` (makes 4.1, 4.2, 4.3, 4.4 pass).
-- [ ] 5.3 Implement `SearchMediaIntent.perform()`: query OfflineSync
+- [x] 5.3 Implement `SearchMediaIntent.perform()`: query OfflineSync
   cache; if local hits < threshold (3), supplement via Jellyseerr
   discover; merge dedup by tmdbId; return up to 10 (makes 4.5, 4.6, 4.7
   pass).
-- [ ] 5.4 Implement `ResumeWatchingIntent.perform()`: read most recent
+- [x] 5.4 Implement `ResumeWatchingIntent.perform()`: read most recent
   `CachedUserProgress` with `playbackPositionTicks > 0`, return
   `OpensIntent` that the app handles via in-process navigation; empty
   case returns "Nothing to resume" snippet (makes 4.8, 4.9 pass).
