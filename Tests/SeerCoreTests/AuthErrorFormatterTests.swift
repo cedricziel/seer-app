@@ -71,6 +71,31 @@ final class AuthErrorFormatterTests: XCTestCase {
         XCTAssertTrue(advice.suggestion?.contains("8096") ?? false)
     }
 
+    func testAdvice_cannotConnectToHost_private172RangeSuggestsPort() {
+        // RFC 1918 172.16.0.0–172.31.255.255 should be treated as local.
+        let error = URLError(.cannotConnectToHost)
+        for octet in [16, 20, 31] {
+            let host = "172.\(octet).5.10"
+            let advice = AuthErrorFormatter.advice(for: error, urlString: "http://\(host)")
+            XCTAssertTrue(
+                advice.suggestion?.contains("8096") ?? false,
+                "Expected port hint for private 172.\(octet) range, got: \(advice.suggestion ?? "nil")"
+            )
+        }
+    }
+
+    func testAdvice_cannotConnectToHost_public172RangeSkipsPortHint() {
+        // 172.0–172.15 and 172.32–172.255 are public ARIN-allocated ranges.
+        let error = URLError(.cannotConnectToHost)
+        for host in ["172.15.5.10", "172.32.5.10", "172.255.5.10"] {
+            let advice = AuthErrorFormatter.advice(for: error, urlString: "http://\(host)")
+            XCTAssertFalse(
+                advice.suggestion?.contains(":8096") ?? true,
+                "Did not expect port hint for public \(host), got: \(advice.suggestion ?? "nil")"
+            )
+        }
+    }
+
     func testAdvice_cannotConnectToHost_publicHostSkipsPortHint() {
         let error = URLError(.cannotConnectToHost)
         let advice = AuthErrorFormatter.advice(for: error, urlString: "https://jellyfin.example.com")

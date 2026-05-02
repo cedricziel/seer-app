@@ -138,7 +138,7 @@ public enum AuthErrorFormatter {
 
         let isLikelyLocal = host.hasPrefix("192.168.") ||
             host.hasPrefix("10.") ||
-            host.hasPrefix("172.") ||
+            isPrivate172(host) ||
             host == "localhost" ||
             host.hasSuffix(".local")
 
@@ -146,5 +146,19 @@ public enum AuthErrorFormatter {
             return "Try adding the Jellyfin port, e.g. \(host):8096"
         }
         return "Verify the port and that the server is running"
+    }
+
+    /// RFC 1918 limits the 172.x private range to 172.16.0.0–172.31.255.255.
+    /// `host.hasPrefix("172.")` would misclassify the public 172.0–172.15
+    /// and 172.32–172.255 blocks (now ARIN-allocated) as local.
+    private static func isPrivate172(_ host: String) -> Bool {
+        let parts = host.split(separator: ".", maxSplits: 2, omittingEmptySubsequences: false)
+        guard parts.count >= 2,
+              parts[0] == "172",
+              let octet = Int(parts[1])
+        else {
+            return false
+        }
+        return (16 ... 31).contains(octet)
     }
 }

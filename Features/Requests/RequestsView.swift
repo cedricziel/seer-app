@@ -107,10 +107,14 @@ private struct RequestsContentView: View {
             }
         }
         .task {
-            if viewModel.isJellyseerrConfigured {
-                await viewModel.loadRequests()
-                viewModel.startAutoRefresh()
-            }
+            guard viewModel.isJellyseerrConfigured else { return }
+            await viewModel.loadRequests()
+            // The SwiftUI `.task` may have been cancelled while the load
+            // was in flight (e.g. the user navigated away). Skip starting
+            // the polling loop in that case so we don't leak an unscoped
+            // scheduler Task that onDisappear has already missed.
+            guard !Task.isCancelled else { return }
+            viewModel.startAutoRefresh()
         }
         .onDisappear {
             viewModel.stopAutoRefresh()

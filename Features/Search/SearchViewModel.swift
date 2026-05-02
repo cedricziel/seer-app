@@ -43,6 +43,10 @@ public final class SearchViewModel: ObservableObject {
     private let historyStore: SearchHistoryStore
     private let debounceMilliseconds: Int
     private var searchTask: Task<Void, Never>?
+    /// Bumped before each new search Task. Older tasks check it before
+    /// mutating state so a stale debounce/cancel can't clobber the
+    /// freshest search.
+    private var searchGeneration: Int = 0
 
     // MARK: - Initialization
 
@@ -111,8 +115,11 @@ public final class SearchViewModel: ObservableObject {
             return
         }
 
-        // Cancel any existing search
+        // Cancel any existing search and bump the generation so the cancelled
+        // task can't flip our state on its way out.
         searchTask?.cancel()
+        searchGeneration += 1
+        let generation = searchGeneration
 
         isDebouncing = true
         errorMessage = nil
@@ -121,30 +128,34 @@ public final class SearchViewModel: ObservableObject {
 
         let debounce = debounceMilliseconds
         searchTask = Task {
+            defer {
+                if generation == searchGeneration {
+                    isDebouncing = false
+                    isSearching = false
+                }
+            }
+
             do {
                 try await Task.sleep(for: .milliseconds(debounce))
 
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, generation == searchGeneration else { return }
 
                 isDebouncing = false
                 isSearching = true
 
                 let response = try await jellyseerrService!.search(query: query, page: 1)
 
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, generation == searchGeneration else { return }
 
                 searchResults = response.results.filter { $0.mediaType != .person }
                 totalPages = response.totalPages
                 recordSearchHistory(query)
             } catch {
-                if !Task.isCancelled {
+                if !Task.isCancelled, generation == searchGeneration {
                     errorMessage = error.localizedDescription
                     searchResults = []
                 }
             }
-
-            isDebouncing = false
-            isSearching = false
         }
     }
 
