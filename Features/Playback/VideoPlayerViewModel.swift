@@ -377,9 +377,20 @@ public final class VideoPlayerViewModel {
     /// Updates Now Playing info for lock screen / control center
     private func updateNowPlayingInfo(player: AVPlayer) {
         let imageURL = appState.jellyfinServerURL?.appendingPathComponent("Items/\(item.id)/Images/Primary")
+        let playerDuration = player.currentItem?.duration
+        let durationSeconds: Double? = if let playerDuration, playerDuration.isNumeric {
+            CMTimeGetSeconds(playerDuration)
+        } else if duration > 0 {
+            duration
+        } else {
+            nil
+        }
+        let elapsed = player.currentTime().isNumeric ? CMTimeGetSeconds(player.currentTime()) : 0
         PiPPlaybackManager.shared.updateNowPlayingInfo(
             for: item,
-            player: player,
+            duration: durationSeconds,
+            elapsed: elapsed,
+            rate: player.rate,
             imageURL: imageURL
         )
     }
@@ -419,6 +430,10 @@ public final class VideoPlayerViewModel {
             currentTime = seconds
             playbackState = playbackState?.withPosition(
                 ticks: PlaybackState.positionTicks(from: seconds)
+            )
+            PiPPlaybackManager.shared.updateNowPlayingPlaybackTime(
+                elapsed: seconds,
+                rate: player?.rate ?? 0
             )
         }
     }
