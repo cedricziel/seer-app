@@ -129,10 +129,12 @@ private struct RequestsContentView: View {
     // MARK: - Not Configured View
 
     private var notConfiguredView: some View {
-        EmptyContentView(
-            title: "Jellyseerr Not Configured",
-            systemImage: "server.rack",
-            description: "Configure Jellyseerr in settings to view your requests."
+        JellyseerrConnectPrompt(
+            title: "Manage Requests",
+            description: "Connect Jellyseerr to track and manage media requests.",
+            onSuccess: {
+                Task { await viewModel.refresh() }
+            }
         )
     }
 

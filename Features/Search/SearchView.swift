@@ -26,6 +26,10 @@ private struct SearchContentView: View {
     @State private var showRequestOptions: Bool = false
     @State private var requestOptionsResult: SearchResult?
 
+    // Pending Request action waiting for Jellyseerr connect
+    @State private var pendingRequestAfterConnect: SearchResult?
+    @State private var showJellyseerrConnectSheet: Bool = false
+
     init(appState: AppState) {
         self.appState = appState
         _viewModel = StateObject(wrappedValue: SearchViewModel(appState: appState))
@@ -76,6 +80,28 @@ private struct SearchContentView: View {
                 )
                 .presentationDetents([.medium, .large])
             }
+            .sheet(isPresented: $showJellyseerrConnectSheet) {
+                JellyseerrConnectSheet(
+                    connector: connectJellyseerr,
+                    onSuccess: {
+                        showJellyseerrConnectSheet = false
+                        // Resume the originating Request tap once Jellyseerr
+                        // is configured. Defer to the next runloop so the
+                        // sheet's dismiss animation completes first.
+                        if let pending = pendingRequestAfterConnect {
+                            pendingRequestAfterConnect = nil
+                            Task { @MainActor in
+                                try? await Task.sleep(for: .milliseconds(50))
+                                handleRequestAction(pending)
+                            }
+                        }
+                    },
+                    onCancel: {
+                        showJellyseerrConnectSheet = false
+                        pendingRequestAfterConnect = nil
+                    }
+                )
+            }
             .sheet(isPresented: $showRequestOptions) {
                 if let result = requestOptionsResult {
                     RequestOptionsSheet(
@@ -100,10 +126,12 @@ private struct SearchContentView: View {
     // MARK: - Not Configured View
 
     private var notConfiguredView: some View {
-        EmptyContentView(
-            title: "Jellyseerr Not Configured",
-            systemImage: "server.rack",
-            description: "Configure Jellyseerr in settings to search and request media."
+        JellyseerrConnectPrompt(
+            title: "Search Movies & Shows",
+            description: "Connect Jellyseerr to search and request new titles.",
+            onSuccess: {
+                Task { await viewModel.search() }
+            }
         )
     }
 
@@ -251,7 +279,24 @@ private struct SearchContentView: View {
 
     // MARK: - Actions
 
+    @MainActor
+    @Sendable
+    private func connectJellyseerr(url: URL, apiKey: String) async throws {
+        let service = JellyseerrService(serverURL: url, apiKey: apiKey)
+        let userInfo = try await service.verifyAuth()
+        appState.setJellyseerrPermissions(userInfo.permissions)
+        appState.saveJellyseerrCredentials(serverURL: url, apiKey: apiKey)
+    }
+
     private func handleRequestAction(_ result: SearchResult) {
+        // Defensive: if Jellyseerr is unconfigured (e.g. server switch
+        // mid-flow), present the connect sheet and resume on success.
+        guard viewModel.isJellyseerrConfigured else {
+            pendingRequestAfterConnect = result
+            showJellyseerrConnectSheet = true
+            return
+        }
+
         // For TV shows, show options sheet for season selection
         if result.mediaType == .tvShow {
             requestOptionsResult = result

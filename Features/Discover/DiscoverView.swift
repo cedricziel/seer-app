@@ -106,10 +106,15 @@ private struct DiscoverContentView: View {
     // MARK: - Not Configured View
 
     private var notConfiguredView: some View {
-        EmptyContentView(
-            title: "Jellyseerr Not Configured",
-            systemImage: "server.rack",
-            description: "Configure Jellyseerr in settings to discover and request media."
+        JellyseerrConnectPrompt(
+            title: "Discover Movies & Shows",
+            description: "Connect Jellyseerr to browse trending content and request new media.",
+            onSuccess: {
+                Task {
+                    viewModel.serverChanged()
+                    await viewModel.loadInitialData()
+                }
+            }
         )
     }
 
