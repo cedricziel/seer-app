@@ -53,40 +53,56 @@ Final task in each group: run `make lint` and `make format`.
 
 ## 2. Tests (red) — SeerCore (AppEntity foundation)
 
-- [ ] 2.1 `MediaItemEntityQueryTests.testEntitiesReturnedFromOfflineSync`
+- [x] 2.1 `MediaItemEntityQueryTests.testEntitiesReturnedFromOfflineSync`
   — fixture `OfflineSync` SwiftData store with two `CachedMediaItem`s,
   expect `MediaItemEntityQuery().entities(matching:)` to return both
   (covers Scenario: "Entity query returns library items from offline cache"
-  in `app-intents-foundation`).
-- [ ] 2.2 `MediaItemEntityQueryTests.testEmptyCacheReturnsEmpty`
+  in `app-intents-foundation`). — Implemented in
+  `Tests/SeerCoreTests/AppIntents/AppEntityQueryTests.swift` against an
+  in-memory ModelContainer injected via `AppIntentsContext`.
+- [x] 2.2 `MediaItemEntityQueryTests.testEmptyCacheReturnsEmpty`
   — covers Scenario: "Empty cache returns no results".
-- [ ] 2.3 `MediaItemEntityQueryTests.testSuggestedEntitiesReturnsRecent`
+- [x] 2.3 `MediaItemEntityQueryTests.testSuggestedEntitiesReturnsRecent`
   — `OfflineSync` with five items, three with recent
   `CachedUserProgress`. Expect `suggestedEntities()` to return the three
   recent ones (covers Scenario: "Siri suggestions surface recent items").
-- [ ] 2.4 `RequestEntityQueryTests.testEntitiesFromCachedRequests`
+- [x] 2.4 `RequestEntityQueryTests.testEntitiesFromCachedRequests`
   — fixture `CachedRequest` rows, expect query to return matching ones.
-- [ ] 2.5 `ServerEntityQueryTests.testEntitiesFromConfiguredServers`
+- [x] 2.5 `ServerEntityQueryTests.testEntitiesFromConfiguredServers`
   — two `ServerConfiguration` rows, expect both as entities.
-- [ ] 2.6 `ServerEntityQueryTests.testDefaultsToActiveServer`
+- [x] 2.6 `ServerEntityQueryTests.testDefaultsToActiveServer`
   — covers Scenario: "Server entity default is active server".
-- [ ] 2.7 Run `make lint` and `make format`.
+- [x] 2.7 Run `make lint` and `make format`. — Both clean (0 violations,
+  0 files formatted).
 
 ## 3. Implementation (green) — SeerCore (AppEntity foundation)
 
-- [ ] 3.1 Define `MediaItemEntity` in
+- [x] 3.1 Define `MediaItemEntity` in
   `Packages/SeerCore/Sources/SeerCore/AppIntents/MediaItemEntity.swift`
   conforming to `AppEntity` + `IndexedEntity`. Properties: `id`,
-  `title`, `year`, `mediaType`, `posterURL` (display only).
-- [ ] 3.2 Define `MediaItemEntityQuery` reading from the shared
+  `title`, `year`, `mediaType`, `posterURL` (display only). — Posters
+  not surfaced in v1; spec privacy footer says "title, year, type,
+  identifier — no posters". Added `Equatable` conformance for
+  `XCTAssertEqual` ergonomics in tests.
+- [x] 3.2 Define `MediaItemEntityQuery` reading from the shared
   `OfflineSync` `ModelContext`; implement `entities(matching:)`,
   `entities(for:)`, `suggestedEntities()` (makes 2.1, 2.2, 2.3 pass).
-- [ ] 3.3 Define `RequestEntity` and `RequestEntityQuery` reading from
+  — `EntityStringQuery` conformance; empty match string returns all
+  rows. Falls back to a transient in-memory container when
+  `AppIntentsContext.modelContainer` is nil (intent fired before app
+  launch finished) so queries never throw on cold-start.
+- [x] 3.3 Define `RequestEntity` and `RequestEntityQuery` reading from
   `CachedRequest` (makes 2.4 pass).
-- [ ] 3.4 Define `ServerEntity` and `ServerEntityQuery` reading from
+- [x] 3.4 Define `ServerEntity` and `ServerEntityQuery` reading from
   `ServerConfiguration`; `defaultResult()` returns `AppState.activeServer`
-  (makes 2.5, 2.6 pass).
-- [ ] 3.5 Run `make lint` and `make format`.
+  (makes 2.5, 2.6 pass). — `SortDescriptor` does not accept `Bool`
+  key-paths in SwiftData (Bool is not `Comparable` in Swift), so
+  active-first sort is done in-memory after a `lastUsed`/`name`
+  database sort.
+- [x] 3.5 Run `make lint` and `make format`. — Both clean. Also added
+  `AppIntentsContext.modelContainer = modelContainer` to
+  `App/SeerApp/SeerApp.swift` so production queries read from the
+  same CloudKit-backed store the app uses.
 
 ## 4. Tests (red) — SeerCore (verb intents)
 

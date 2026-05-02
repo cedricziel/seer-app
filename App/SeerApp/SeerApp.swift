@@ -68,6 +68,11 @@ struct SeerApp: App {
         // Set the model context on AppState
         state.setModelContext(modelContainer.mainContext)
 
+        // Register the SwiftData container with App Intents queries so
+        // entity queries (MediaItemEntityQuery, RequestEntityQuery,
+        // ServerEntityQuery) can read from the same store the app uses.
+        AppIntentsContext.modelContainer = modelContainer
+
         // Initialize OfflineSyncService
         let syncService = OfflineSyncService(modelContext: modelContainer.mainContext)
         _offlineSyncService = StateObject(wrappedValue: syncService)
