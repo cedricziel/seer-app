@@ -89,16 +89,17 @@ final class AppEntityQueryTests: XCTestCase {
         let now = Date()
 
         // Three items with progress, two without.
-        let withProgress = (0 ..< 3).map { idx in
-            let item = CachedMediaItem(
+        let withProgress: [CachedMediaItem] = (0 ..< 3).map { idx in
+            let ticks = Int64((idx + 1) * 1_000_000)
+            let played = now.addingTimeInterval(TimeInterval(-idx * 60))
+            return CachedMediaItem(
                 id: "p-\(idx)",
                 serverConfigurationID: serverID,
                 name: "Played \(idx)",
                 mediaType: "Movie",
-                playbackPositionTicks: Int64((idx + 1) * 1_000_000),
-                lastPlayedDate: now.addingTimeInterval(TimeInterval(-idx * 60))
+                playbackPositionTicks: ticks,
+                lastPlayedDate: played
             )
-            return item
         }
         let withoutProgress = (0 ..< 2).map { idx in
             CachedMediaItem(
@@ -162,13 +163,15 @@ final class AppEntityQueryTests: XCTestCase {
     /// 2.5 — every configured server appears as an entity.
     func testEntitiesFromConfiguredServers() async throws {
         let context = container.mainContext
+        let personalURL = try XCTUnwrap(URL(string: "https://personal.example.com"))
+        let familyURL = try XCTUnwrap(URL(string: "https://family.example.com"))
         let personal = ServerConfiguration(
             name: "Personal",
-            jellyfinURL: URL(string: "https://personal.example.com")!
+            jellyfinURL: personalURL
         )
         let family = ServerConfiguration(
             name: "Family",
-            jellyfinURL: URL(string: "https://family.example.com")!
+            jellyfinURL: familyURL
         )
         context.insert(personal)
         context.insert(family)
@@ -186,14 +189,16 @@ final class AppEntityQueryTests: XCTestCase {
     /// is marked active, regardless of insertion order.
     func testDefaultsToActiveServer() async throws {
         let context = container.mainContext
+        let personalURL = try XCTUnwrap(URL(string: "https://personal.example.com"))
+        let familyURL = try XCTUnwrap(URL(string: "https://family.example.com"))
         let personal = ServerConfiguration(
             name: "Personal",
-            jellyfinURL: URL(string: "https://personal.example.com")!,
+            jellyfinURL: personalURL,
             isActive: false
         )
         let family = ServerConfiguration(
             name: "Family",
-            jellyfinURL: URL(string: "https://family.example.com")!,
+            jellyfinURL: familyURL,
             isActive: true
         )
         context.insert(personal)
@@ -204,7 +209,7 @@ final class AppEntityQueryTests: XCTestCase {
         let result = try await query.suggestedEntities().first
         XCTAssertEqual(result?.name, "Family")
 
-        let defaultEntity = try await query.defaultResult()
+        let defaultEntity = await query.defaultResult()
         XCTAssertEqual(defaultEntity?.name, "Family")
     }
 }
