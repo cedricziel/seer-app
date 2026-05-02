@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/cedricziel/seer-app/compare/v0.2.2...v0.2.3) (2026-05-02)
+
+
+### Bug Fixes
+
+* **release:** pin manual signing settings in project.yml ([3ec2ae9](https://github.com/cedricziel/seer-app/commit/3ec2ae9f18ce9256880f62e3801ae8ce741f0d96))
+
 ## [0.2.2](https://github.com/cedricziel/seer-app/compare/v0.2.1...v0.2.2) (2026-05-02)
 
 
