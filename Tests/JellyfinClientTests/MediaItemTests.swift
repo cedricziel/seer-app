@@ -16,8 +16,8 @@ final class MediaItemTests: XCTestCase {
     }
 
     func testRuntimeMinutes_twoHoursFifteenMinutes_returns135() {
-        let ticks: Int64 = 81_000_000_000 // 2h15m
-        let item = makeItem(runTimeTicks: ticks)
+        // 81_000_000_000 ticks = 2h15m
+        let item = makeItem(runTimeTicks: 81_000_000_000)
         XCTAssertEqual(item.runtimeMinutes, 135)
     }
 

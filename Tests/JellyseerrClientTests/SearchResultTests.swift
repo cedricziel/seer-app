@@ -153,7 +153,7 @@ final class SearchResultTests: XCTestCase {
         backdropPath: String? = nil,
         mediaInfoStatus: SearchResult.MediaInfo.MediaStatus? = nil
     ) -> SearchResult {
-        let mediaInfo: SearchResult.MediaInfo? = mediaInfoStatus.map {
+        let mediaInfo = mediaInfoStatus.map {
             SearchResult.MediaInfo(id: 1, tmdbId: nil, tvdbId: nil, status: $0, requests: nil)
         }
         return SearchResult(

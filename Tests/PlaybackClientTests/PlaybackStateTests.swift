@@ -30,7 +30,7 @@ final class PlaybackStateTests: XCTestCase {
     }
 
     func testPositionTicksFromSeconds_roundTrip() {
-        let originalTicks: Int64 = 12_345_670
+        let originalTicks = Int64(12_345_670)
         let seconds = Double(originalTicks) / 10_000_000.0
         XCTAssertEqual(PlaybackState.positionTicks(from: seconds), originalTicks)
     }
