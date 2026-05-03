@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/cedricziel/seer-app/compare/v0.5.0...v0.6.0) (2026-05-03)
+
+
+### Features
+
+* **telemetry:** enable OTLP shipping in TestFlight builds ([441dd01](https://github.com/cedricziel/seer-app/commit/441dd01ecbb6c9a52a814d5ebc6eda3581747970))
+
 ## [0.5.0](https://github.com/cedricziel/seer-app/compare/v0.4.1...v0.5.0) (2026-05-03)
 
 
