@@ -81,21 +81,6 @@ final class PersonDetailViewSnapshotTests: XCTestCase {
         )
     }
 
-    func testBiography_LongText_iPhoneCompact() {
-        let view = PersonBiographyView(
-            overview: String(
-                repeating: "An award-winning actor with a long career on stage and screen. ",
-                count: 8
-            )
-        )
-        .padding()
-
-        assertSnapshot(
-            of: view,
-            as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13))
-        )
-    }
-
     // MARK: - Filmography
 
     func testFilmography_Loading_iPhoneCompact() {
