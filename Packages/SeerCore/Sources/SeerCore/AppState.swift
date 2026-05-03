@@ -144,7 +144,7 @@ public final class AppState: ObservableObject {
     }
 
     /// Convenience struct for accessing Jellyfin credentials
-    public struct JellyfinCredentials {
+    public struct JellyfinCredentials: Sendable {
         public let serverURL: URL
         public let accessToken: String
         public let userId: String
@@ -165,6 +165,30 @@ public final class AppState: ObservableObject {
             accessToken: accessToken,
             userId: userId,
             deviceId: deviceId
+        )
+    }
+
+    /// Resolve credentials for a specific server id (not necessarily
+    /// the currently active one). Used by App Intents that target a
+    /// non-active server explicitly via a `ServerEntity` parameter.
+    public func jellyfinCredentials(for serverID: UUID) -> JellyfinCredentials? {
+        guard let server = configuration(for: serverID),
+              let userID = server.jellyfinUserID,
+              let token = KeychainManager.shared.getCredential(
+                  for: serverID,
+                  key: .jellyfinAccessToken
+              ),
+              let device = KeychainManager.shared.getCredential(
+                  for: serverID,
+                  key: .jellyfinDeviceID
+              )
+        else { return nil }
+        let serverURL = ServerURLResolver.shared.resolveJellyfinURL(for: server)
+        return JellyfinCredentials(
+            serverURL: serverURL,
+            accessToken: token,
+            userId: userID,
+            deviceId: device
         )
     }
 

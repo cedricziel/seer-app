@@ -190,6 +190,16 @@ struct SeerApp: App {
             print("Failed to initialize DownloadManager: \(error)")
         }
 
+        // Install production implementations for the App Intent test
+        // seams (RequestMediaIntent.submitter, SearchMediaIntent.
+        // discoverSupplement, MarkAsWatchedIntent.updater,
+        // DownloadForOfflineIntent.enqueuer). Replaces the defaults
+        // that throw `serverNotReachable`.
+        IntentSeams.install(
+            appState: appState,
+            downloadManager: downloadManager
+        )
+
         // Setup request status poller
         if let serverID = appState.activeServerID {
             let poller = RequestStatusPoller(

@@ -107,6 +107,9 @@ credentials/
 # Isolated agent run worktrees — local-only, never committed.
 .claude/worktrees/
 
+# Scheduling lockfile written by the agent runtime — local-only.
+.claude/scheduled_tasks.lock
+
 # swift-snapshot-testing failure / diff artifacts (the .1.png references
 # ARE committed; *.failure.png and *.diff.png are written on a mismatch
 # and should stay local — CI uploads them as artifacts).
