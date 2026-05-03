@@ -10,7 +10,6 @@ import OTelSwiftLog
 import PersistenceExporter
 import ResourceExtension
 import SignPostIntegration
-import URLSessionInstrumentation
 
 /// OpenTelemetry-based telemetry service that collects and reports performance metrics and crash data.
 /// This service replaces the previous Errata SDK implementation while preserving the same consent model.
@@ -55,9 +54,6 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
 
     /// OpenTelemetry logger for crash reports
     private var otelLogger: (any OpenTelemetryApi.Logger)?
-
-    /// URLSession instrumentation for automatic HTTP request tracing
-    private var urlSessionInstrumentation: URLSessionInstrumentation?
 
     /// Storage URL for persisting telemetry data when offline
     private static var persistenceStorageURL: URL {
@@ -116,7 +112,10 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
             return
         }
 
-        setupURLSessionInstrumentation()
+        // URLSessionInstrumentation intentionally not enabled: opentelemetry-swift's
+        // swizzling crashes on iOS 26 / Swift 6 with dispatch_assert_queue isolation
+        // checks (see github.com/open-telemetry/opentelemetry-swift/issues/937).
+        // Re-enable once upstream ships a fix.
 
         tracer = tracerProvider.get(instrumentationName: "seer-app", instrumentationVersion: Bundle.main.appVersion)
         stableMeter = meterProvider
@@ -228,25 +227,6 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
         Self.logger.debug("Swift Logging bootstrapped with OpenTelemetry log handler")
 
         return provider
-    }
-
-    private func setupURLSessionInstrumentation() {
-        urlSessionInstrumentation = URLSessionInstrumentation(
-            configuration: URLSessionInstrumentationConfiguration(
-                shouldInstrument: { request in
-                    // Skip requests with no URL - can't trace without a valid URL
-                    guard let url = request.url?.absoluteString else {
-                        return false
-                    }
-
-                    // Don't trace OTLP exporter requests to avoid infinite loops
-                    let isOtlpRequest = url.contains("/v1/traces") || url.contains("/v1/metrics") || url
-                        .contains("/v1/logs")
-                    return !isOtlpRequest
-                }
-            )
-        )
-        Self.logger.debug("URLSession instrumentation enabled for automatic HTTP tracing")
     }
 
     /// Call this when consent changes to initialize or update OTEL
