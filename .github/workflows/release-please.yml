@@ -63,10 +63,25 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: true
 
-      - name: Provide stub Secrets.xcconfig
+      - name: Provide Secrets.xcconfig
+        env:
+          OTLP_ENDPOINT:    ${{ secrets.OTLP_ENDPOINT }}
+          OTLP_AUTH_HEADER: ${{ secrets.OTLP_AUTH_HEADER }}
         run: |
           if [ ! -f Config/Secrets.xcconfig ]; then
             cp Config/Secrets.xcconfig.template Config/Secrets.xcconfig
+          fi
+          if [ -n "$OTLP_ENDPOINT" ] && [ -n "$OTLP_AUTH_HEADER" ]; then
+            # xcconfig treats // as a comment; escape with /$()/ so the
+            # URL survives Xcode's preprocessor when expanded into Info.plist.
+            ENDPOINT_ESCAPED=$(printf '%s' "$OTLP_ENDPOINT" | sed 's|//|/$()/|g')
+            {
+              echo "OTLP_ENDPOINT = $ENDPOINT_ESCAPED"
+              echo "OTLP_AUTH_HEADER = $OTLP_AUTH_HEADER"
+            } >> Config/Secrets.xcconfig
+            echo "OTLP endpoint configured"
+          else
+            echo "OTLP endpoint not configured (secrets unavailable) - telemetry disabled"
           fi
 
       - name: Configure SSH for match repo
