@@ -1,5 +1,6 @@
 import DownloadClient
 import JellyfinClient
+import Kingfisher
 import SeerCore
 import SeerUI
 import SwiftUI
@@ -210,32 +211,63 @@ extension MediaDetailView {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 LazyHStack(spacing: 12) {
-                    ForEach(people.prefix(10), id: \.name) { person in
-                        VStack {
-                            Circle()
-                                .fill(Color(.systemGray5))
-                                .frame(width: 60, height: 60)
-                                .overlay {
-                                    Image(systemName: "person.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-
-                            Text(person.name ?? "Unknown")
-                                .font(.caption)
-                                .lineLimit(1)
-
-                            if let role = person.role {
-                                Text(role)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .frame(width: 80)
+                    ForEach(Array(people.prefix(10).enumerated()), id: \.offset) { _, person in
+                        castCell(for: person)
                     }
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func castCell(for person: MediaItem.Person) -> some View {
+        if person.id != nil {
+            NavigationLink(value: person) {
+                castCellContent(for: person)
+            }
+            .buttonStyle(.plain)
+        } else {
+            castCellContent(for: person)
+        }
+    }
+
+    private func castCellContent(for person: MediaItem.Person) -> some View {
+        VStack {
+            Group {
+                if let url = viewModel.personImageURL(for: person) {
+                    KFImage(url)
+                        .placeholder { castPlaceholder }
+                        .fade(duration: 0.25)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else {
+                    castPlaceholder
+                }
+            }
+            .frame(width: 60, height: 60)
+            .clipShape(Circle())
+
+            Text(person.name ?? "Unknown")
+                .font(.caption)
+                .lineLimit(1)
+
+            if let role = person.role {
+                Text(role)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(width: 80)
+    }
+
+    private var castPlaceholder: some View {
+        Circle()
+            .fill(Color(.systemGray5))
+            .overlay {
+                Image(systemName: "person.fill")
+                    .foregroundStyle(.secondary)
+            }
     }
 
     // MARK: - Seasons Section

@@ -414,6 +414,30 @@ targets:
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeerApp.app/SeerApp"
         BUNDLE_LOADER: "$(TEST_HOST)"
 
+  # Host-based test bundle for Features/Library code (PersonDetailView etc.).
+  # Mirrors AuthFeatureTests so feature snapshot tests stay scoped to a
+  # single feature. iOS-only because SnapshotTesting renders via UIKit.
+  LibraryFeatureTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS]
+    sources:
+      - path: Tests/LibraryFeatureTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: SeerApp
+      - target: SeerCore
+      - target: JellyfinClient
+      - target: SeerUI
+      - package: SnapshotTesting
+        product: SnapshotTesting
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.libraryfeaturetests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/SeerApp.app/SeerApp"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
   # iOS-only because SnapshotTesting renders via UIKit (UIImage/UIWindow).
   # SeerUI itself supports tvOS; tvOS tests live in SeerUITestsTV.
   SeerUITests:
@@ -485,6 +509,7 @@ schemes:
         OfflineSyncTests: [test]
         SeerUITests: [test]
         AuthFeatureTests: [test]
+        LibraryFeatureTests: [test]
     run:
       config: Debug
       environmentVariables:
@@ -505,6 +530,7 @@ schemes:
         - OfflineSyncTests
         - SeerUITests
         - AuthFeatureTests
+        - LibraryFeatureTests
     profile:
       config: Release
     analyze:

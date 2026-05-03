@@ -44,6 +44,9 @@ private struct LibraryContentView: View {
             .navigationDestination(for: MediaItem.self) { item in
                 MediaDetailView(item: item, source: .library, viewModel: viewModel)
             }
+            .navigationDestination(for: MediaItem.Person.self) { person in
+                PersonDetailView(person: person, appState: appState)
+            }
             .toolbar { toolbarContent }
         }
         .task { await viewModel.loadInitialData() }

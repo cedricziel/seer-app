@@ -317,6 +317,96 @@ public extension JellyfinService {
     }
 }
 
+// MARK: - Persons
+
+public extension JellyfinService {
+    /// Fetch full details for a person (actor, director, etc.) by ID.
+    func getPerson(id: String) async throws -> PersonDetail {
+        guard let userID else {
+            throw JellyfinError.notAuthenticated
+        }
+
+        var components = try serverURL
+            .appendingPathComponent("Users/\(userID)/Items/\(id)")
+            .urlComponents()
+        components.queryItems = [
+            URLQueryItem(name: "Fields", value: "Overview,ProductionLocations,PremiereDate,EndDate")
+        ]
+
+        guard let url = components.url else {
+            throw JellyfinError.invalidURL
+        }
+
+        let request = try authenticatedRequest(url: url)
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        return try decoder.decode(PersonDetail.self, from: data)
+    }
+
+    /// Fetch movies and series in the user's library that feature the given person.
+    func getItems(personId: String, limit: Int = 20) async throws -> [MediaItem] {
+        guard let userID else {
+            throw JellyfinError.notAuthenticated
+        }
+
+        var components = try serverURL
+            .appendingPathComponent("Users/\(userID)/Items")
+            .urlComponents()
+        components.queryItems = [
+            URLQueryItem(name: "PersonIds", value: personId),
+            URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series"),
+            URLQueryItem(name: "Recursive", value: "true"),
+            URLQueryItem(name: "SortBy", value: "PremiereDate,SortName"),
+            URLQueryItem(name: "SortOrder", value: "Descending"),
+            URLQueryItem(name: "Limit", value: String(limit)),
+            URLQueryItem(name: "Fields", value: "Overview,Genres")
+        ]
+
+        guard let url = components.url else {
+            throw JellyfinError.invalidURL
+        }
+
+        let request = try authenticatedRequest(url: url)
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        return try decoder.decode(ItemsResponse.self, from: data).items
+    }
+
+    /// Build a URL for a person's primary image. The optional `imageTag` is
+    /// used as a cache-busting query parameter so updated images are refetched.
+    func getPersonImageURL(
+        personId: String,
+        imageTag: String? = nil,
+        maxWidth: Int? = nil,
+        maxHeight: Int? = nil
+    ) -> URL {
+        guard var components = URLComponents(
+            url: serverURL.appendingPathComponent("Items/\(personId)/Images/Primary"),
+            resolvingAgainstBaseURL: false
+        ) else {
+            return serverURL
+        }
+
+        var queryItems: [URLQueryItem] = []
+        if let imageTag {
+            queryItems.append(URLQueryItem(name: "tag", value: imageTag))
+        }
+        if let maxWidth {
+            queryItems.append(URLQueryItem(name: "maxWidth", value: String(maxWidth)))
+        }
+        if let maxHeight {
+            queryItems.append(URLQueryItem(name: "maxHeight", value: String(maxHeight)))
+        }
+        if !queryItems.isEmpty {
+            components.queryItems = queryItems
+        }
+
+        return components.url ?? serverURL
+    }
+}
+
 // MARK: - Search
 
 public extension JellyfinService {
