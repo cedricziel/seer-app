@@ -285,6 +285,25 @@ public final class LibraryViewModel: ObservableObject {
         serverURL?.appendingPathComponent("Items/\(library.id)/Images/Primary")
     }
 
+    func personImageURL(for person: MediaItem.Person, maxWidth: Int? = 240) -> URL? {
+        guard let id = person.id, !id.isEmpty, let serverURL else { return nil }
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("Items/\(id)/Images/Primary"),
+            resolvingAgainstBaseURL: false
+        )
+        var queryItems: [URLQueryItem] = []
+        if let tag = person.imageTag {
+            queryItems.append(URLQueryItem(name: "tag", value: tag))
+        }
+        if let maxWidth {
+            queryItems.append(URLQueryItem(name: "maxWidth", value: String(maxWidth)))
+        }
+        if !queryItems.isEmpty {
+            components?.queryItems = queryItems
+        }
+        return components?.url
+    }
+
     /// Fetch full item details including format information (MediaSources)
     func getItemDetails(id: String) async -> MediaItem? {
         guard let service = jellyfinService else { return nil }

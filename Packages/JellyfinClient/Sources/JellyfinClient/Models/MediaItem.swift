@@ -161,12 +161,28 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         public let id: String?
         public let role: String?
         public let type: String?
+        public let imageTag: String?
+
+        public init(
+            name: String? = nil,
+            id: String? = nil,
+            role: String? = nil,
+            type: String? = nil,
+            imageTag: String? = nil
+        ) {
+            self.name = name
+            self.id = id
+            self.role = role
+            self.type = type
+            self.imageTag = imageTag
+        }
 
         enum CodingKeys: String, CodingKey {
             case name = "Name"
             case id = "Id"
             case role = "Role"
             case type = "Type"
+            case imageTag = "PrimaryImageTag"
         }
     }
 
