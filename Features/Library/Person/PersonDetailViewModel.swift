@@ -31,7 +31,7 @@ final class PersonDetailViewModel: ObservableObject {
               let userID = appState.jellyfinUserID
         else {
             jellyfinService = nil
-            self.serverURL = nil
+            serverURL = nil
             return
         }
 
