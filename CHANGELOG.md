@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/cedricziel/seer-app/compare/v0.4.0...v0.4.1) (2026-05-03)
+
+
+### Bug Fixes
+
+* **playback:** nonisolated MPMediaItemArtwork handler to stop SIGTRAP ([#28](https://github.com/cedricziel/seer-app/issues/28)) ([939acec](https://github.com/cedricziel/seer-app/commit/939acecdab4aaf3609563860f33ac565fb78d7b3))
+
 ## [0.4.0](https://github.com/cedricziel/seer-app/compare/v0.3.0...v0.4.0) (2026-05-03)
 
 
