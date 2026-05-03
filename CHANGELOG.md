@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0](https://github.com/cedricziel/seer-app/compare/v0.3.0...v0.4.0) (2026-05-03)
+
+
+### Features
+
+* **app-intents:** AppEntity foundation ([#19](https://github.com/cedricziel/seer-app/issues/19)) ([4751d3c](https://github.com/cedricziel/seer-app/commit/4751d3ceeef814397f74bffd1578e82591d0c4ce))
+* **app-intents:** AppShortcutsProvider + Spotlight + URL router ([#24](https://github.com/cedricziel/seer-app/issues/24)) ([56cdf75](https://github.com/cedricziel/seer-app/commit/56cdf75683aa6efcdd5107fc7c632f442411bce7))
+* **app-intents:** proposal + setup foundation ([#18](https://github.com/cedricziel/seer-app/issues/18)) ([3204f96](https://github.com/cedricziel/seer-app/commit/3204f969172b9c469b100d3dcaf4d61ae4d7ccdc))
+* **app-intents:** Tier 1 verb intents — Request, Search, Resume ([#21](https://github.com/cedricziel/seer-app/issues/21)) ([1e3b075](https://github.com/cedricziel/seer-app/commit/1e3b075a08188cb65f8041ffe87a2241c744bc50))
+* **app-intents:** Tier 2 verb intents + RequestsViewModel cache writer ([#23](https://github.com/cedricziel/seer-app/issues/23)) ([a1498c2](https://github.com/cedricziel/seer-app/commit/a1498c2f92bc5b4ac77a0ed9786ce75386a58963))
+* **app-intents:** Tier 3 — INPlayMediaIntent donation + Focus Filter ([#25](https://github.com/cedricziel/seer-app/issues/25)) ([f5d1bb1](https://github.com/cedricziel/seer-app/commit/f5d1bb14841fe0bbc4d781a3b5adcc918c1bf486))
+* **app-intents:** wire production seams from SeerApp.setupServices ([#27](https://github.com/cedricziel/seer-app/issues/27)) ([a6d80c3](https://github.com/cedricziel/seer-app/commit/a6d80c3c35fb11d7cf4ef2675223fa6059a22786))
+
+
+### Bug Fixes
+
+* **playback:** drive Now Playing time updates from VM observer ([#20](https://github.com/cedricziel/seer-app/issues/20)) ([1019269](https://github.com/cedricziel/seer-app/commit/101926932bd88263d0ab85492bae1b523fa31a66))
+
 ## [0.3.0](https://github.com/cedricziel/seer-app/compare/v0.2.5...v0.3.0) (2026-05-02)
 
 
