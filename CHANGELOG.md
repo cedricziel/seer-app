@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/cedricziel/seer-app/compare/v0.4.1...v0.5.0) (2026-05-03)
+
+
+### Features
+
+* **library:** add Jellyfin person details screen ([#30](https://github.com/cedricziel/seer-app/issues/30)) ([f432fa5](https://github.com/cedricziel/seer-app/commit/f432fa5c56dc314b02489554f3d14690df90a2fe))
+
 ## [0.4.1](https://github.com/cedricziel/seer-app/compare/v0.4.0...v0.4.1) (2026-05-03)
 
 
