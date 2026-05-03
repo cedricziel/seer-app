@@ -144,7 +144,7 @@ public final class AppState: ObservableObject {
     }
 
     /// Convenience struct for accessing Jellyfin credentials
-    public struct JellyfinCredentials {
+    public struct JellyfinCredentials: Sendable {
         public let serverURL: URL
         public let accessToken: String
         public let userId: String
