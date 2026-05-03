@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/cedricziel/seer-app/compare/v0.6.0...v0.6.1) (2026-05-03)
+
+
+### Bug Fixes
+
+* **telemetry:** disable URLSessionInstrumentation pending upstream fix ([d0dda28](https://github.com/cedricziel/seer-app/commit/d0dda286d9a6d7074888bef058bd9b940a6b5fae))
+
 ## [0.6.0](https://github.com/cedricziel/seer-app/compare/v0.5.0...v0.6.0) (2026-05-03)
 
 
