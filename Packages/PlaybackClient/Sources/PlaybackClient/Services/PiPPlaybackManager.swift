@@ -382,22 +382,29 @@ public final class PiPPlaybackManager {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
-    /// Loads artwork from URL and updates Now Playing info
+    /// Loads artwork from URL and updates Now Playing info.
+    ///
+    /// CRITICAL: `MPMediaItemArtwork`'s `requestHandler` is invoked by
+    /// `MPNowPlayingInfoCenter` on its own internal serial queue
+    /// whenever the system needs the bitmap (lock screen, control
+    /// centre, AirPlay receiver). The handler MUST NOT inherit
+    /// `@MainActor` isolation from the surrounding scope — if it
+    /// does, Swift 6 strict-concurrency runtime traps with
+    /// `_dispatch_assert_queue_fail` when MediaPlayer pulls the
+    /// artwork off-main. Build it via the helper below so the
+    /// closure is created in a nonisolated context.
     private func loadArtwork(from url: URL) {
-        Task {
+        Task.detached {
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 #if canImport(UIKit)
-                    if let image = UIImage(data: data) {
-                        await MainActor.run {
-                            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in
-                                image
-                            }
-                            var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
-                            info[MPMediaItemPropertyArtwork] = artwork
-                            MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-                            print("[PiPManager] Artwork loaded and set")
-                        }
+                    guard let image = UIImage(data: data) else { return }
+                    let artwork = Self.makeArtwork(from: image)
+                    await MainActor.run {
+                        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+                        info[MPMediaItemPropertyArtwork] = artwork
+                        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+                        print("[PiPManager] Artwork loaded and set")
                     }
                 #endif
             } catch {
@@ -405,6 +412,18 @@ public final class PiPPlaybackManager {
             }
         }
     }
+
+    #if canImport(UIKit)
+        /// Builds an `MPMediaItemArtwork` whose `requestHandler` closure
+        /// is `@Sendable` and nonisolated, so MediaPlayer can call it
+        /// from any queue. The static context guarantees the closure
+        /// does NOT inherit any actor isolation.
+        nonisolated static func makeArtwork(from image: UIImage) -> MPMediaItemArtwork {
+            MPMediaItemArtwork(boundsSize: image.size) { @Sendable _ in
+                image
+            }
+        }
+    #endif
 
     // MARK: - Remote Command Center
 
