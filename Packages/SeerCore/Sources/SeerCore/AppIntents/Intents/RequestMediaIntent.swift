@@ -90,7 +90,7 @@ public struct RequestMediaIntent: AppIntent {
                 jellyseerrURL: credentials.url,
                 apiKey: credentials.apiKey,
                 title: title,
-                mediaType: mediaType ?? .movie
+                mediaType: mediaType
             )
         )
 
@@ -157,14 +157,17 @@ public struct RequestSubmission: Sendable {
     public let jellyseerrURL: URL
     public let apiKey: String
     public let title: String
-    public let mediaType: RequestMediaType
+    /// `nil` when the user did not specify a media type. The submitter
+    /// SHOULD treat this as "either type acceptable" rather than
+    /// silently defaulting to one direction.
+    public let mediaType: RequestMediaType?
 
     public init(
         serverID: UUID,
         jellyseerrURL: URL,
         apiKey: String,
         title: String,
-        mediaType: RequestMediaType
+        mediaType: RequestMediaType?
     ) {
         self.serverID = serverID
         self.jellyseerrURL = jellyseerrURL

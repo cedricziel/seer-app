@@ -46,12 +46,19 @@ enum IntentSeams {
 
             // Resolve the title to a Jellyseerr media id by searching.
             let response = try await service.search(query: submission.title)
-            let preferredType: SearchResult.MediaType = submission.mediaType == .show
-                ? .tvShow
-                : .movie
-            guard let match = response.results.first(where: {
-                $0.mediaType == preferredType
-            }) ?? response.results.first(where: { $0.mediaType != .person }) else {
+
+            // When the user supplied a media type, prefer matches of
+            // that type; only fall back to a non-person match if the
+            // typed match is missing. When no type was supplied, take
+            // the first non-person match directly.
+            let typed: SearchResult.MediaType? = submission.mediaType.map { type in
+                type == .show ? .tvShow : .movie
+            }
+            let typedMatch = typed.flatMap { type in
+                response.results.first(where: { $0.mediaType == type })
+            }
+            let fallbackMatch = response.results.first(where: { $0.mediaType != .person })
+            guard let match = typedMatch ?? fallbackMatch else {
                 throw IntentError.notFound(submission.title)
             }
 
@@ -82,20 +89,23 @@ enum IntentSeams {
                 let service = JellyseerrService(serverURL: url, apiKey: key)
                 do {
                     let response = try await service.search(query: query)
-                    return response.results.compactMap { result in
-                        guard result.mediaType != .person else { return nil }
+                    var entities: [MediaItemEntity] = []
+                    entities.reserveCapacity(20)
+                    for result in response.results where result.mediaType != .person {
                         let id = result.mediaInfo?.tmdbId.map { "tmdb:\($0)" }
                             ?? "discover:\(result.id)"
                         let year = SearchResult.parseYear(
                             from: result.releaseDate ?? result.firstAirDate
                         )
-                        return MediaItemEntity(
+                        entities.append(MediaItemEntity(
                             id: id,
                             title: result.displayTitle ?? "Untitled",
                             year: year,
                             mediaType: result.mediaType == .movie ? "Movie" : "Series"
-                        )
+                        ))
+                        if entities.count >= 20 { break }
                     }
+                    return entities
                 } catch {
                     logger.error("Discover supplement failed: \(String(describing: error))")
                     return []
@@ -141,8 +151,11 @@ enum IntentSeams {
             guard let manager else {
                 throw IntentError.serverNotReachable
             }
+            // Resolve credentials for the payload's server id (NOT the
+            // active server). Multi-server scenario: an intent can
+            // target a non-active server via its ServerEntity param.
             let creds = await Task { @MainActor in
-                appState.jellyfinCredentials
+                appState.jellyfinCredentials(for: payload.serverID)
             }.value
             guard let creds else {
                 throw IntentError.needsConfiguration
