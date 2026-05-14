@@ -1,6 +1,6 @@
 source "https://rubygems.org"
 
-gem "fastlane", "~> 2.226"
+gem "fastlane", "~> 2.234"
 gem "xcodeproj", "~> 1.27"
 
 # Dependabot's bundler parser only accepts a string-literal argument here,
