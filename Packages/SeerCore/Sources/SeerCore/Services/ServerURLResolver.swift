@@ -37,7 +37,7 @@ public final class ServerURLResolver: ObservableObject {
     /// Singleton instance
     public static let shared = ServerURLResolver()
 
-    private let wifiMonitor: WiFiSSIDMonitor
+    private let wifiMonitor: any WiFiNetworkStatus
     private let prober: any ReachabilityProber
     private let dateProvider: @MainActor @Sendable () -> Date
     private var probeCache: [UUID: CachedProbe] = [:]
@@ -50,7 +50,7 @@ public final class ServerURLResolver: ObservableObject {
     private static let cacheTTL: TimeInterval = 60
 
     public init(
-        wifiMonitor: WiFiSSIDMonitor = .shared,
+        wifiMonitor: any WiFiNetworkStatus = WiFiSSIDMonitor.shared,
         prober: any ReachabilityProber = URLSessionReachabilityProber(),
         dateProvider: @MainActor @Sendable @escaping () -> Date = { Date() }
     ) {

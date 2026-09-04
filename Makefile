@@ -1,4 +1,4 @@
-.PHONY: generate build build-release lint format clean open test version \
+.PHONY: generate build build-release lint format clean open test version setup resolve \
         fastlane-install fastlane-test fastlane-build fastlane-beta fastlane-release fastlane-match fastlane-bootstrap-signing \
         fastlane-sync-metadata fastlane-screenshots \
         _ensure-brew-ruby

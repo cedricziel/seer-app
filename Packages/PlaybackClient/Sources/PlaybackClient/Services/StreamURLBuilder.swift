@@ -345,12 +345,18 @@ public enum StreamURLBuilder {
         return nil
     }
 
-    /// Build a direct download URL (original file)
+    /// Build a direct download URL (original file).
+    ///
+    /// Download URLs carry no `api_key` query item: the background
+    /// `URLSession` sends the `Authorization` header from `buildAuthHeaders`,
+    /// and keeping the long-lived token out of the URL keeps it out of
+    /// server, proxy and resume-data logs. (Playback URLs still need the
+    /// query token because AirPlay receivers fetch the URL without headers.)
     private static func buildDirectDownloadURL(
         itemId: String,
         mediaSourceId: String,
         serverURL: URL,
-        accessToken: String
+        accessToken _: String
     ) -> URL {
         guard var components = URLComponents(
             url: serverURL
@@ -363,20 +369,25 @@ public enum StreamURLBuilder {
         }
 
         components.queryItems = [
-            URLQueryItem(name: "api_key", value: accessToken),
             URLQueryItem(name: "mediaSourceId", value: mediaSourceId)
         ]
 
         return components.url ?? serverURL
     }
 
-    // Build a transcoded download URL (HLS for iOS compatibility)
+    // Build a transcoded download URL.
+    //
+    // Uses Jellyfin's progressive `/Videos/{id}/stream.mp4` endpoint, which
+    // returns a single MP4 file. The HLS `master.m3u8` endpoint must NOT be
+    // used here: a background download of a playlist yields a few hundred
+    // bytes of text that references server-side segments, so the "downloaded"
+    // file is unplayable offline.
     // swiftlint:disable:next function_parameter_count
     private static func buildTranscodedDownloadURL(
         itemId: String,
         mediaSourceId: String,
         serverURL: URL,
-        accessToken: String,
+        accessToken _: String,
         deviceID: String,
         quality: DownloadQualitySettings
     ) -> URL {
@@ -384,7 +395,7 @@ public enum StreamURLBuilder {
             url: serverURL
                 .appendingPathComponent("Videos")
                 .appendingPathComponent(itemId)
-                .appendingPathComponent("master.m3u8"),
+                .appendingPathComponent("stream.mp4"),
             resolvingAgainstBaseURL: false
         ) else {
             return serverURL
@@ -392,14 +403,13 @@ public enum StreamURLBuilder {
 
         var queryItems = [
             URLQueryItem(name: "mediaSourceId", value: mediaSourceId),
-            URLQueryItem(name: "api_key", value: accessToken),
+            // Auth travels in the Authorization header (see buildDirectDownloadURL)
             URLQueryItem(name: "DeviceId", value: deviceID),
-            // Transcode to iOS-compatible formats
+            // Transcode to iOS-compatible formats in a single progressive file
+            URLQueryItem(name: "container", value: "mp4"),
             URLQueryItem(name: "videoCodec", value: "h264"),
             URLQueryItem(name: "audioCodec", value: "aac"),
-            URLQueryItem(name: "segmentContainer", value: "ts"),
-            URLQueryItem(name: "breakOnNonKeyFrames", value: "true"),
-            // Use static mode for download (not adaptive streaming)
+            // `static=false` asks the server to transcode rather than serve the original
             URLQueryItem(name: "static", value: "false")
         ]
 
@@ -413,6 +423,25 @@ public enum StreamURLBuilder {
 
         components.queryItems = queryItems
         return components.url ?? serverURL
+    }
+
+    /// Query parameters that carry credentials and must never be logged
+    private static let sensitiveQueryNames: Set<String> = ["api_key", "apikey", "x-emby-token", "x-mediabrowser-token"]
+
+    /// A copy of `url` suitable for logging, with credential-bearing query
+    /// values replaced by `REDACTED`.
+    public static func redactedDescription(of url: URL) -> String {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let queryItems = components.queryItems
+        else {
+            return url.absoluteString
+        }
+        components.queryItems = queryItems.map { item in
+            sensitiveQueryNames.contains(item.name.lowercased())
+                ? URLQueryItem(name: item.name, value: "REDACTED")
+                : item
+        }
+        return components.url?.absoluteString ?? url.absoluteString
     }
 
     /// Build authorization headers

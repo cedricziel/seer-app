@@ -110,8 +110,11 @@ public final class ImagePrefetchService {
         type: String,
         width: Int
     ) -> URL? {
-        var components = URLComponents(url: serverURL, resolvingAgainstBaseURL: false)
-        components?.path = "/Items/\(itemId)/Images/\(type)"
+        // appendingPathComponent keeps any reverse-proxy base path (e.g. /jellyfin)
+        var components = URLComponents(
+            url: serverURL.appendingPathComponent("Items/\(itemId)/Images/\(type)"),
+            resolvingAgainstBaseURL: false
+        )
         components?.queryItems = [
             URLQueryItem(name: "maxWidth", value: String(width)),
             URLQueryItem(name: "quality", value: "90")

@@ -9,6 +9,7 @@ import SwiftUI
 @main
 struct SeerApp: App {
     @UIApplicationDelegateAdaptor(SeerAppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
 
     @StateObject private var appState: AppState
     @StateObject private var offlineSyncService: OfflineSyncService
@@ -82,6 +83,26 @@ struct SeerApp: App {
 
         // Initialize NetworkMonitor
         _networkMonitor = StateObject(wrappedValue: NetworkMonitor.shared)
+
+        // The notification center delegate must be in place before
+        // `application(_:didFinishLaunchingWithOptions:)` returns, otherwise a
+        // notification tap that cold-launches the app is never delivered.
+        let notifManager = NotificationManager(modelContainer: notificationModelContainer)
+        notifManager.setup()
+        _notificationManager = State(initialValue: notifManager)
+
+        // Create the download manager synchronously at launch so it owns the
+        // background URLSession delegate before iOS delivers any
+        // `handleEventsForBackgroundURLSession` callbacks. A SwiftUI `.task`
+        // never runs for a UI-less background relaunch, which previously meant
+        // completed downloads were dropped.
+        do {
+            let manager = try DownloadManager(modelContainer: downloadModelContainer)
+            manager.configure(from: state)
+            _downloadManager = State(initialValue: manager)
+        } catch {
+            print("Failed to initialize DownloadManager: \(error)")
+        }
     }
 
     var body: some Scene {
@@ -109,6 +130,14 @@ struct SeerApp: App {
                 .onOpenURL { url in
                     flowmarkRouter.route(url)
                 }
+                .onChange(of: scenePhase) { _, phase in
+                    // BGTaskScheduler only runs tasks that have been submitted;
+                    // registering the handlers alone never schedules a first run.
+                    if phase == .background {
+                        appDelegate.scheduleRequestPollTask()
+                        appDelegate.scheduleAutoDownloadTask()
+                    }
+                }
                 .environment(downloadManager)
                 .environment(notificationManager)
         }
@@ -117,25 +146,43 @@ struct SeerApp: App {
     @MainActor
     private func configureServicesCredentials() {
         // Configure download manager
-        guard let manager = downloadManager,
-              let credentials = appState.jellyfinCredentials
+        downloadManager?.configure(from: appState)
+
+        // (Re)bind the request status poller to the active server
+        if let service = requestNotificationService {
+            ensureRequestStatusPoller(notificationService: service)
+        }
+    }
+
+    /// Creates a poller for the active server if none exists yet or the active
+    /// server changed, then configures it with the server's Jellyseerr
+    /// credentials. A poller is bound to one server ID for the lifetime of
+    /// its cache, so switching servers must replace it rather than reconfigure it.
+    @MainActor
+    private func ensureRequestStatusPoller(notificationService: RequestNotificationService) {
+        guard let serverKey = appState.activeServerKey else { return }
+
+        let poller: RequestStatusPoller
+        if let existing = requestStatusPoller, existing.serverID == serverKey {
+            poller = existing
+        } else {
+            let previous = requestStatusPoller
+            Task { await previous?.stopPolling() }
+            poller = RequestStatusPoller(
+                modelContainer: notificationModelContainer,
+                notificationService: notificationService,
+                serverID: serverKey
+            )
+            requestStatusPoller = poller
+            appDelegate.requestStatusPoller = poller
+        }
+
+        guard let jellyseerrURL = appState.jellyseerrServerURL,
+              let apiKey = appState.jellyseerrAPIKey
         else { return }
-
-        manager.configure(
-            serverURL: credentials.serverURL,
-            accessToken: credentials.accessToken,
-            userID: credentials.userId,
-            deviceID: credentials.deviceId
-        )
-
-        // Configure request status poller with Jellyseerr credentials
-        if let jellyseerrURL = appState.jellyseerrServerURL,
-           let apiKey = appState.jellyseerrAPIKey,
-           let poller = requestStatusPoller {
-            Task {
-                await poller.configure(serverURL: jellyseerrURL, apiKey: apiKey)
-                await poller.startPolling()
-            }
+        Task {
+            await poller.configure(serverURL: jellyseerrURL, apiKey: apiKey)
+            await poller.startPolling()
         }
     }
 
@@ -150,10 +197,8 @@ struct SeerApp: App {
         spotlightIndexer = indexer
         indexer.reconcile()
 
-        // Setup notification manager first
-        let notifManager = NotificationManager(modelContainer: notificationModelContainer)
-        notifManager.setup()
-        notificationManager = notifManager
+        // Notification manager was created in `init`; wire the rest here
+        guard let notifManager = notificationManager else { return }
         appDelegate.notificationManager = notifManager
 
         // Setup request notification service
@@ -167,27 +212,10 @@ struct SeerApp: App {
         // Set app delegate as action delegate
         notifManager.actionDelegate = appDelegate
 
-        // Setup download manager
-        do {
-            let manager = try DownloadManager(modelContainer: downloadModelContainer)
-
-            // Configure with credentials when available
-            if let credentials = appState.jellyfinCredentials {
-                manager.configure(
-                    serverURL: credentials.serverURL,
-                    accessToken: credentials.accessToken,
-                    userID: credentials.userId,
-                    deviceID: credentials.deviceId
-                )
-            }
-
-            // Set notification delegate
+        // Wire up the download manager created in `init`
+        if let manager = downloadManager {
             manager.notificationDelegate = dlNotifService
-
-            downloadManager = manager
             appDelegate.downloadManager = manager
-        } catch {
-            print("Failed to initialize DownloadManager: \(error)")
         }
 
         // Install production implementations for the App Intent test
@@ -200,23 +228,8 @@ struct SeerApp: App {
             downloadManager: downloadManager
         )
 
-        // Setup request status poller
-        if let serverID = appState.activeServerID {
-            let poller = RequestStatusPoller(
-                modelContainer: notificationModelContainer,
-                notificationService: reqNotifService,
-                serverID: serverID.uuidString
-            )
-            requestStatusPoller = poller
-            appDelegate.requestStatusPoller = poller
-
-            // Configure and start polling if Jellyseerr is configured
-            if let jellyseerrURL = appState.jellyseerrServerURL,
-               let apiKey = appState.jellyseerrAPIKey {
-                await poller.configure(serverURL: jellyseerrURL, apiKey: apiKey)
-                await poller.startPolling()
-            }
-        }
+        // Setup request status poller for the active server (if any)
+        ensureRequestStatusPoller(notificationService: reqNotifService)
     }
 
     /// Configures Kingfisher image cache with appropriate limits

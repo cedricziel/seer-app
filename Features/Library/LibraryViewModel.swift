@@ -77,12 +77,42 @@ public final class LibraryViewModel: ObservableObject {
     private func setupService() {
         guard let serverURL = appState.jellyfinServerURL,
               let accessToken = appState.jellyfinAccessToken,
-              let userID = appState.jellyfinUserID else { return }
+              let userID = appState.jellyfinUserID
+        else {
+            serverURL = nil
+            jellyfinService = nil
+            return
+        }
         self.serverURL = serverURL
         jellyfinService = JellyfinService(
             serverURL: serverURL, accessToken: accessToken,
             userID: userID, deviceID: appState.jellyfinDeviceID
         )
+    }
+
+    /// Rebuild the service and clear server-specific state after the active
+    /// server changed. Without this, refreshes keep using the previous
+    /// server's client, token and cache scope.
+    func serverChanged() {
+        cancelAllTasks()
+        // Cancelled loads never reach their `isLoading = false`; reset here so
+        // the view cannot stay on the loading state for the new server.
+        isLoading = false
+        isLoadingMore = false
+        isLoadingLatestItems = false
+        isLoadingContinueWatching = false
+        setupService()
+        serverConfigurationID = appState.activeServer?.id
+        libraries = []
+        selectedLibrary = nil
+        mediaItems = []
+        continueWatching = []
+        latestItems = []
+        hasLoadedLatestItems = false
+        hasLoadedContinueWatching = false
+        errorMessage = nil
+        currentPage = 0
+        hasMoreItems = true
     }
 
     func loadInitialData() async {

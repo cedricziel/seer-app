@@ -122,7 +122,7 @@ struct PrivacySettingsView: View {
 
     private var privacyLinksSection: some View {
         Section {
-            Link(destination: URL(string: "https://seer.app/privacy")!) {
+            Link(destination: URL(string: "https://cedricziel.github.io/seer-app/privacy-policy.html")!) {
                 Label("Privacy Policy", systemImage: "doc.text")
             }
 

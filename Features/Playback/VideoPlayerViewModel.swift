@@ -37,15 +37,31 @@ public final class VideoPlayerViewModel {
     private var streamInfo: StreamInfo?
     private var playbackState: PlaybackState?
     private var isPlayingOffline: Bool = false
-    private var downloadManager: DownloadManager?
+    /// Injected by the hosting view from the SwiftUI environment before
+    /// loading, so downloaded media plays from disk instead of streaming.
+    var downloadManager: DownloadManager?
 
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
     private var progressReportTask: Task<Void, Never>?
     private var controlsHideTask: Task<Void, Never>?
+    private var loadTask: Task<Void, Never>?
 
     /// Whether playback has been started (for reporting)
     private var hasReportedStart: Bool = false
+
+    /// Set once `stop()` has run. A load that was still in flight when the
+    /// view went away must not start playback afterwards.
+    private var isStopped: Bool = false
+
+    /// Identifies the active load. Bumped by `loadAndPlay()` and `stop()` so
+    /// a superseded or cancelled load that resumes after an `await` cannot
+    /// install a stale player over the current one.
+    private var loadGeneration: Int = 0
+
+    private func isCurrentLoad(_ generation: Int) -> Bool {
+        generation == loadGeneration && !isStopped
+    }
 
     // MARK: - Initialization
 
@@ -98,24 +114,44 @@ public final class VideoPlayerViewModel {
 
     // MARK: - Public Methods
 
+    /// Load the media and auto-play once ready. The load runs in a task owned
+    /// by the view model so `stop()` can cancel it if the view is dismissed
+    /// before the stream is ready; otherwise playback would start invisibly
+    /// in the background.
+    func loadAndPlay(startPositionTicks: Int64 = 0) {
+        loadTask?.cancel()
+        isStopped = false
+        loadGeneration += 1
+        loadTask = Task { [weak self] in
+            guard let self else { return }
+            await loadMedia(startPositionTicks: startPositionTicks)
+            guard !Task.isCancelled, !isStopped, isReady, errorMessage == nil else { return }
+            play()
+        }
+    }
+
     /// Load the media and prepare for playback
     func loadMedia(startPositionTicks: Int64 = 0) async {
+        let generation = loadGeneration
         setupAudioSession()
         isBuffering = true
         errorMessage = nil
+        teardownPlayer()
 
         // Check for local downloaded file first
-        if let localURL = await getLocalFileURL() {
-            await loadFromLocalFile(url: localURL, startPositionTicks: startPositionTicks)
+        let localURL = await getLocalFileURL()
+        guard isCurrentLoad(generation) else { return }
+        if let localURL {
+            await loadFromLocalFile(url: localURL, startPositionTicks: startPositionTicks, generation: generation)
             return
         }
 
         // Fall back to streaming
-        await loadFromStream(startPositionTicks: startPositionTicks)
+        await loadFromStream(startPositionTicks: startPositionTicks, generation: generation)
     }
 
     /// Load media from streaming server
-    private func loadFromStream(startPositionTicks: Int64) async {
+    private func loadFromStream(startPositionTicks: Int64, generation: Int) async {
         print("🎬 [VideoPlayer] loadFromStream called for item: \(item.id)")
         guard let service = playbackService else {
             print("🎬 [VideoPlayer] ERROR: No playback service")
@@ -131,6 +167,7 @@ public final class VideoPlayerViewModel {
                 startPositionTicks: startPositionTicks
             )
             print("🎬 [VideoPlayer] Got stream info successfully")
+            guard isCurrentLoad(generation) else { return }
             streamInfo = info
             audioTracks = info.audioStreams
             subtitleTracks = info.subtitleStreams
@@ -183,15 +220,14 @@ public final class VideoPlayerViewModel {
     /// Check for local downloaded file
     private func getLocalFileURL() async -> URL? {
         guard let manager = downloadManager,
-              let serverURL = appState.jellyfinServerURL
+              let serverID = appState.activeServerKey
         else { return nil }
 
-        let serverID = serverURL.host ?? "default"
         return await manager.localFileURL(forItemID: item.id, serverID: serverID)
     }
 
     /// Load media from local file
-    private func loadFromLocalFile(url: URL, startPositionTicks: Int64) async {
+    private func loadFromLocalFile(url: URL, startPositionTicks: Int64, generation: Int) async {
         isPlayingOffline = true
 
         // Create player from local file
@@ -214,6 +250,7 @@ public final class VideoPlayerViewModel {
         } catch {
             // Duration loading failed, will use default
         }
+        guard isCurrentLoad(generation) else { return }
 
         // Seek to start position if provided
         if startPositionTicks > 0 {
@@ -239,6 +276,7 @@ public final class VideoPlayerViewModel {
 
     /// Start playback
     func play() {
+        guard !isStopped else { return }
         player?.play()
         isPlaying = true
 
@@ -322,19 +360,31 @@ public final class VideoPlayerViewModel {
         scheduleControlsHide()
     }
 
-    /// Stop playback and clean up
+    /// Stop playback and clean up. Safe to call more than once.
     func stop() {
+        guard !isStopped else { return }
+        isStopped = true
+        loadGeneration += 1
+        loadTask?.cancel()
+        loadTask = nil
         reportPlaybackStopped()
         stopProgressReporting()
         controlsHideTask?.cancel()
+        teardownPlayer()
+    }
 
+    /// Detach observers from the current player and release it. Called before
+    /// a new player is created (retry) and from `stop()`, so an old player is
+    /// never left running with a live periodic time observer.
+    private func teardownPlayer() {
         if let observer = timeObserver, let player {
             player.removeTimeObserver(observer)
-            timeObserver = nil
         }
-
+        timeObserver = nil
+        cancellables.removeAll()
         player?.pause()
         player = nil
+        isPlaying = false
     }
 
     // MARK: - Private Methods
@@ -368,7 +418,7 @@ public final class VideoPlayerViewModel {
         case .directStream: "DirectStream"
         }
         print("🎬 [VideoPlayer] Stream type: \(streamTypeStr)")
-        print("🎬 [VideoPlayer] Stream URL: \(info.url.absoluteString)")
+        print("🎬 [VideoPlayer] Stream URL: \(StreamURLBuilder.redactedDescription(of: info.url))")
 
         // All stream types now have auth in URL query params
         return AVPlayerItem(url: info.url)
@@ -471,13 +521,16 @@ public final class VideoPlayerViewModel {
         isBuffering = false
     }
 
+    /// Logs only safe error fields. `userInfo` can carry the failing stream
+    /// URL, which includes the access token, so it is never printed whole.
     private func logPlaybackError(_ error: Error?) {
         guard let nsError = error as? NSError else { return }
         print("🎬 [VideoPlayer] Error domain: \(nsError.domain), code: \(nsError.code)")
-        print("🎬 [VideoPlayer] Error userInfo: \(nsError.userInfo)")
+        if let failingURL = nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL {
+            print("🎬 [VideoPlayer] Failing URL: \(StreamURLBuilder.redactedDescription(of: failingURL))")
+        }
         guard let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? NSError else { return }
         print("🎬 [VideoPlayer] Underlying error: \(underlyingError.domain), code: \(underlyingError.code)")
-        print("🎬 [VideoPlayer] Underlying userInfo: \(underlyingError.userInfo)")
     }
 
     private func scheduleControlsHide() {
@@ -494,12 +547,11 @@ public final class VideoPlayerViewModel {
 
     private func startProgressReporting() {
         stopProgressReporting()
-        progressReportTask = Task {
+        progressReportTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(10))
-                if !Task.isCancelled {
-                    reportProgress()
-                }
+                guard !Task.isCancelled, let self else { return }
+                reportProgress()
             }
         }
     }
