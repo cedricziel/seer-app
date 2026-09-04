@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/cedricziel/seer-app/compare/v0.6.1...v0.6.2) (2026-09-04)
+
+
+### Bug Fixes
+
+* recover background downloads, persist sync and notification state, harden playback teardown ([#42](https://github.com/cedricziel/seer-app/issues/42)) ([753b749](https://github.com/cedricziel/seer-app/commit/753b7492c1b13d09af092c006ae2d5a276daa9d0))
+
 ## [0.6.1](https://github.com/cedricziel/seer-app/compare/v0.6.0...v0.6.1) (2026-05-03)
 
 
