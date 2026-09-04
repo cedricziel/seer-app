@@ -73,6 +73,10 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
             .preferredColorScheme(.dark)
             .persistentSystemOverlays(.hidden)
             .onAppear {
+                // Hand the environment's download manager to the view model so
+                // downloaded items play from disk, including on a retry after
+                // a PiP restoration.
+                viewModel.downloadManager = downloadManager
                 // Skip loading if we already have a player (restoration from PiP)
                 // Restoration completion is now handled by signalRestorationComplete() in updateUIViewController
                 guard existingPlayer == nil else {
@@ -81,9 +85,6 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
                     }
                     return
                 }
-                // Hand the environment's download manager to the view model so
-                // downloaded items play from disk.
-                viewModel.downloadManager = downloadManager
                 // The view model owns the load task (not SwiftUI's .task, which
                 // is cancelled during fullScreenCover presentation) and cancels
                 // it from stop() if the view is dismissed mid-load.

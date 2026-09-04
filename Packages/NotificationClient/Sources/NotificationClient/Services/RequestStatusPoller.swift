@@ -76,12 +76,15 @@ public actor RequestStatusPoller {
 
             // Get cached statuses for this server only; request IDs collide across servers
             let cachedStatuses = try await store.fetchAllCachedStatuses(forServerID: serverID)
+            guard !isStopped else { return }
             let cachedByID = Dictionary(cachedStatuses.map { ($0.requestID, $0) }) { first, _ in first }
 
             // Detect changes
             var changes: [RequestStatusChange] = []
 
             for request in currentRequests {
+                // Each upsert suspends; a stop in the meantime must end the poll
+                guard !isStopped else { return }
                 let currentStatus = request.status.rawValue
                 let title = request.media.displayTitle ?? "Unknown"
 
