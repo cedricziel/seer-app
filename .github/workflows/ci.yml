@@ -17,8 +17,31 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      # Pinned to the same releases .claude/hooks/session-start.sh installs,
+      # so local and CI lint results agree. `brew install` picks up whatever
+      # the runner image ships (SwiftFormat 0.62.1 added rules that flag
+      # files this repo never formatted with them).
       - name: Install tooling
-        run: brew install swiftlint swiftformat
+        env:
+          SWIFTLINT_VERSION: "0.63.2"
+          SWIFTFORMAT_VERSION: "0.61.1"
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          curl -fsSL --retry 3 \
+            "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip" \
+            -o "$tmp/swiftlint.zip"
+          unzip -q -o "$tmp/swiftlint.zip" -d "$tmp/swiftlint"
+          curl -fsSL --retry 3 \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip" \
+            -o "$tmp/swiftformat.zip"
+          unzip -q -o "$tmp/swiftformat.zip" -d "$tmp/swiftformat"
+          mkdir -p "$HOME/.local/bin"
+          install -m 0755 "$tmp/swiftlint/swiftlint" "$HOME/.local/bin/swiftlint"
+          install -m 0755 "$tmp/swiftformat/swiftformat" "$HOME/.local/bin/swiftformat"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/swiftlint" --version
+          "$HOME/.local/bin/swiftformat" --version
 
       - name: SwiftLint (strict)
         run: swiftlint lint --strict
