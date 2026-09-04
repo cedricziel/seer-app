@@ -6,8 +6,10 @@ import SwiftData
 public actor RequestStatusPoller {
     private let store: NotificationStore
     private let notificationService: RequestNotificationService
-    /// Configuration ID of the server this poller watches
-    public let serverID: String
+    /// Configuration ID of the server this poller watches. `nonisolated` so
+    /// the app can compare it synchronously when deciding whether to
+    /// recreate the poller after a server switch.
+    public nonisolated let serverID: String
 
     private var jellyseerrService: JellyseerrService?
     private var pollingTask: Task<Void, Never>?
