@@ -209,30 +209,35 @@ public final class MediaItemSyncService {
 
     // MARK: - Private Methods
 
-    private func syncItems(
+    func syncItems(
         _ serverItems: [MediaItem],
         serverConfig: ServerConfiguration,
         library: CachedLibrary?
     ) async throws {
         let serverIds = Set(serverItems.map(\.id))
+        let configID = serverConfig.id
 
-        // Fetch existing items
-        let existingItems: [CachedMediaItem]
-        if let library {
-            let libId = library.id
-            let descriptor = FetchDescriptor<CachedMediaItem>(
-                predicate: #Predicate { $0.libraryId == libId }
-            )
-            existingItems = try modelContext.fetch(descriptor)
-        } else {
-            let ids = Array(serverIds)
-            let descriptor = FetchDescriptor<CachedMediaItem>(
-                predicate: #Predicate { ids.contains($0.id) }
-            )
-            existingItems = try modelContext.fetch(descriptor)
+        // Look up existing rows by (server, item id) regardless of which
+        // library they were first cached under. Latest / continue-watching
+        // syncs cache items with `libraryId == nil`; a later library sync must
+        // update those rows rather than insert a second row with the same id.
+        let ids = Array(serverIds)
+        let byIdDescriptor = FetchDescriptor<CachedMediaItem>(
+            predicate: #Predicate { $0.serverConfigurationID == configID && ids.contains($0.id) }
+        )
+        let matchingItems = try modelContext.fetch(byIdDescriptor)
+
+        // The CloudKit-backed store cannot enforce uniqueness, so duplicates
+        // can still arrive from other devices. Keep the first row per id and
+        // drop the rest instead of trapping in `Dictionary(uniqueKeysWithValues:)`.
+        var existingById: [String: CachedMediaItem] = [:]
+        for item in matchingItems {
+            if existingById[item.id] == nil {
+                existingById[item.id] = item
+            } else {
+                modelContext.delete(item)
+            }
         }
-
-        let existingById = Dictionary(uniqueKeysWithValues: existingItems.map { ($0.id, $0) })
 
         // Update or create items
         for serverItem in serverItems {
@@ -245,8 +250,13 @@ public final class MediaItemSyncService {
         }
 
         // Remove items from this library that no longer exist on server
-        if library != nil {
-            for existing in existingItems where !serverIds.contains(existing.id) {
+        if let library {
+            let libId = library.id
+            let libraryDescriptor = FetchDescriptor<CachedMediaItem>(
+                predicate: #Predicate { $0.libraryId == libId }
+            )
+            let libraryItems = try modelContext.fetch(libraryDescriptor)
+            for existing in libraryItems where !serverIds.contains(existing.id) {
                 modelContext.delete(existing)
             }
         }

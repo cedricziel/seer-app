@@ -372,6 +372,25 @@ targets:
         TEST_HOST: ""
         BUNDLE_LOADER: ""
 
+  NotificationClientTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, tvOS]
+    sources:
+      - path: Tests/NotificationClientTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: NotificationClient
+      - target: JellyseerrClient
+      - target: DownloadClient
+      - target: SeerCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.notificationclienttests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
   OfflineSyncTests:
     type: bundle.unit-test
     supportedDestinations: [iOS, tvOS]
@@ -507,6 +526,7 @@ schemes:
         JellyfinClientTests: [test]
         JellyseerrClientTests: [test]
         OfflineSyncTests: [test]
+        NotificationClientTests: [test]
         SeerUITests: [test]
         AuthFeatureTests: [test]
         LibraryFeatureTests: [test]
@@ -528,6 +548,7 @@ schemes:
         - JellyfinClientTests
         - JellyseerrClientTests
         - OfflineSyncTests
+        - NotificationClientTests
         - SeerUITests
         - AuthFeatureTests
         - LibraryFeatureTests

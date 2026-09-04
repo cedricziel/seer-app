@@ -14,6 +14,22 @@ public enum DownloadQuality: String, Codable, Sendable, CaseIterable {
     /// Low quality (480p, ~1.5 Mbps)
     case low
 
+    /// `UserDefaults` key the download settings screen writes the user's
+    /// preferred quality to. `DownloadManager` reads it when a caller does
+    /// not pass an explicit quality.
+    public static let userDefaultsKey = "downloadQuality"
+
+    /// The quality the user picked in download settings, falling back to
+    /// `.high` when nothing has been chosen yet.
+    public static func userPreferred(from defaults: UserDefaults = .standard) -> DownloadQuality {
+        guard let raw = defaults.string(forKey: userDefaultsKey),
+              let quality = DownloadQuality(rawValue: raw)
+        else {
+            return .high
+        }
+        return quality
+    }
+
     /// Human-readable description
     public var displayName: String {
         switch self {

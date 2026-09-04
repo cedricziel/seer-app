@@ -6,7 +6,8 @@ import SwiftData
 public actor RequestStatusPoller {
     private let store: NotificationStore
     private let notificationService: RequestNotificationService
-    private let serverID: String
+    /// Configuration ID of the server this poller watches
+    public let serverID: String
 
     private var jellyseerrService: JellyseerrService?
     private var pollingTask: Task<Void, Never>?
@@ -63,9 +64,9 @@ public actor RequestStatusPoller {
             let response = try await service.getRequests(take: 50, skip: 0, filter: .all, sort: .modified)
             let currentRequests = response.results
 
-            // Get cached statuses
-            let cachedStatuses = try await store.fetchAllCachedStatuses()
-            let cachedByID = Dictionary(uniqueKeysWithValues: cachedStatuses.map { ($0.requestID, $0) })
+            // Get cached statuses for this server only; request IDs collide across servers
+            let cachedStatuses = try await store.fetchAllCachedStatuses(forServerID: serverID)
+            let cachedByID = Dictionary(cachedStatuses.map { ($0.requestID, $0) }) { first, _ in first }
 
             // Detect changes
             var changes: [RequestStatusChange] = []
@@ -77,7 +78,7 @@ public actor RequestStatusPoller {
                 if let cached = cachedByID[request.id] {
                     // Check for meaningful status changes
                     if cached.status != currentStatus {
-                        if let change = detectChange(
+                        if let change = Self.detectChange(
                             oldStatus: cached.status,
                             newStatus: currentStatus,
                             requestID: request.id,
@@ -119,7 +120,7 @@ public actor RequestStatusPoller {
     // MARK: - Change Detection
 
     /// Detect meaningful status changes
-    private func detectChange(
+    static func detectChange(
         oldStatus: Int,
         newStatus: Int,
         requestID: Int,
@@ -138,13 +139,8 @@ public actor RequestStatusPoller {
             return .declined(requestID: requestID, title: title)
         }
 
-        // Approved/Processing -> Available
+        // Approved/Processing -> Available (content finished downloading)
         if oldStatus == 2 || oldStatus == 5, newStatus == 4 {
-            return .available(requestID: requestID, title: title)
-        }
-
-        // Processing -> Available (content finished downloading)
-        if oldStatus == 5, newStatus == 4 {
             return .available(requestID: requestID, title: title)
         }
 

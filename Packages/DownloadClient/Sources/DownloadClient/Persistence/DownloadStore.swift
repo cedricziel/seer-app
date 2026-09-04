@@ -47,6 +47,14 @@ public actor DownloadStore {
         return try context.fetch(descriptor).first
     }
 
+    /// Fetch the download whose background URLSession task has the given identifier
+    public func fetchDownload(taskIdentifier: Int) throws -> Download? {
+        let context = ModelContext(modelContainer)
+        let predicate = #Predicate<Download> { $0.taskIdentifier == taskIdentifier }
+        let descriptor = FetchDescriptor<Download>(predicate: predicate)
+        return try context.fetch(descriptor).first
+    }
+
     /// Fetch downloads with a specific state
     public func fetchDownloads(withState state: DownloadState) throws -> [Download] {
         let stateRaw = state.rawValue
@@ -175,6 +183,22 @@ public actor DownloadStore {
         guard let download = try context.fetch(descriptor).first else { return }
 
         context.delete(download)
+        try context.save()
+    }
+
+    /// Re-key downloads recorded under earlier host-based server IDs to the
+    /// server's configuration ID. Files stay where they are; only the lookup
+    /// key changes.
+    public func reassignServerID(from legacyIDs: [String], to serverID: String) throws {
+        guard !legacyIDs.isEmpty else { return }
+        let context = ModelContext(modelContainer)
+        let predicate = #Predicate<Download> { legacyIDs.contains($0.serverID) }
+        let descriptor = FetchDescriptor<Download>(predicate: predicate)
+        let downloads = try context.fetch(descriptor)
+        guard !downloads.isEmpty else { return }
+        for download in downloads {
+            download.serverID = serverID
+        }
         try context.save()
     }
 

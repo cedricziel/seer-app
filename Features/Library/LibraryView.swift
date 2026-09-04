@@ -52,7 +52,7 @@ private struct LibraryContentView: View {
         .task { await viewModel.loadInitialData() }
         .onDisappear { viewModel.cancelAllTasks() }
         .onChange(of: appState.activeServerID) {
-            viewModel.cancelAllTasks()
+            viewModel.serverChanged()
             Task { await viewModel.refresh() }
         }
         .fullScreenCover(item: $selectedItemForPlayback) { item in

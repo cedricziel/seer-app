@@ -11,7 +11,7 @@ public final class NotificationManager: NSObject {
     public private(set) var isAuthorized: Bool = false
 
     /// User's notification preferences
-    public private(set) var preferences: NotificationPreferences?
+    public private(set) var preferences: NotificationPreferenceValues?
 
     // MARK: - Dependencies
 
@@ -81,11 +81,11 @@ public final class NotificationManager: NSObject {
     // MARK: - Preferences
 
     /// Update notification preferences
-    public func updatePreferences(_ update: (inout NotificationPreferences) -> Void) async throws {
-        var prefs = preferences ?? NotificationPreferences()
+    public func updatePreferences(_ update: (inout NotificationPreferenceValues) -> Void) async throws {
+        var prefs = try await store.fetchPreferences()
         update(&prefs)
         try await store.savePreferences(prefs)
-        await refresh()
+        preferences = prefs
     }
 
     // MARK: - Scheduling

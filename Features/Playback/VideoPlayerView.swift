@@ -81,14 +81,10 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
                     }
                     return
                 }
-                // Use explicit Task to avoid SwiftUI's .task cancellation during fullScreenCover presentation
-                Task {
-                    await viewModel.loadMedia(startPositionTicks: startPositionTicks)
-                    // Auto-play when ready
-                    if viewModel.isReady, viewModel.errorMessage == nil {
-                        viewModel.play()
-                    }
-                }
+                // The view model owns the load task (not SwiftUI's .task, which
+                // is cancelled during fullScreenCover presentation) and cancels
+                // it from stop() if the view is dismissed mid-load.
+                viewModel.loadAndPlay(startPositionTicks: startPositionTicks)
             }
             .onDisappear {
                 // Only stop if not going to PiP
@@ -121,12 +117,7 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
 
                 HStack(spacing: 16) {
                     Button("Retry") {
-                        Task {
-                            await viewModel.loadMedia(startPositionTicks: startPositionTicks)
-                            if viewModel.isReady, viewModel.errorMessage == nil {
-                                viewModel.play()
-                            }
-                        }
+                        viewModel.loadAndPlay(startPositionTicks: startPositionTicks)
                     }
                     .buttonStyle(.bordered)
                     .accessibilityHint("Double tap to retry loading the video")
@@ -288,6 +279,12 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
                         return
                     }
                     logger.debug("[VideoPlayer] Dismissing player view")
+                    // After a PiP restoration the controller is presented by
+                    // UIKit and the SwiftUI view that owned `onDisappear` is
+                    // long gone, so tear playback down here as well. `stop()`
+                    // and `clearPlayer()` are idempotent for the normal path.
+                    viewModel.stop()
+                    pipManager.clearPlayer()
                     onDismiss()
                 }
             }
@@ -310,7 +307,8 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
                             player: player,
                             item: item,
                             controller: playerViewController,
-                            delegate: self
+                            delegate: self,
+                            onClosed: { [viewModel] in viewModel.stop() }
                         )
                     }
                     // Dismiss the fullScreenCover

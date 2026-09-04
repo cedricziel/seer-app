@@ -57,8 +57,15 @@ public final class DownloadManager {
     private var userID: String?
     private var deviceID: String?
 
+    /// Key of the server the credentials belong to. Downloads recorded for
+    /// other servers are left alone until that server becomes active again.
+    private var serverID: String?
+
+    /// `UserDefaults` key the download settings screen writes the WiFi-only toggle to
+    public static let wifiOnlyUserDefaultsKey = "wifiOnlyDownloads"
+
     /// WiFi-only downloads setting
-    var wifiOnlyEnabled: Bool = true
+    var wifiOnlyEnabled: Bool
 
     // MARK: - Notification Delegate
 
@@ -73,7 +80,16 @@ public final class DownloadManager {
         storage = try DownloadStorage()
         queue = DownloadQueue(maxConcurrent: 2)
         sessionManager = BackgroundSessionManager.shared
+
+        // Seed the WiFi-only setting from what the settings screen persisted so
+        // the queue does not start cellular downloads before that screen is opened.
+        let wifiOnly = UserDefaults.standard.object(forKey: Self.wifiOnlyUserDefaultsKey) as? Bool ?? true
+        wifiOnlyEnabled = wifiOnly
+
         sessionManager.delegate = self
+        Task { [queue] in
+            await queue.setWiFiOnlyEnabled(wifiOnly)
+        }
 
         // Set up queue callback SYNCHRONOUSLY (not in a Task)
         queue.setOnShouldStartDownloadSync { [weak self] downloadID in
@@ -100,20 +116,33 @@ public final class DownloadManager {
     // MARK: - Configuration
 
     /// Configure with server credentials
+    /// - Parameters:
+    ///   - serverID: Key of the server these credentials belong to
+    ///     (`AppState.activeServerKey`). Only that server's downloads are
+    ///     (re)started.
+    ///   - legacyServerIDs: Host-based keys older versions stored downloads
+    ///     under; matching rows are migrated to `serverID`.
     public func configure(
         serverURL: URL,
         accessToken: String,
         userID: String,
-        deviceID: String
+        deviceID: String,
+        serverID: String? = nil,
+        legacyServerIDs: [String] = []
     ) {
         self.serverURL = serverURL
         self.accessToken = accessToken
         self.userID = userID
         self.deviceID = deviceID
+        self.serverID = serverID
 
         // Process any pending downloads now that we have credentials
         Task { [weak self] in
-            await self?.requeuePendingDownloads()
+            guard let self else { return }
+            if let serverID {
+                try? await store.reassignServerID(from: legacyServerIDs, to: serverID)
+            }
+            await requeuePendingDownloads()
         }
     }
 
@@ -128,7 +157,9 @@ public final class DownloadManager {
             serverURL: serverURL,
             accessToken: accessToken,
             userID: userID,
-            deviceID: deviceID
+            deviceID: deviceID,
+            serverID: appState.activeServerKey,
+            legacyServerIDs: appState.legacyServerKeys
         )
     }
 
@@ -139,7 +170,8 @@ public final class DownloadManager {
         // Get currently active background tasks to avoid duplicates
         let activeTasks = await sessionManager.activeTaskIdentifiers()
 
-        for download in downloads {
+        // Only the active server's downloads can be started with these credentials
+        for download in downloads where serverID == nil || download.serverID == serverID {
             if download.state == .pending {
                 await queue.enqueue(download.id)
             } else if download.state == .downloading {
@@ -148,6 +180,11 @@ public final class DownloadManager {
                     // Task is still running, re-register mapping and mark as active
                     sessionManager.registerTask(taskID, forDownload: download.id)
                     await queue.markActive(download.id)
+                } else if let pendingFile = pendingFileURL(for: download) {
+                    // The session finished this task while we were not around
+                    // (background relaunch, crash). Finish it instead of
+                    // throwing the bytes away and starting over.
+                    await finalizeDownload(downloadID: download.id, tempFileURL: pendingFile)
                 } else {
                     // Task not running, reset to pending and re-enqueue
                     try? await store.updateState(downloadID: download.id, state: .pending)
@@ -155,6 +192,16 @@ public final class DownloadManager {
                 }
             }
         }
+    }
+
+    /// Find a completed-but-unprocessed file for a download, if the session
+    /// parked one under either the download ID or the task identifier.
+    private func pendingFileURL(for download: Download) -> URL? {
+        var candidates = [BackgroundSessionManager.pendingFileURL(forDownload: download.id)]
+        if let taskID = download.taskIdentifier {
+            candidates.append(BackgroundSessionManager.pendingFileURL(forTask: taskID))
+        }
+        return candidates.first { FileManager.default.fileExists(atPath: $0.path) }
     }
 
     // MARK: - Public API
@@ -173,14 +220,17 @@ public final class DownloadManager {
     }
 
     /// Download a media item
+    /// - Parameter quality: Explicit quality override. When `nil` the quality
+    ///   chosen in download settings (`DownloadQuality.userPreferred()`) is used.
     public func downloadItem(
         _ item: MediaItem,
         serverID: String,
-        quality: DownloadQuality = .high
+        quality: DownloadQuality? = nil
     ) async throws {
         guard serverURL != nil, accessToken != nil else {
             throw DownloadError.notConfigured
         }
+        let quality = quality ?? DownloadQuality.userPreferred()
 
         // Check if already downloaded or downloading
         if let existing = try await store.fetchDownload(itemID: item.id, serverID: serverID) {
@@ -352,7 +402,23 @@ public final class DownloadManager {
             return
         }
         guard let download = try? await store.fetchDownload(id: downloadID) else { return }
+        if let serverID, download.serverID != serverID {
+            // Belongs to another server; leave it pending until that server is active
+            await queue.markCompleted(downloadID)
+            return
+        }
         try? await store.updateState(downloadID: downloadID, state: .downloading)
+
+        // A paused or interrupted download carries resume data; continue it
+        // instead of starting over from byte zero.
+        if let resumeData = download.resumeData {
+            let task = sessionManager.resumeDownload(resumeData: resumeData, downloadID: downloadID)
+            try? await store.updateResumeData(downloadID: downloadID, resumeData: nil)
+            try? await store.updateTaskIdentifier(downloadID: downloadID, taskIdentifier: task.taskIdentifier)
+            await refresh()
+            return
+        }
+
         do {
             let playbackService = PlaybackService(
                 serverURL: serverURL, accessToken: accessToken, userID: userID ?? "", deviceID: deviceID
@@ -380,7 +446,7 @@ public final class DownloadManager {
             }
 
             print("[Download] Starting download: \(download.name)")
-            print("[Download] URL: \(downloadURL.absoluteString)")
+            print("[Download] URL: \(StreamURLBuilder.redactedDescription(of: downloadURL))")
             print("[Download] Transcoded: \(isTranscoded)")
 
             let headers = StreamURLBuilder.buildAuthHeaders(accessToken: accessToken, deviceID: deviceID)

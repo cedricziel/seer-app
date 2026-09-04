@@ -177,9 +177,16 @@ public final class RequestsViewModel: ObservableObject {
                 predicate: #Predicate { $0.serverConfigurationID == serverID }
             )
             let existing = try context.fetch(existingDescriptor)
-            let existingByID: [String: CachedRequest] = Dictionary(
-                uniqueKeysWithValues: existing.map { ($0.id, $0) }
-            )
+            // The CloudKit-backed store cannot enforce uniqueness, so keep
+            // the first row per id and drop duplicates rather than trapping.
+            var existingByID: [String: CachedRequest] = [:]
+            for row in existing {
+                if existingByID[row.id] == nil {
+                    existingByID[row.id] = row
+                } else {
+                    context.delete(row)
+                }
+            }
 
             // Upsert: update existing or insert new.
             for live in requests {
