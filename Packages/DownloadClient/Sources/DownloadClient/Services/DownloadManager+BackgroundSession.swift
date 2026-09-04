@@ -51,8 +51,18 @@ extension DownloadManager: BackgroundSessionDelegate {
     /// storage and mark the download completed. Shared by the live delegate
     /// path and the launch-time reconciliation in `requeuePendingDownloads`.
     func finalizeDownload(downloadID: UUID, tempFileURL: URL) async {
+        // Claim before the first suspension so a concurrent caller sees it
+        guard !finalizingDownloadIDs.contains(downloadID) else { return }
+        finalizingDownloadIDs.insert(downloadID)
+        defer { finalizingDownloadIDs.remove(downloadID) }
+
         guard let download = try? await store.fetchDownload(id: downloadID) else {
             // Clean up intermediate file if we can't process the download
+            try? FileManager.default.removeItem(at: tempFileURL)
+            return
+        }
+        guard download.state != .completed else {
+            // Already finalized by another path; the parked file is a leftover
             try? FileManager.default.removeItem(at: tempFileURL)
             return
         }
@@ -69,7 +79,6 @@ extension DownloadManager: BackgroundSessionDelegate {
 
             // Update download record
             try await store.updateFilePath(downloadID: downloadID, relativePath: relativePath)
-            try await store.updateTaskIdentifier(downloadID: downloadID, taskIdentifier: nil)
             try await store.updateState(downloadID: downloadID, state: .completed)
 
             // Notify delegate for notifications

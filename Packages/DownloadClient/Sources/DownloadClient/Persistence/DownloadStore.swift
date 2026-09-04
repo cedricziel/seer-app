@@ -47,10 +47,15 @@ public actor DownloadStore {
         return try context.fetch(descriptor).first
     }
 
-    /// Fetch the download whose background URLSession task has the given identifier
+    /// Fetch the download whose background URLSession task has the given
+    /// identifier. Task identifiers are only unique within a session, so only
+    /// rows still in `.downloading` are candidates.
     public func fetchDownload(taskIdentifier: Int) throws -> Download? {
+        let downloadingRaw = DownloadState.downloading.rawValue
         let context = ModelContext(modelContainer)
-        let predicate = #Predicate<Download> { $0.taskIdentifier == taskIdentifier }
+        let predicate = #Predicate<Download> {
+            $0.taskIdentifier == taskIdentifier && $0.stateRawValue == downloadingRaw
+        }
         let descriptor = FetchDescriptor<Download>(predicate: predicate)
         return try context.fetch(descriptor).first
     }
@@ -114,6 +119,13 @@ public actor DownloadStore {
 
         download.state = state
         download.errorMessage = errorMessage
+
+        // A task identifier is only meaningful while the transfer is running;
+        // drop it on every other transition so a reused identifier from a
+        // later session cannot resolve to this row.
+        if state != .downloading {
+            download.taskIdentifier = nil
+        }
 
         if state == .completed {
             download.completedDate = Date()

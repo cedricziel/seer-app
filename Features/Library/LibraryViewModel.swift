@@ -95,6 +95,12 @@ public final class LibraryViewModel: ObservableObject {
     /// server's client, token and cache scope.
     func serverChanged() {
         cancelAllTasks()
+        // Cancelled loads never reach their `isLoading = false`; reset here so
+        // the view cannot stay on the loading state for the new server.
+        isLoading = false
+        isLoadingMore = false
+        isLoadingLatestItems = false
+        isLoadingContinueWatching = false
         setupService()
         serverConfigurationID = appState.activeServer?.id
         libraries = []

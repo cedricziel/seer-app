@@ -111,9 +111,20 @@ public final class AppState: ObservableObject {
 
     /// Host-based keys earlier versions used for the active server's
     /// downloads. Used once to migrate existing rows to `activeServerKey`.
+    /// A host that another configuration also uses (same machine, different
+    /// port or path) is ambiguous and is left out so the other server's
+    /// downloads are not re-keyed to this one.
     public var legacyServerKeys: [String] {
         guard let server = activeServer else { return [] }
-        return [server.jellyfinURL.host, server.internalJellyfinURL?.host].compactMap(\.self)
+        let otherHosts = Set(
+            servers
+                .filter { $0.id != server.id }
+                .flatMap { [$0.jellyfinURL.host, $0.internalJellyfinURL?.host] }
+                .compactMap(\.self)
+        )
+        return [server.jellyfinURL.host, server.internalJellyfinURL?.host]
+            .compactMap(\.self)
+            .filter { !otherHosts.contains($0) }
     }
 
     public var jellyfinServerURL: URL? {

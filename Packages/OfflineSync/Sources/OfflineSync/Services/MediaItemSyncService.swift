@@ -253,7 +253,7 @@ public final class MediaItemSyncService {
         if let library {
             let libId = library.id
             let libraryDescriptor = FetchDescriptor<CachedMediaItem>(
-                predicate: #Predicate { $0.libraryId == libId }
+                predicate: #Predicate { $0.serverConfigurationID == configID && $0.libraryId == libId }
             )
             let libraryItems = try modelContext.fetch(libraryDescriptor)
             for existing in libraryItems where !serverIds.contains(existing.id) {

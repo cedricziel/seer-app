@@ -37,7 +37,9 @@ public final class VideoPlayerViewModel {
     private var streamInfo: StreamInfo?
     private var playbackState: PlaybackState?
     private var isPlayingOffline: Bool = false
-    private var downloadManager: DownloadManager?
+    /// Injected by the hosting view from the SwiftUI environment before
+    /// loading, so downloaded media plays from disk instead of streaming.
+    var downloadManager: DownloadManager?
 
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
@@ -51,6 +53,15 @@ public final class VideoPlayerViewModel {
     /// Set once `stop()` has run. A load that was still in flight when the
     /// view went away must not start playback afterwards.
     private var isStopped: Bool = false
+
+    /// Identifies the active load. Bumped by `loadAndPlay()` and `stop()` so
+    /// a superseded or cancelled load that resumes after an `await` cannot
+    /// install a stale player over the current one.
+    private var loadGeneration: Int = 0
+
+    private func isCurrentLoad(_ generation: Int) -> Bool {
+        generation == loadGeneration && !isStopped
+    }
 
     // MARK: - Initialization
 
@@ -110,6 +121,7 @@ public final class VideoPlayerViewModel {
     func loadAndPlay(startPositionTicks: Int64 = 0) {
         loadTask?.cancel()
         isStopped = false
+        loadGeneration += 1
         loadTask = Task { [weak self] in
             guard let self else { return }
             await loadMedia(startPositionTicks: startPositionTicks)
@@ -120,23 +132,26 @@ public final class VideoPlayerViewModel {
 
     /// Load the media and prepare for playback
     func loadMedia(startPositionTicks: Int64 = 0) async {
+        let generation = loadGeneration
         setupAudioSession()
         isBuffering = true
         errorMessage = nil
         teardownPlayer()
 
         // Check for local downloaded file first
-        if let localURL = await getLocalFileURL() {
-            await loadFromLocalFile(url: localURL, startPositionTicks: startPositionTicks)
+        let localURL = await getLocalFileURL()
+        guard isCurrentLoad(generation) else { return }
+        if let localURL {
+            await loadFromLocalFile(url: localURL, startPositionTicks: startPositionTicks, generation: generation)
             return
         }
 
         // Fall back to streaming
-        await loadFromStream(startPositionTicks: startPositionTicks)
+        await loadFromStream(startPositionTicks: startPositionTicks, generation: generation)
     }
 
     /// Load media from streaming server
-    private func loadFromStream(startPositionTicks: Int64) async {
+    private func loadFromStream(startPositionTicks: Int64, generation: Int) async {
         print("🎬 [VideoPlayer] loadFromStream called for item: \(item.id)")
         guard let service = playbackService else {
             print("🎬 [VideoPlayer] ERROR: No playback service")
@@ -152,6 +167,7 @@ public final class VideoPlayerViewModel {
                 startPositionTicks: startPositionTicks
             )
             print("🎬 [VideoPlayer] Got stream info successfully")
+            guard isCurrentLoad(generation) else { return }
             streamInfo = info
             audioTracks = info.audioStreams
             subtitleTracks = info.subtitleStreams
@@ -211,7 +227,7 @@ public final class VideoPlayerViewModel {
     }
 
     /// Load media from local file
-    private func loadFromLocalFile(url: URL, startPositionTicks: Int64) async {
+    private func loadFromLocalFile(url: URL, startPositionTicks: Int64, generation: Int) async {
         isPlayingOffline = true
 
         // Create player from local file
@@ -234,6 +250,7 @@ public final class VideoPlayerViewModel {
         } catch {
             // Duration loading failed, will use default
         }
+        guard isCurrentLoad(generation) else { return }
 
         // Seek to start position if provided
         if startPositionTicks > 0 {
@@ -347,6 +364,7 @@ public final class VideoPlayerViewModel {
     func stop() {
         guard !isStopped else { return }
         isStopped = true
+        loadGeneration += 1
         loadTask?.cancel()
         loadTask = nil
         reportPlaybackStopped()
@@ -503,13 +521,16 @@ public final class VideoPlayerViewModel {
         isBuffering = false
     }
 
+    /// Logs only safe error fields. `userInfo` can carry the failing stream
+    /// URL, which includes the access token, so it is never printed whole.
     private func logPlaybackError(_ error: Error?) {
         guard let nsError = error as? NSError else { return }
         print("🎬 [VideoPlayer] Error domain: \(nsError.domain), code: \(nsError.code)")
-        print("🎬 [VideoPlayer] Error userInfo: \(nsError.userInfo)")
+        if let failingURL = nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL {
+            print("🎬 [VideoPlayer] Failing URL: \(StreamURLBuilder.redactedDescription(of: failingURL))")
+        }
         guard let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? NSError else { return }
         print("🎬 [VideoPlayer] Underlying error: \(underlyingError.domain), code: \(underlyingError.code)")
-        print("🎬 [VideoPlayer] Underlying userInfo: \(underlyingError.userInfo)")
     }
 
     private func scheduleControlsHide() {

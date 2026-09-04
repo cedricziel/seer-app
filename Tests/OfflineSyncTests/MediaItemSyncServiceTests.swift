@@ -137,6 +137,32 @@ final class MediaItemSyncServiceTests: XCTestCase {
         XCTAssertEqual(try cachedItems().count, 2)
     }
 
+    func testLibrarySync_cleanupDoesNotCrossServers() async throws {
+        // The same server added twice (e.g. internal and external URL) yields
+        // two configurations whose libraries share Jellyfin's library ID.
+        let otherServer = try ServerConfiguration(
+            name: "Other",
+            jellyfinURL: XCTUnwrap(URL(string: "https://other.example.com"))
+        )
+        context.insert(otherServer)
+        let libraryA = CachedLibrary(id: "shared-lib", serverConfigurationID: serverConfig.id, name: "Movies")
+        let libraryB = CachedLibrary(id: "shared-lib", serverConfigurationID: otherServer.id, name: "Movies")
+        context.insert(libraryA)
+        context.insert(libraryB)
+        try context.save()
+
+        try await service.syncItems([movie("a"), movie("b")], serverConfig: serverConfig, library: libraryA)
+        try await service.syncItems([movie("a"), movie("b")], serverConfig: otherServer, library: libraryB)
+        XCTAssertEqual(try cachedItems(id: "b").count, 2)
+
+        // Server A's library no longer has "b"; server B's row must survive
+        try await service.syncItems([movie("a")], serverConfig: serverConfig, library: libraryA)
+
+        let remaining = try cachedItems(id: "b")
+        XCTAssertEqual(remaining.count, 1, "Cleanup must be scoped to the syncing server")
+        XCTAssertEqual(remaining.first?.serverConfigurationID, otherServer.id)
+    }
+
     func testSync_isScopedToServerConfiguration() async throws {
         let otherServer = try ServerConfiguration(
             name: "Other",

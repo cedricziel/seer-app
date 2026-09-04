@@ -61,6 +61,11 @@ public final class DownloadManager {
     /// other servers are left alone until that server becomes active again.
     private var serverID: String?
 
+    /// Downloads whose completed file is currently being moved into place.
+    /// The launch-time reconcile and the session delegate can both try to
+    /// finalize the same download; the second caller must bail out.
+    var finalizingDownloadIDs: Set<UUID> = []
+
     /// `UserDefaults` key the download settings screen writes the WiFi-only toggle to
     public static let wifiOnlyUserDefaultsKey = "wifiOnlyDownloads"
 

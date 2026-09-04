@@ -81,6 +81,9 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
                     }
                     return
                 }
+                // Hand the environment's download manager to the view model so
+                // downloaded items play from disk.
+                viewModel.downloadManager = downloadManager
                 // The view model owns the load task (not SwiftUI's .task, which
                 // is cancelled during fullScreenCover presentation) and cancels
                 // it from stop() if the view is dismissed mid-load.

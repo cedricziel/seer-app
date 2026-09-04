@@ -14,6 +14,11 @@ public actor RequestStatusPoller {
     private var jellyseerrService: JellyseerrService?
     private var pollingTask: Task<Void, Never>?
 
+    /// Set by `stopPolling()`. Checked after awaited work so a poll that was
+    /// already in flight (including one started by a background task) does
+    /// not write to the cache or notify after the poller was retired.
+    private var isStopped = false
+
     /// Polling configuration
     private let pollingInterval: TimeInterval = 15 * 60 // 15 minutes
 
@@ -39,6 +44,7 @@ public actor RequestStatusPoller {
     /// Start background polling
     public func startPolling() {
         guard pollingTask == nil else { return }
+        isStopped = false
 
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -50,6 +56,7 @@ public actor RequestStatusPoller {
 
     /// Stop background polling
     public func stopPolling() {
+        isStopped = true
         pollingTask?.cancel()
         pollingTask = nil
     }
@@ -64,6 +71,7 @@ public actor RequestStatusPoller {
         do {
             // Fetch current requests from Jellyseerr
             let response = try await service.getRequests(take: 50, skip: 0, filter: .all, sort: .modified)
+            guard !isStopped else { return }
             let currentRequests = response.results
 
             // Get cached statuses for this server only; request IDs collide across servers
@@ -110,8 +118,8 @@ public actor RequestStatusPoller {
                 }
             }
 
-            // Send notifications for changes
-            if !changes.isEmpty {
+            // Send notifications for changes (unless retired mid-poll)
+            if !changes.isEmpty, !isStopped {
                 await notificationService.notifyRequestStatusChanges(changes, serverID: serverID)
             }
         } catch {
