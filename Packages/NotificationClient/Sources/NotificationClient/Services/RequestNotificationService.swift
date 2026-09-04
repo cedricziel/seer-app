@@ -39,7 +39,7 @@ public final class RequestNotificationService {
                     NotificationUserInfoKey.requestID.rawValue: change.requestID,
                     NotificationUserInfoKey.serverID.rawValue: serverID
                 ],
-                identifier: "request-status-\(change.requestID)"
+                identifier: "request-status-\(serverID)-\(change.requestID)"
             )
         } catch {
             print("[RequestNotificationService] Failed to schedule notification: \(error)")

@@ -3,9 +3,21 @@ import Foundation
 import Network
 import SystemConfiguration.CaptiveNetwork
 
+/// Read-only view of the current Wi-Fi network state. `WiFiSSIDMonitor` is
+/// the production implementation; tests substitute a stub so resolver logic
+/// never touches CoreLocation.
+@MainActor
+public protocol WiFiNetworkStatus: AnyObject {
+    var currentSSID: String? { get }
+    var isOnWiFi: Bool { get }
+    var hasLocationPermission: Bool { get }
+    func requestLocationPermission()
+    func refresh()
+}
+
 /// Monitors the current WiFi network SSID
 @MainActor
-public final class WiFiSSIDMonitor: ObservableObject {
+public final class WiFiSSIDMonitor: ObservableObject, WiFiNetworkStatus {
     /// The current WiFi SSID (nil if not on WiFi or permission denied)
     @Published public private(set) var currentSSID: String?
 
@@ -30,10 +42,14 @@ public final class WiFiSSIDMonitor: ObservableObject {
                 }
             }
         }
+        // CoreLocation invokes `locationManagerDidChangeAuthorization` as soon
+        // as the delegate is set, so the initial permission state arrives
+        // through the delegate. Do NOT read `authorizationStatus` here: that
+        // call blocks the calling thread on an XPC round trip to locationd,
+        // and in a host-less test process on the simulator it never returns.
         locationManager.delegate = locationDelegate
 
         setupNetworkMonitoring()
-        checkLocationPermission()
     }
 
     /// Request location permission (required to read WiFi SSID)
@@ -60,14 +76,6 @@ public final class WiFiSSIDMonitor: ObservableObject {
             }
         }
         pathMonitor.start(queue: DispatchQueue.global(qos: .utility))
-    }
-
-    private func checkLocationPermission() {
-        let status = locationManager.authorizationStatus
-        hasLocationPermission = status == .authorizedWhenInUse || status == .authorizedAlways
-        if hasLocationPermission {
-            updateSSID()
-        }
     }
 
     private func updateSSID() {

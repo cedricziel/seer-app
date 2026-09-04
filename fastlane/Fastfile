@@ -40,7 +40,10 @@ lane :test do
     scheme: SCHEME,
     devices: [ENV["SIMULATOR"] || "iPhone 17"],
     clean: false,
-    output_directory: "fastlane/test_output"
+    output_directory: "fastlane/test_output",
+    # Fail a test that stalls instead of holding the runner until the job
+    # limit. 120s is far above the slowest legitimate test in this suite.
+    xcargs: "-test-timeouts-enabled YES -default-test-execution-time-allowance 120"
   )
 end
 
