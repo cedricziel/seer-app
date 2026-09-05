@@ -56,7 +56,7 @@ extension MediaDetailView {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
-        .background(Color(.systemGray6))
+        .background(Color.formatBadgeFill)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -73,7 +73,7 @@ extension MediaDetailView {
                         .font(.caption)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color(.systemGray5))
+                        .background(Color.genrePillFill)
                         .clipShape(Capsule())
                 }
             }
@@ -141,7 +141,7 @@ extension MediaDetailView {
 
     private var castPlaceholder: some View {
         Circle()
-            .fill(Color(.systemGray5))
+            .fill(Color.castPlaceholderFill)
             .overlay {
                 Image(systemName: "person.fill")
                     .foregroundStyle(.secondary)
@@ -200,5 +200,33 @@ extension MediaDetailView {
                 }
             }
         }
+    }
+}
+
+// MARK: - Cross-platform colors
+
+private extension Color {
+    static var formatBadgeFill: Color {
+        #if os(iOS)
+            Color(uiColor: .systemGray6)
+        #else
+            Color.gray.opacity(0.12)
+        #endif
+    }
+
+    static var genrePillFill: Color {
+        #if os(iOS)
+            Color(uiColor: .systemGray5)
+        #else
+            Color.gray.opacity(0.15)
+        #endif
+    }
+
+    static var castPlaceholderFill: Color {
+        #if os(iOS)
+            Color(uiColor: .systemGray5)
+        #else
+            Color.gray.opacity(0.15)
+        #endif
     }
 }

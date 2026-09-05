@@ -133,8 +133,7 @@ final class PersonDetailViewSnapshotTests: XCTestCase {
             PersonFilmographyView(
                 state: .loaded(items),
                 personName: "Jane Doe",
-                imageURL: { _ in nil },
-                roleLabel: { "Actor · \($0.year.map(String.init) ?? "")" }
+                imageURL: { _ in nil }
             )
             .padding()
         }

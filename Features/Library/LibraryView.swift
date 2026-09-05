@@ -39,9 +39,9 @@ private struct LibraryContentView: View {
     var body: some View {
         NavigationStack(path: $path) {
             Group {
-                if viewModel.isLoading, viewModel.mediaItems.isEmpty, viewModel.continueWatching.isEmpty {
+                if viewModel.isLoading, viewModel.libraries.isEmpty, viewModel.continueWatching.isEmpty {
                     LoadingView(message: "Loading library...")
-                } else if let error = hostAwareErrorMessage, viewModel.mediaItems.isEmpty {
+                } else if let error = hostAwareErrorMessage, viewModel.libraries.isEmpty {
                     ErrorView(error: error) {
                         Task { await viewModel.refresh() }
                     }
@@ -64,6 +64,7 @@ private struct LibraryContentView: View {
         .task { await viewModel.loadInitialData() }
         .onDisappear { viewModel.cancelAllTasks() }
         .onChange(of: appState.activeServerID) {
+            path = NavigationPath()
             viewModel.serverChanged()
             Task { await viewModel.refresh() }
         }
@@ -152,7 +153,9 @@ private struct LibraryContentView: View {
     private var continueWatchingSkeleton: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Continue Watching").font(.title2).fontWeight(.bold).padding(.horizontal)
-            SkeletonHeroRow().padding(.horizontal)
+            #if !os(tvOS)
+                SkeletonHeroRow().padding(.horizontal)
+            #endif
             SkeletonLandscapeRow()
         }
     }
@@ -188,7 +191,7 @@ private struct LibraryContentView: View {
             subtitle: heroSubtitle(for: item),
             imageURL: continueWatchingImageURL(for: item),
             progress: progressFraction(for: item),
-            isDownloaded: isItemDownloaded(item),
+            isDownloaded: offlineDimmingEnabled ? isItemDownloaded(item) : false,
             showOfflineDimming: offlineDimmingEnabled,
             onResume: { selectedItemForPlayback = item },
             contextMenuConfig: contextMenuConfig(for: item, canPlay: true, showDetails: true),
@@ -203,7 +206,7 @@ private struct LibraryContentView: View {
                 subtitle: landscapeSubtitle(for: item),
                 imageURL: continueWatchingImageURL(for: item),
                 progress: progressFraction(for: item),
-                isDownloaded: isItemDownloaded(item),
+                isDownloaded: offlineDimmingEnabled ? isItemDownloaded(item) : false,
                 showOfflineDimming: offlineDimmingEnabled,
                 contextMenuConfig: contextMenuConfig(for: item, canPlay: true, showDetails: true),
                 contextMenuActions: contextMenuActions(for: item, canPlay: true)
@@ -290,7 +293,7 @@ private struct LibraryContentView: View {
     }
 
     private func latestItemCard(for item: MediaItem) -> some View {
-        let downloaded = isItemDownloaded(item)
+        let downloaded = offlineDimmingEnabled ? isItemDownloaded(item) : false
         return NavigationLink(value: item) {
             ZStack(alignment: .topTrailing) {
                 MediaCard(

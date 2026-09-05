@@ -25,7 +25,7 @@ extension MediaDetailView {
                     .font(.headline)
 
                 VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
+                    ForEach(Array(rows.enumerated()), id: \.element.label) { index, row in
                         if index > 0 {
                             Divider()
                         }
