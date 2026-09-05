@@ -32,6 +32,7 @@ struct MediaDetailView: View {
     @State var selectedEpisodeForDetail: MediaItem?
     @State var showEpisodeDetail: Bool = false
     @State private var detailedItem: MediaItem?
+    @State var isOverviewExpanded: Bool = false
 
     /// The item to display - uses detailed item if available, otherwise falls back to passed item
     var displayItem: MediaItem {
@@ -41,50 +42,34 @@ struct MediaDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Backdrop
-                BackdropImage(url: viewModel.imageURL(for: item, type: .backdrop))
-
-                // Content
-                VStack(alignment: .leading, spacing: 16) {
-                    // Title and metadata
+                #if os(tvOS)
+                    // tvOS: headerSection renders the full-bleed backdrop head
+                    // (title, meta, rating and actions overlaid on it).
                     headerSection
 
-                    // Play button (for movies and episodes from library)
-                    if source == .library, item.type == .movie || item.type == .episode {
-                        playButton
-                    }
+                    contentSections
+                        .padding()
+                #else
+                    // Backdrop
+                    BackdropImage(url: viewModel.imageURL(for: item, type: .backdrop))
 
-                    // Overview
-                    if let overview = item.overview {
-                        overviewSection(overview)
-                    }
+                    // Title and metadata. Rendered directly below the backdrop
+                    // (no intervening padding) so its own negative top padding
+                    // achieves the full ~56pt poster/backdrop overlap.
+                    headerSection
+                        .padding(.horizontal)
 
-                    // Format Info (for playable items)
-                    if source == .library, item.isPlayable {
-                        formatInfoSection
-                    }
+                    // Content
+                    VStack(alignment: .leading, spacing: 16) {
+                        // Play button (for movies and episodes from library)
+                        if source == .library, item.type == .movie || item.type == .episode {
+                            playButton
+                        }
 
-                    // Genres
-                    if let genres = item.genres, !genres.isEmpty {
-                        genresSection(genres)
+                        contentSections
                     }
-
-                    // Cast
-                    if let people = item.people, !people.isEmpty {
-                        castSection(people)
-                    }
-
-                    // Seasons section for TV series from library
-                    if item.type == .series, source == .library {
-                        seasonsSection
-                    }
-
-                    // Request Button (only for search results, if Jellyseerr is configured)
-                    if source == .search, appState.jellyseerrServerURL != nil {
-                        requestSection
-                    }
-                }
-                .padding()
+                    .padding()
+                #endif
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -147,8 +132,50 @@ struct MediaDetailView: View {
 
     /// Whether the item has playback progress
     var hasProgress: Bool {
-        guard let ticks = item.userData?.playbackPositionTicks else { return false }
+        guard let ticks = displayItem.userData?.playbackPositionTicks else { return false }
         return ticks > 0
+    }
+
+    // MARK: - Content Sections
+
+    /// Overview, format, genres, cast, seasons and request sections shared
+    /// by both the iOS/iPadOS and tvOS header layouts.
+    @ViewBuilder
+    private var contentSections: some View {
+        // Overview
+        if let overview = item.overview {
+            overviewSection(overview)
+        }
+
+        // Format Info (for playable items)
+        if source == .library, item.isPlayable {
+            formatInfoSection
+        }
+
+        // Details (movies only)
+        if item.type == .movie, source == .library {
+            detailsSection
+        }
+
+        // Genres
+        if let genres = item.genres, !genres.isEmpty {
+            genresSection(genres)
+        }
+
+        // Cast
+        if let people = item.people, !people.isEmpty {
+            castSection(people)
+        }
+
+        // Seasons section for TV series from library
+        if item.type == .series, source == .library {
+            seasonsSection
+        }
+
+        // Request Button (only for search results, if Jellyseerr is configured)
+        if source == .search, appState.jellyseerrServerURL != nil {
+            requestSection
+        }
     }
 
     // MARK: - Request Section

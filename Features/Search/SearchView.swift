@@ -16,6 +16,7 @@ struct SearchView: View {
 private struct SearchContentView: View {
     @ObservedObject var appState: AppState
     @StateObject private var viewModel: SearchViewModel
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var selectedResult: SearchResult?
     @State private var isRequestingMedia: Bool = false
@@ -247,9 +248,7 @@ private struct SearchContentView: View {
 
     private var searchResultsGrid: some View {
         ScrollView {
-            LazyVGrid(columns: [
-                GridItem(.adaptive(minimum: 140), spacing: 16)
-            ], spacing: 16) {
+            LazyVGrid(columns: mediaGridColumns(horizontalSizeClass: horizontalSizeClass), spacing: 16) {
                 ForEach(viewModel.searchResults) { result in
                     SearchResultCard(
                         result: result,

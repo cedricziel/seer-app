@@ -384,6 +384,36 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         return "\(mins)m"
     }
 
+    /// Formatted runtime string using long-form units (e.g., "2 hr 8 min", "8 min")
+    public var formattedDurationLong: String? {
+        guard let minutes = runtimeMinutes else { return nil }
+        let hours = minutes / 60
+        let mins = minutes % 60
+        if hours > 0 {
+            return "\(hours) hr \(mins) min"
+        }
+        return "\(mins) min"
+    }
+
+    /// Remaining time text based on playback position (e.g., "1 hr 12 min left", "21 min left").
+    /// Returns nil when the runtime or a nonzero playback position is unavailable.
+    public var remainingTimeText: String? {
+        guard let totalTicks = runTimeTicks,
+              let positionTicks = userData?.playbackPositionTicks,
+              positionTicks > 0 else { return nil }
+
+        let remainingTicks = totalTicks - positionTicks
+        guard remainingTicks > 0 else { return nil }
+
+        let remainingMinutes = Int(remainingTicks / 600_000_000)
+        let hours = remainingMinutes / 60
+        let mins = remainingMinutes % 60
+        if hours > 0 {
+            return "\(hours) hr \(mins) min left"
+        }
+        return "\(mins) min left"
+    }
+
     /// Whether the item can be played directly (movie or episode)
     public var isPlayable: Bool {
         type == .movie || type == .episode

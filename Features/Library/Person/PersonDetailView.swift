@@ -34,7 +34,8 @@ struct PersonDetailView: View {
                 PersonFilmographyView(
                     state: filmographyState,
                     personName: viewModel.displayName,
-                    imageURL: { viewModel.imageURL(for: $0) }
+                    imageURL: { viewModel.imageURL(for: $0) },
+                    roleLabel: { viewModel.roleLabel(for: $0) }
                 )
             }
             .padding()
@@ -150,6 +151,8 @@ struct PersonDetailHeader: View {
 struct PersonBiographyView: View {
     let overview: String
 
+    @State private var isExpanded = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Biography")
@@ -157,6 +160,14 @@ struct PersonBiographyView: View {
             Text(overview)
                 .font(.body)
                 .foregroundStyle(.secondary)
+                .lineLimit(isExpanded ? nil : 4)
+            Button(isExpanded ? "Less" : "More") {
+                withAnimation {
+                    isExpanded.toggle()
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.accentColor)
         }
     }
 }
@@ -174,14 +185,15 @@ struct PersonFilmographyView: View {
     let state: State
     let personName: String
     let imageURL: (MediaItem) -> URL?
+    let roleLabel: (MediaItem) -> String? = { _ in nil }
+
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Filmography")
-                .font(.headline)
-
             switch state {
             case .loading:
+                filmographyPlaceholderHeader
                 HStack {
                     Spacer()
                     ProgressView()
@@ -189,28 +201,48 @@ struct PersonFilmographyView: View {
                 }
                 .padding(.vertical, 24)
             case let .error(message):
+                filmographyPlaceholderHeader
                 SectionEmptyView(message: message, systemImage: "exclamationmark.triangle")
             case .empty:
+                filmographyPlaceholderHeader
                 SectionEmptyView(
                     message: "No titles in your library feature \(personName).",
                     systemImage: "film.stack"
                 )
             case let .loaded(items):
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 12) {
-                        ForEach(items) { item in
-                            NavigationLink(value: item) {
-                                MediaCard(
-                                    title: item.name,
-                                    subtitle: item.year.map { String($0) },
-                                    imageURL: imageURL(item)
-                                )
-                                .frame(width: 140)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                filmographyHeader(count: items.count)
+                filmographyGrid(items: items)
+            }
+        }
+    }
+
+    private var filmographyPlaceholderHeader: some View {
+        Text("Filmography")
+            .font(.headline)
+    }
+
+    private func filmographyHeader(count: Int) -> some View {
+        HStack {
+            Text("In your library")
+                .font(.headline)
+            Spacer()
+            Text("\(count)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func filmographyGrid(items: [MediaItem]) -> some View {
+        LazyVGrid(columns: mediaGridColumns(horizontalSizeClass: horizontalSizeClass), spacing: 16) {
+            ForEach(items) { item in
+                NavigationLink(value: item) {
+                    MediaCard(
+                        title: item.name,
+                        subtitle: roleLabel(item),
+                        imageURL: imageURL(item)
+                    )
                 }
+                .buttonStyle(.plain)
             }
         }
     }
