@@ -147,60 +147,6 @@ extension MediaDetailView {
                     .foregroundStyle(.secondary)
             }
     }
-
-    // MARK: - Seasons Section
-
-    var seasonsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Seasons")
-                .font(.headline)
-
-            if let viewModel = seriesViewModel {
-                if viewModel.isLoadingSeasons {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                } else if viewModel.seasons.isEmpty {
-                    Text("No seasons available")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.seasons) { season in
-                        let episodes = viewModel.episodesBySeason[season.id] ?? []
-                        SeasonDisclosureRow(
-                            season: season,
-                            episodes: episodes,
-                            isExpanded: viewModel.expandedSeasons.contains(season.id),
-                            isLoading: viewModel.isLoadingEpisodes[season.id] ?? false,
-                            onToggle: {
-                                Task {
-                                    await viewModel.toggleSeason(season.id)
-                                }
-                            },
-                            imageURL: { viewModel.imageURL(for: $0, type: .primary) },
-                            onPlayEpisode: { episode in
-                                selectedEpisodeForPlayback = episode
-                                showPlayer = true
-                            },
-                            onTapEpisode: { episode in
-                                selectedEpisodeForDetail = episode
-                                showEpisodeDetail = true
-                            },
-                            onDownloadEpisode: { episode in
-                                await downloadEpisode(episode)
-                            },
-                            onDownloadSeason: {
-                                await downloadSeason(episodes: episodes)
-                            },
-                            downloadStateForEpisode: { episode in
-                                downloadStateFor(episodeID: episode.id)
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
 }
 
 // MARK: - Cross-platform colors

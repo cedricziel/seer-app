@@ -64,6 +64,8 @@ struct MediaDetailView: View {
                         // Play button (for movies and episodes from library)
                         if source == .library, item.type == .movie || item.type == .episode {
                             playButton
+                        } else if source == .library, item.type == .series {
+                            seriesPrimaryActionButton
                         }
 
                         contentSections
@@ -72,7 +74,9 @@ struct MediaDetailView: View {
                 #endif
             }
         }
+        #if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .task {
             // Fetch detailed item info with MediaSources for format info
             if source == .library, item.isPlayable {
@@ -111,22 +115,35 @@ struct MediaDetailView: View {
                 selectedEpisodeForPlayback = nil
             }
         }
+        #if os(tvOS)
+        .navigationDestination(isPresented: $showEpisodeDetail) {
+            episodeDetailDestination
+        }
+        #else
         .sheet(isPresented: $showEpisodeDetail) {
-            if let episode = selectedEpisodeForDetail {
-                EpisodeDetailSheet(
-                    episode: episode,
-                    imageURL: viewModel.imageURL(for: episode, type: .primary),
-                    downloadState: episodeDownloadStates[episode.id] ?? .notDownloaded,
-                    onPlay: {
-                        showEpisodeDetail = false
-                        selectedEpisodeForPlayback = episode
-                        showPlayer = true
-                    },
-                    onDownload: {
-                        Task { await downloadEpisode(episode) }
-                    }
-                )
-            }
+                    episodeDetailDestination
+                }
+        #endif
+    }
+
+    /// The episode detail screen content, shared between the iOS/iPadOS
+    /// `.sheet` presentation and the tvOS pushed `.navigationDestination`.
+    @ViewBuilder
+    private var episodeDetailDestination: some View {
+        if let episode = selectedEpisodeForDetail {
+            EpisodeDetailSheet(
+                episode: episode,
+                imageURL: viewModel.imageURL(for: episode, type: .primary),
+                downloadState: episodeDownloadStates[episode.id] ?? .notDownloaded,
+                onPlay: {
+                    showEpisodeDetail = false
+                    selectedEpisodeForPlayback = episode
+                    showPlayer = true
+                },
+                onDownload: {
+                    Task { await downloadEpisode(episode) }
+                }
+            )
         }
     }
 
@@ -134,6 +151,47 @@ struct MediaDetailView: View {
     var hasProgress: Bool {
         guard let ticks = displayItem.userData?.playbackPositionTicks else { return false }
         return ticks > 0
+    }
+
+    // MARK: - Series Primary Action
+
+    /// "Resume S# · E#" primary action for a series, shown in the same
+    /// position `playButton` occupies for movies/episodes. Recomputed from
+    /// the currently selected season chip each time it renders, so it
+    /// updates — and hides — as the user browses seasons. Hidden entirely
+    /// when the selected season has no next-up episode (e.g. fully watched).
+    @ViewBuilder
+    var seriesPrimaryActionButton: some View {
+        if let seriesViewModel,
+           let selectedSeasonID = seriesViewModel.selectedSeasonID,
+           let nextUp = seriesViewModel.nextUpEpisode(for: selectedSeasonID) {
+            let season = seriesViewModel.seasons.first { $0.id == selectedSeasonID }
+            Button {
+                selectedEpisodeForPlayback = nextUp
+                showPlayer = true
+            } label: {
+                HStack {
+                    Image(systemName: "play.fill")
+                    Text(seriesResumeLabel(season: season, episode: nextUp))
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.accentColor)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+
+    private func seriesResumeLabel(season: MediaItem?, episode: MediaItem) -> String {
+        var parts: [String] = []
+        if let seasonNumber = season?.indexNumber {
+            parts.append("S\(seasonNumber)")
+        }
+        if let episodeNumber = episode.indexNumber {
+            parts.append("E\(episodeNumber)")
+        }
+        return parts.isEmpty ? "Resume" : "Resume \(parts.joined(separator: " · "))"
     }
 
     // MARK: - Content Sections

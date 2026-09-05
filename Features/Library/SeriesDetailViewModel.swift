@@ -16,10 +16,15 @@ final class SeriesDetailViewModel {
 
     var seasons: [MediaItem] = []
     var episodesBySeason: [String: [MediaItem]] = [:]
-    var expandedSeasons: Set<String> = []
     var isLoadingSeasons: Bool = false
     var isLoadingEpisodes: [String: Bool] = [:]
     var errorMessage: String?
+
+    /// The season currently shown in the season chip row / episode list.
+    /// Defaults to the first season with an unplayed episode (fallback:
+    /// the first season) once `loadSeasons()` completes. Changes every time
+    /// the user taps a chip.
+    var selectedSeasonID: String?
 
     /// Indicates if the view is showing cached data
     var isShowingCachedData: Bool = false
@@ -76,10 +81,12 @@ final class SeriesDetailViewModel {
 
     // MARK: - Public Methods
 
-    /// Loads all seasons for the series
+    /// Loads all seasons for the series. `isLoadingSeasons` is cleared as
+    /// soon as the season list itself is known, so the chip row can render
+    /// immediately; the initial-season scan that follows only occupies the
+    /// per-season `isLoadingEpisodes` flags, not the whole section.
     func loadSeasons() async {
         isLoadingSeasons = true
-        defer { isLoadingSeasons = false }
 
         // Load cached seasons first
         await loadCachedSeasons()
@@ -88,12 +95,16 @@ final class SeriesDetailViewModel {
             if seasons.isEmpty {
                 errorMessage = "Not connected to Jellyfin"
             }
+            isLoadingSeasons = false
+            await selectInitialSeasonIfNeeded()
             return
         }
 
         // Check if we're offline
         guard networkMonitor?.isConnected ?? true else {
             isShowingCachedData = !seasons.isEmpty
+            isLoadingSeasons = false
+            await selectInitialSeasonIfNeeded()
             return
         }
 
@@ -116,6 +127,9 @@ final class SeriesDetailViewModel {
                 errorMessage = error.localizedDescription
             }
         }
+
+        isLoadingSeasons = false
+        await selectInitialSeasonIfNeeded()
     }
 
     /// Loads cached seasons from SwiftData
@@ -169,20 +183,60 @@ final class SeriesDetailViewModel {
         }
     }
 
-    /// Toggles the expanded state of a season and loads episodes if needed
-    func toggleSeason(_ seasonId: String) async {
-        if expandedSeasons.contains(seasonId) {
-            expandedSeasons.remove(seasonId)
-        } else {
-            expandedSeasons.insert(seasonId)
-            await loadEpisodesIfNeeded(for: seasonId)
-        }
-    }
-
     private func loadEpisodesIfNeeded(for seasonId: String) async {
         guard episodesBySeason[seasonId] == nil else { return }
         guard let season = seasons.first(where: { $0.id == seasonId }) else { return }
         await loadEpisodes(for: season)
+    }
+
+    /// Selects a season for the season chip row / episode list, loading its
+    /// episodes first if they haven't been fetched yet.
+    func selectSeason(_ seasonId: String) async {
+        selectedSeasonID = seasonId
+        await loadEpisodesIfNeeded(for: seasonId)
+    }
+
+    /// Picks the first season with an unplayed episode as the initial
+    /// selection, falling back to the first season. Every season's episode
+    /// list is prefetched concurrently (rather than one at a time) so the
+    /// scan takes roughly one round trip instead of N; each season's own
+    /// `isLoadingEpisodes` flag still tracks its individual fetch, so the
+    /// chip row and any already-selected season are unaffected while this
+    /// runs.
+    private func selectInitialSeasonIfNeeded() async {
+        guard selectedSeasonID == nil, !seasons.isEmpty else { return }
+
+        await withTaskGroup(of: Void.self) { group in
+            for season in seasons {
+                group.addTask { await self.loadEpisodesIfNeeded(for: season.id) }
+            }
+        }
+
+        // The prefetch above suspends on real network round trips; a chip tap
+        // (selectSeason) can run concurrently and set selectedSeasonID while
+        // we're awaiting it. Re-check before each assignment below so a
+        // selection made during that window wins instead of being reverted.
+        guard selectedSeasonID == nil else { return }
+
+        for season in seasons {
+            if let episodes = episodesBySeason[season.id],
+               episodes.contains(where: { $0.userData?.played != true }) {
+                selectedSeasonID = season.id
+                return
+            }
+        }
+
+        guard selectedSeasonID == nil else { return }
+        selectedSeasonID = seasons.first?.id
+    }
+
+    /// The first unplayed/in-progress episode of the given season, used to
+    /// drive the series' "Resume S# · E#" primary action. Recomputed on each
+    /// call rather than cached, so it tracks `selectedSeasonID` as the user
+    /// browses season chips and hides itself when the selected season has no
+    /// unplayed episodes.
+    func nextUpEpisode(for seasonId: String) -> MediaItem? {
+        episodesBySeason[seasonId]?.first(where: { $0.userData?.played != true })
     }
 
     // MARK: - Image URLs

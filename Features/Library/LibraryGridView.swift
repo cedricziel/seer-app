@@ -23,16 +23,35 @@ enum LibraryGridDestination: Hashable {
 /// `isRecentlyAddedFeed`) as part of normal navigation, so sharing one
 /// instance between them would let popping this screen silently corrupt
 /// Library home's own toolbar filter and currently-selected library.
+///
+/// On regular width, `selectedItemID` lets a caller route grid taps into a
+/// `LibraryDetailColumn`-style detail pane (§5) instead of always pushing
+/// `MediaDetailView` onto this screen's own `NavigationStack`. Passing it
+/// resolves the item purely by id, so the receiving detail column falls
+/// back to a network fetch (`LibraryViewModel.getItemDetails(id:)`) rather
+/// than an instant cache hit when it's driven by a different
+/// `LibraryViewModel` instance than the one that populated this grid — the
+/// two instances intentionally don't share `mediaItems` for the reason
+/// above. `LibraryView`'s own `navigationDestination(for:
+/// LibraryGridDestination.self)` still needs to thread its detail column's
+/// selection binding through to actually engage that pane; that callsite
+/// change is out of scope for this file.
 struct LibraryGridView: View {
     let destination: LibraryGridDestination
     let appState: AppState
+    /// Regular-width detail-pane selection, supplied by a caller that wants
+    /// grid taps routed to its own `LibraryDetailColumn` instead of pushed
+    /// onto this screen's `NavigationStack`. `nil` (the default) preserves
+    /// today's push-only behavior on every width.
+    let selectedItemID: Binding<MediaItem.ID?>?
     @StateObject private var viewModel: LibraryViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedItemForPlayback: MediaItem?
 
-    init(destination: LibraryGridDestination, appState: AppState) {
+    init(destination: LibraryGridDestination, appState: AppState, selectedItemID: Binding<MediaItem.ID?>? = nil) {
         self.destination = destination
         self.appState = appState
+        self.selectedItemID = selectedItemID
         _viewModel = StateObject(wrappedValue: LibraryViewModel(appState: appState))
     }
 
@@ -53,16 +72,18 @@ struct LibraryGridView: View {
             .padding(.vertical)
         }
         .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.large)
-        .task { await enterDestination() }
-        .fullScreenCover(item: $selectedItemForPlayback) { item in
-            VideoPlayerView(
-                item: item,
-                appState: appState,
-                startPositionTicks: item.userData?.playbackPositionTicks ?? 0,
-                onPiPStart: { selectedItemForPlayback = nil }
-            )
-        }
+        #if !os(tvOS)
+            .navigationBarTitleDisplayMode(.large)
+        #endif
+            .task { await enterDestination() }
+            .fullScreenCover(item: $selectedItemForPlayback) { item in
+                VideoPlayerView(
+                    item: item,
+                    appState: appState,
+                    startPositionTicks: item.userData?.playbackPositionTicks ?? 0,
+                    onPiPStart: { selectedItemForPlayback = nil }
+                )
+            }
     }
 
     private func enterDestination() async {
@@ -148,7 +169,7 @@ struct LibraryGridView: View {
             .font(.subheadline.weight(.semibold))
             .padding(.horizontal, 16)
             .frame(height: 44)
-            .background(Color(.systemGray5))
+            .background(Color.libraryGridFilterFill)
             .clipShape(Capsule())
         }
     }
@@ -159,8 +180,8 @@ struct LibraryGridView: View {
                 .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 16)
                 .frame(height: 44)
-                .background(isSelected ? Color.primary : Color(.systemGray5))
-                .foregroundStyle(isSelected ? Color(.systemBackground) : Color.primary)
+                .background(isSelected ? Color.primary : Color.libraryGridFilterFill)
+                .foregroundStyle(isSelected ? Color.white : Color.primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -173,17 +194,35 @@ struct LibraryGridView: View {
                 spacing: 16
             ) {
                 ForEach(viewModel.mediaItems) { item in
-                    NavigationLink(value: item) {
-                        gridCell(for: item)
-                    }
-                    .buttonStyle(.plain)
-                    .onAppear { Task { await viewModel.loadMoreItemsIfNeeded(currentItem: item) } }
+                    gridLink(for: item)
+                        .onAppear { Task { await viewModel.loadMoreItemsIfNeeded(currentItem: item) } }
                 }
             }
             .padding(.horizontal)
             if viewModel.isLoadingMore {
                 HStack { Spacer(); ProgressView(); Spacer() }.padding()
             }
+        }
+    }
+
+    /// Routes to the caller-supplied `selectedItemID` on regular width when
+    /// one was provided, otherwise pushes `MediaDetailView` via the
+    /// `MediaItem` `navigationDestination` declared by whichever
+    /// `NavigationStack` hosts this screen.
+    @ViewBuilder
+    private func gridLink(for item: MediaItem) -> some View {
+        if let selectedItemID, horizontalSizeClass == .regular {
+            Button {
+                selectedItemID.wrappedValue = item.id
+            } label: {
+                gridCell(for: item)
+            }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink(value: item) {
+                gridCell(for: item)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -234,5 +273,17 @@ struct LibraryGridView: View {
         }
         guard let year else { return nil }
         return year + typeSuffix
+    }
+}
+
+// MARK: - Cross-platform colors
+
+private extension Color {
+    static var libraryGridFilterFill: Color {
+        #if os(iOS)
+            Color(uiColor: .systemGray5)
+        #else
+            Color.gray.opacity(0.2)
+        #endif
     }
 }

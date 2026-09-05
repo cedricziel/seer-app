@@ -89,6 +89,8 @@ extension MediaDetailView {
 
                 if source == .library, item.type == .movie || item.type == .episode {
                     playButton
+                } else if source == .library, item.type == .series {
+                    seriesPrimaryActionButton
                 }
             }
             .padding(64)

@@ -185,9 +185,21 @@ struct PersonFilmographyView: View {
     let state: State
     let personName: String
     let imageURL: (MediaItem) -> URL?
-    let roleLabel: (MediaItem) -> String? = { _ in nil }
+    let roleLabel: (MediaItem) -> String?
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    init(
+        state: State,
+        personName: String,
+        imageURL: @escaping (MediaItem) -> URL?,
+        roleLabel: @escaping (MediaItem) -> String? = { _ in nil }
+    ) {
+        self.state = state
+        self.personName = personName
+        self.imageURL = imageURL
+        self.roleLabel = roleLabel
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
