@@ -456,6 +456,7 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         guard remainingTicks > 0 else { return nil }
 
         let remainingMinutes = Int(remainingTicks / 600_000_000)
+        guard remainingMinutes > 0 else { return "Less than a minute left" }
         let hours = remainingMinutes / 60
         let mins = remainingMinutes % 60
         if hours > 0 {

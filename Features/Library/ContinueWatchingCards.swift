@@ -98,6 +98,7 @@ struct ContinueWatchingHeroCard: View {
                 .background(Capsule().fill(Color.white))
         }
         .buttonStyle(.plain)
+        .disabled(isDimmed)
     }
 
     @ViewBuilder

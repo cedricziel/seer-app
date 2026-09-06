@@ -110,7 +110,7 @@ struct ServerSwitcherView: View {
         }
     #endif
 
-    #if os(iOS)
+    #if !os(tvOS)
         private var iOSBody: some View {
             NavigationStack {
                 List {

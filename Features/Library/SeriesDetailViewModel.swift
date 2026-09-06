@@ -197,28 +197,19 @@ final class SeriesDetailViewModel {
     }
 
     /// Picks the first season with an unplayed episode as the initial
-    /// selection, falling back to the first season. Every season's episode
-    /// list is prefetched concurrently (rather than one at a time) so the
-    /// scan takes roughly one round trip instead of N; each season's own
-    /// `isLoadingEpisodes` flag still tracks its individual fetch, so the
-    /// chip row and any already-selected season are unaffected while this
-    /// runs.
+    /// selection, falling back to the first season. Seasons are scanned one
+    /// at a time, in order, stopping at the first hit, so a fully watched
+    /// series costs at most one request per season and a typical one costs
+    /// a single round trip; unscanned seasons load lazily when their chip is
+    /// tapped.
     private func selectInitialSeasonIfNeeded() async {
         guard selectedSeasonID == nil, !seasons.isEmpty else { return }
 
-        await withTaskGroup(of: Void.self) { group in
-            for season in seasons {
-                group.addTask { await self.loadEpisodesIfNeeded(for: season.id) }
-            }
-        }
-
-        // The prefetch above suspends on real network round trips; a chip tap
-        // (selectSeason) can run concurrently and set selectedSeasonID while
-        // we're awaiting it. Re-check before each assignment below so a
-        // selection made during that window wins instead of being reverted.
-        guard selectedSeasonID == nil else { return }
-
         for season in seasons {
+            await loadEpisodesIfNeeded(for: season.id)
+            // A chip tap (selectSeason) can run while we await the network;
+            // a selection made in that window wins over the automatic one.
+            guard selectedSeasonID == nil else { return }
             if let episodes = episodesBySeason[season.id],
                episodes.contains(where: { $0.userData?.played != true }) {
                 selectedSeasonID = season.id

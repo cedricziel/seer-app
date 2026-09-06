@@ -181,7 +181,7 @@ struct LibraryGridView: View {
                 .padding(.horizontal, 16)
                 .frame(height: 44)
                 .background(isSelected ? Color.primary : Color.libraryGridFilterFill)
-                .foregroundStyle(isSelected ? Color.white : Color.primary)
+                .foregroundStyle(isSelected ? Color.libraryGridSelectedLabel : Color.primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -189,6 +189,13 @@ struct LibraryGridView: View {
 
     private var gridSection: some View {
         VStack(spacing: 16) {
+            if viewModel.isLoading, viewModel.mediaItems.isEmpty {
+                ProgressView().frame(maxWidth: .infinity).padding()
+            } else if let error = viewModel.errorMessage, viewModel.mediaItems.isEmpty {
+                SectionEmptyView(message: error, systemImage: "exclamationmark.triangle")
+            } else if viewModel.mediaItems.isEmpty {
+                SectionEmptyView(message: "No titles match these filters", systemImage: "film.stack")
+            }
             LazyVGrid(
                 columns: mediaGridColumns(horizontalSizeClass: horizontalSizeClass),
                 spacing: 16
@@ -284,6 +291,16 @@ private extension Color {
             Color(uiColor: .systemGray5)
         #else
             Color.gray.opacity(0.2)
+        #endif
+    }
+
+    /// Label color on a selected (label-colored) capsule: the background color,
+    /// so the pair stays inverted in both light and dark appearance.
+    static var libraryGridSelectedLabel: Color {
+        #if os(iOS)
+            Color(uiColor: .systemBackground)
+        #else
+            Color.black
         #endif
     }
 }

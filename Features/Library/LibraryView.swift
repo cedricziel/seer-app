@@ -310,6 +310,7 @@ private struct LibraryContentView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(offlineDimmingEnabled && !isItemDownloaded(item))
     }
 
     private func continueWatchingImageURL(for item: MediaItem) -> URL? {

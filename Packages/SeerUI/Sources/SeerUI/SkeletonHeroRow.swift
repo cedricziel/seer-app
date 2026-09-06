@@ -17,8 +17,13 @@ public struct SkeletonHeroRow: View {
 /// A single 180×101 landscape skeleton card, matching the size of the
 /// non-hero Continue Watching cards, with title/subtitle placeholder lines.
 public struct SkeletonLandscapeCard: View {
-    public static let width: CGFloat = 180
-    public static let height: CGFloat = 101
+    #if os(tvOS)
+        public static let width: CGFloat = 405
+        public static let height: CGFloat = 228
+    #else
+        public static let width: CGFloat = 180
+        public static let height: CGFloat = 101
+    #endif
 
     public init() {}
 
