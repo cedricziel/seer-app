@@ -507,9 +507,9 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
     private var spatialAudioLabel: String? {
         guard let format = audioSpatialFormat else { return nil }
         switch format.lowercased() {
-        case "dolbyatmos", "atmos": "Atmos"
-        case "dtsx", "dts:x": "DTS:X"
-        default: nil
+        case "dolbyatmos", "atmos": return "Atmos"
+        case "dtsx", "dts:x": return "DTS:X"
+        default: return nil
         }
     }
 
