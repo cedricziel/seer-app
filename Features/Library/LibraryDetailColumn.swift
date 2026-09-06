@@ -1,11 +1,18 @@
 import JellyfinClient
+import SeerCore
 import SeerUI
 import SwiftUI
 
-/// Detail column for `LibraryView`'s regular-width `NavigationSplitView`
-/// path (iPad / Mac Designed for iPad). Given the split view's current
-/// `MediaItem.ID` selection, resolves it back to a full `MediaItem` and
-/// renders `MediaDetailView` for it.
+/// Detail column for `LibraryView`'s `NavigationSplitView` (iPad / Mac
+/// Designed for iPad). Given the split view's current `MediaItem.ID`
+/// selection, resolves it back to a full `MediaItem` and renders
+/// `MediaDetailView` for it.
+///
+/// The column owns its own `NavigationStack` so pushes that originate
+/// inside the detail (cast member → `PersonDetailView`, filmography item →
+/// `MediaDetailView`) stay in this column; the home column's stack and its
+/// destinations are not visible from here. Changing the selection pops the
+/// column back to its root.
 ///
 /// Selection almost always resolves synchronously from data the view model
 /// has already loaded (`mediaItems`, `continueWatching`, `latestItems`);
@@ -14,6 +21,8 @@ import SwiftUI
 struct LibraryDetailColumn: View {
     let selectedItemID: MediaItem.ID?
     @ObservedObject var viewModel: LibraryViewModel
+    @EnvironmentObject private var appState: AppState
+    @State private var path = NavigationPath()
     @State private var fetchedItem: MediaItem?
     @State private var isFetching = false
 
@@ -31,8 +40,19 @@ struct LibraryDetailColumn: View {
     }
 
     var body: some View {
-        content
-            .task(id: selectedItemID) { await loadIfNeeded() }
+        NavigationStack(path: $path) {
+            content
+                .navigationDestination(for: MediaItem.self) { item in
+                    MediaDetailView(item: item, source: .library, viewModel: viewModel)
+                }
+                .navigationDestination(for: MediaItem.Person.self) { person in
+                    PersonDetailView(person: person, appState: appState)
+                }
+        }
+        .task(id: selectedItemID) { await loadIfNeeded() }
+        .onChange(of: selectedItemID) {
+            path = NavigationPath()
+        }
     }
 
     @ViewBuilder

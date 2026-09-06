@@ -24,25 +24,22 @@ enum LibraryGridDestination: Hashable {
 /// instance between them would let popping this screen silently corrupt
 /// Library home's own toolbar filter and currently-selected library.
 ///
-/// On regular width, `selectedItemID` lets a caller route grid taps into a
-/// `LibraryDetailColumn`-style detail pane (§5) instead of always pushing
-/// `MediaDetailView` onto this screen's own `NavigationStack`. Passing it
-/// resolves the item purely by id, so the receiving detail column falls
-/// back to a network fetch (`LibraryViewModel.getItemDetails(id:)`) rather
-/// than an instant cache hit when it's driven by a different
-/// `LibraryViewModel` instance than the one that populated this grid — the
-/// two instances intentionally don't share `mediaItems` for the reason
-/// above. `LibraryView`'s own `navigationDestination(for:
-/// LibraryGridDestination.self)` still needs to thread its detail column's
-/// selection binding through to actually engage that pane; that callsite
-/// change is out of scope for this file.
+/// When the caller passes `selectedItemID` (the Library split view on iPad /
+/// Mac, when both columns are visible), item taps *select* into the caller's
+/// detail column instead of pushing `MediaDetailView` onto this screen's own
+/// `NavigationStack`. Selection is by id only, so the receiving detail column
+/// falls back to a network fetch (`LibraryViewModel.getItemDetails(id:)`)
+/// rather than an instant cache hit — this grid's `LibraryViewModel` instance
+/// intentionally doesn't share `mediaItems` with the home screen's, for the
+/// reason above.
 struct LibraryGridView: View {
     let destination: LibraryGridDestination
     let appState: AppState
-    /// Regular-width detail-pane selection, supplied by a caller that wants
-    /// grid taps routed to its own `LibraryDetailColumn` instead of pushed
-    /// onto this screen's `NavigationStack`. `nil` (the default) preserves
-    /// today's push-only behavior on every width.
+    /// Detail-column selection, supplied by a caller whose split view is
+    /// showing a detail column and wants grid taps routed there instead of
+    /// pushed onto this screen's `NavigationStack`. `nil` (the default)
+    /// pushes. The caller decides — this view's own `horizontalSizeClass`
+    /// is compact inside a split view column and cannot be used for that.
     let selectedItemID: Binding<MediaItem.ID?>?
     @StateObject private var viewModel: LibraryViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -213,13 +210,13 @@ struct LibraryGridView: View {
         }
     }
 
-    /// Routes to the caller-supplied `selectedItemID` on regular width when
-    /// one was provided, otherwise pushes `MediaDetailView` via the
-    /// `MediaItem` `navigationDestination` declared by whichever
-    /// `NavigationStack` hosts this screen.
+    /// Routes to the caller-supplied `selectedItemID` when one was provided,
+    /// otherwise pushes `MediaDetailView` via the `MediaItem`
+    /// `navigationDestination` declared by whichever `NavigationStack`
+    /// hosts this screen.
     @ViewBuilder
     private func gridLink(for item: MediaItem) -> some View {
-        if let selectedItemID, horizontalSizeClass == .regular {
+        if let selectedItemID {
             Button {
                 selectedItemID.wrappedValue = item.id
             } label: {

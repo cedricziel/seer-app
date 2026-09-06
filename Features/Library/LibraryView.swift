@@ -21,32 +21,24 @@ private struct LibraryContentView: View {
     @ObservedObject var onboardingManager: OnboardingManager
     @StateObject private var viewModel: LibraryViewModel
     @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
+    /// Read at this level — *outside* the `NavigationSplitView` below — on
+    /// purpose. The split view hands its sidebar column a compact
+    /// horizontal size class regardless of device, so any view inside the
+    /// column cannot tell "iPhone" from "iPad content column" on its own.
+    /// `isSplitLayout` is derived here once and passed down explicitly.
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedItemForPlayback: MediaItem?
     @State private var path = NavigationPath()
-    /// Regular-width (`NavigationSplitView`) detail-column selection. Unused
-    /// on compact width, where navigation pushes `MediaDetailView` onto
-    /// `path` instead.
-    ///
-    /// NOTE(P14 scope): only the home screen's Recently Added row currently
-    /// sets this — see `latestItemCard(for:)`. Library-chip drill-down and
-    /// the pushed grid screen (`LibraryGridView`, owned by a different
-    /// package) still push `MediaDetailView` onto this column's own
-    /// `NavigationStack` `path` regardless of size class, so on regular
-    /// width they open detail inline in the content column rather than in
-    /// this split-view detail pane. Routing the grid screen's item taps
-    /// through `selectedItemID` as well requires editing
-    /// `LibraryGridView.swift`, which is out of scope for this package.
+    /// Detail-column selection when the split view shows both columns
+    /// (iPad / Mac Designed for iPad). On compact width the split view is
+    /// collapsed and navigation pushes `MediaDetailView` onto `path`
+    /// instead, so this stays `nil` there.
     @State private var selectedItemID: MediaItem.ID?
 
     #if os(tvOS)
         private let recentlyAddedCardWidth: CGFloat = 196
     #else
-        /// 140pt on compact width (iPhone), 180pt on regular width (iPad,
-        /// Mac Designed for iPad) per the home-layout spec.
-        private var recentlyAddedCardWidth: CGFloat {
-            horizontalSizeClass == .regular ? 180 : 140
-        }
+        private let recentlyAddedCardWidth: CGFloat = 140
     #endif
 
     init(appState: AppState, onboardingManager: OnboardingManager) {
@@ -55,80 +47,106 @@ private struct LibraryContentView: View {
         _viewModel = StateObject(wrappedValue: LibraryViewModel(appState: appState))
     }
 
+    /// Whether the split view currently shows its detail column alongside
+    /// the home content, so item taps should *select* into that column
+    /// rather than push. Always `false` on tvOS, which uses a plain stack.
+    private var isSplitLayout: Bool {
+        #if os(tvOS)
+            return false
+        #else
+            return horizontalSizeClass == .regular
+        #endif
+    }
+
     var body: some View {
-        SizeClassAdaptive {
-            compactBody
-        } regular: {
-            regularBody
-        }
-        .task { await viewModel.loadInitialData() }
-        .onDisappear { viewModel.cancelAllTasks() }
-        .onChange(of: appState.activeServerID) {
-            path = NavigationPath()
-            selectedItemID = nil
-            viewModel.serverChanged()
-            Task { await viewModel.refresh() }
-        }
-        .fullScreenCover(item: $selectedItemForPlayback) { item in
-            VideoPlayerView(
-                item: item,
-                appState: appState,
-                startPositionTicks: item.userData?.playbackPositionTicks ?? 0,
-                onPiPStart: { selectedItemForPlayback = nil }
-            )
-        }
+        rootContainer
+            .task { await viewModel.loadInitialData() }
+            .onDisappear { viewModel.cancelAllTasks() }
+            .onChange(of: appState.activeServerID) {
+                path = NavigationPath()
+                selectedItemID = nil
+                viewModel.serverChanged()
+                Task { await viewModel.refresh() }
+            }
+            .fullScreenCover(item: $selectedItemForPlayback) { item in
+                VideoPlayerView(
+                    item: item,
+                    appState: appState,
+                    startPositionTicks: item.userData?.playbackPositionTicks ?? 0,
+                    onPiPStart: { selectedItemForPlayback = nil }
+                )
+            }
     }
 
-    // MARK: - Compact (NavigationStack) / Regular (NavigationSplitView)
+    // MARK: - Navigation containers
 
-    private var compactBody: some View {
-        navigationStackBody { contentView }
-            .toolbar { toolbarContent }
+    /// One container per platform, kept stable across size-class changes:
+    ///
+    /// - tvOS: a plain `NavigationStack`.
+    /// - iOS / iPadOS / Mac (Designed for iPad): a two-column
+    ///   `NavigationSplitView`. On regular width the home content (with its
+    ///   own `NavigationStack` for the grid and detail pushes) sits in the
+    ///   leading column and `LibraryDetailColumn` in the trailing one; on
+    ///   compact width the split view collapses to that leading stack by
+    ///   itself, so iPhone and iPad Split View / Slide Over never swap
+    ///   containers mid-session.
+    @ViewBuilder
+    private var rootContainer: some View {
+        #if os(tvOS)
+            homeStack
+        #else
+            NavigationSplitView(columnVisibility: .constant(.all)) {
+                homeStack
+                    // Keep the content column within a sidebar-style width
+                    // range so the detail column always has room, including
+                    // on the narrowest current iPad (mini, 744pt portrait).
+                    .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 600)
+                    // The home content is the primary surface, not a
+                    // collapsible sidebar; the tab sidebar already provides
+                    // that role on iPad.
+                    .toolbar(removing: .sidebarToggle)
+            } detail: {
+                LibraryDetailColumn(selectedItemID: selectedItemID, viewModel: viewModel)
+            }
+            .navigationSplitViewStyle(.balanced)
+        #endif
     }
 
-    private var regularBody: some View {
-        NavigationSplitView {
-            navigationStackBody { regularContentView }
-                .toolbar { regularToolbarContent }
-                // Keep the content column within a normal sidebar-style
-                // width range so the detail column always has room,
-                // including on the narrowest current iPad (mini, 744pt
-                // portrait width). The hero card itself shrinks to fit
-                // (see `continueWatchingRegularSection`), so this column
-                // doesn't need to be wide enough for the hero's full
-                // ~600pt ideal size.
-                .navigationSplitViewColumnWidth(min: 320, ideal: 500, max: 700)
-        } detail: {
-            LibraryDetailColumn(selectedItemID: selectedItemID, viewModel: viewModel)
-        }
-    }
-
-    /// Shared `NavigationStack` scaffolding (loading/error switch plus the
-    /// push destinations) for both size classes; only the home content and
-    /// the toolbar differ between them.
-    private func navigationStackBody(@ViewBuilder content: () -> some View) -> some View {
+    private var homeStack: some View {
         NavigationStack(path: $path) {
-            Group {
-                if viewModel.isLoading, viewModel.libraries.isEmpty, viewModel.continueWatching.isEmpty {
-                    LoadingView(message: "Loading library...")
-                } else if let error = hostAwareErrorMessage, viewModel.libraries.isEmpty {
-                    ErrorView(error: error) {
-                        Task { await viewModel.refresh() }
-                    }
-                } else {
-                    content()
+            homeRoot
+        }
+    }
+
+    /// Root screen of the home stack: loading/error switch, the toolbar,
+    /// and the push destinations. Everything here is *inside* the
+    /// `NavigationStack` so the toolbar items land in its navigation bar.
+    private var homeRoot: some View {
+        Group {
+            if viewModel.isLoading, viewModel.libraries.isEmpty, viewModel.continueWatching.isEmpty {
+                LoadingView(message: "Loading library...")
+            } else if let error = hostAwareErrorMessage, viewModel.libraries.isEmpty {
+                ErrorView(error: error) {
+                    Task { await viewModel.refresh() }
                 }
+            } else {
+                contentView
             }
-            .navigationTitle("Library")
-            .navigationDestination(for: MediaItem.self) { item in
-                MediaDetailView(item: item, source: .library, viewModel: viewModel)
-            }
-            .navigationDestination(for: MediaItem.Person.self) { person in
-                PersonDetailView(person: person, appState: appState)
-            }
-            .navigationDestination(for: LibraryGridDestination.self) { destination in
-                LibraryGridView(destination: destination, appState: appState)
-            }
+        }
+        .navigationTitle("Library")
+        .toolbar { toolbarContent }
+        .navigationDestination(for: MediaItem.self) { item in
+            MediaDetailView(item: item, source: .library, viewModel: viewModel)
+        }
+        .navigationDestination(for: MediaItem.Person.self) { person in
+            PersonDetailView(person: person, appState: appState)
+        }
+        .navigationDestination(for: LibraryGridDestination.self) { destination in
+            LibraryGridView(
+                destination: destination,
+                appState: appState,
+                selectedItemID: isSplitLayout ? $selectedItemID : nil
+            )
         }
     }
 
@@ -141,23 +159,6 @@ private struct LibraryContentView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) { ServerSwitcherButton() }
-    }
-
-    @ToolbarContentBuilder
-    private var regularToolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) { ServerSwitcherButton() }
-        ToolbarItem(placement: .topBarTrailing) {
-            if !viewModel.libraries.isEmpty {
-                // `LibraryChipRow`'s internal `ScrollView(.horizontal)` has
-                // no intrinsic ideal width of its own, which a toolbar item
-                // needs to size itself; cap it so it renders as a bounded
-                // trailing capsule row instead of collapsing to zero width.
-                LibraryChipRow(libraries: viewModel.libraries) { library in
-                    path.append(LibraryGridDestination.library(library))
-                }
-                .frame(maxWidth: 320)
-            }
-        }
     }
 
     private var contentView: some View {
@@ -176,32 +177,6 @@ private struct LibraryContentView: View {
                 }
                 chipRow
                 continueWatchingBlock
-                recentlyAddedBlock
-            }
-            .padding(.vertical)
-        }
-        .refreshable { await viewModel.refresh() }
-    }
-
-    /// Regular-width (iPad / Mac Designed for iPad) home content. The
-    /// library chip row lives in `regularToolbarContent` instead of its own
-    /// row here; Continue Watching and Recently Added use the wider
-    /// hero+list and 180pt-poster layouts respectively.
-    private var regularContentView: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 24) {
-                if viewModel.isShowingCachedData {
-                    OfflineBanner(
-                        isOffline: true,
-                        lastSyncDate: viewModel.lastSyncDate,
-                        onRefresh: { Task { await viewModel.refresh() } }
-                    )
-                    .accessibilityIdentifier("library.offlineBanner")
-                }
-                if onboardingManager.isFirstLaunchAfterSetup {
-                    firstTimeTipSection
-                }
-                continueWatchingBlockRegular
                 recentlyAddedBlock
             }
             .padding(.vertical)
@@ -350,69 +325,6 @@ private struct LibraryContentView: View {
         return remaining
     }
 
-    // MARK: - Continue Watching (regular width)
-
-    @ViewBuilder
-    private var continueWatchingBlockRegular: some View {
-        if viewModel.isLoadingContinueWatching {
-            continueWatchingSkeleton
-        } else if !viewModel.continueWatching.isEmpty {
-            continueWatchingRegularSection
-        }
-    }
-
-    /// Hero (~600×338) beside a vertical list of the remaining items, in
-    /// place of compact width's full-width hero + horizontal landscape row.
-    private var continueWatchingRegularSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Continue Watching").font(.title2).fontWeight(.bold)
-            HStack(alignment: .top, spacing: 20) {
-                if let hero = viewModel.continueWatching.first {
-                    // `ContinueWatchingHeroCard` already sizes itself via a
-                    // 16:9 aspect ratio; cap it at the spec's ~600pt ideal
-                    // width but let it shrink on narrower content columns
-                    // (e.g. iPad mini) instead of forcing a fixed size.
-                    heroCard(for: hero).frame(maxWidth: 600)
-                }
-                let rest = Array(viewModel.continueWatching.dropFirst())
-                if !rest.isEmpty {
-                    VStack(spacing: 12) {
-                        ForEach(rest) { item in continueWatchingListRow(for: item) }
-                    }
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-
-    private func continueWatchingListRow(for item: MediaItem) -> some View {
-        Button { selectedItemForPlayback = item } label: {
-            HStack(spacing: 12) {
-                PosterImage(url: continueWatchingImageURL(for: item), aspectRatio: 136 / 77, cornerRadius: 6)
-                    .frame(width: 136, height: 77)
-                    .watchProgress(progressFraction(for: item), height: 2)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(item.name)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    if let subtitle = landscapeSubtitle(for: item) {
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-        }
-        .buttonStyle(.plain)
-        .mediaContextMenu(
-            config: contextMenuConfig(for: item, canPlay: true, showDetails: true),
-            actions: contextMenuActions(for: item, canPlay: true)
-        )
-    }
-
     // MARK: - Recently Added
 
     @ViewBuilder
@@ -468,9 +380,9 @@ private struct LibraryContentView: View {
             }
         }
         return Group {
-            if horizontalSizeClass == .regular {
-                // Regular width shows the detail in the split view's
-                // trailing column instead of pushing onto `path`.
+            if isSplitLayout {
+                // Split layout shows the detail in the trailing column
+                // instead of pushing onto `path`.
                 Button { selectedItemID = item.id } label: { card }
             } else {
                 NavigationLink(value: item) { card }
