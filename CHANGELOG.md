@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/cedricziel/seer-app/compare/v0.7.0...v0.7.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* **library:** keep one navigation container per platform and put the toolbar inside the stack ([#51](https://github.com/cedricziel/seer-app/issues/51)) ([d52db59](https://github.com/cedricziel/seer-app/commit/d52db59d82b659fcd1bb201f9d3c71cd4666b3d6))
+
 ## [0.7.0](https://github.com/cedricziel/seer-app/compare/v0.6.2...v0.7.0) (2026-09-06)
 
 
