@@ -453,8 +453,20 @@ private struct LibraryContentView: View {
     private func contextMenuActions(for item: MediaItem, canPlay: Bool) -> MediaContextMenuActions {
         MediaContextMenuActions(
             onPlay: canPlay ? { selectedItemForPlayback = item } : nil,
-            onToggleWatched: { watched in Task { try? await viewModel.markAsWatched(item, watched: watched) } }
+            onToggleWatched: { watched in Task { try? await viewModel.markAsWatched(item, watched: watched) } },
+            onShowDetails: { showDetails(for: item) }
         )
+    }
+
+    /// Opens `MediaDetailView` for an item whose primary tap does something
+    /// else (Continue Watching cards resume playback): into the detail
+    /// column when the split view shows one, otherwise pushed onto `path`.
+    private func showDetails(for item: MediaItem) {
+        if isSplitLayout {
+            selectedItem = item
+        } else {
+            path.append(item)
+        }
     }
 }
 
