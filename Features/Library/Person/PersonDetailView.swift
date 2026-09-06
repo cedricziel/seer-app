@@ -167,7 +167,7 @@ struct PersonBiographyView: View {
                 }
             }
             .font(.subheadline)
-            .foregroundStyle(.accentColor)
+            .foregroundStyle(Color.accentColor)
         }
     }
 }

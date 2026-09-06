@@ -241,7 +241,7 @@ struct EpisodeDetailSheet: View {
             segments.append(Text(duration))
         }
         if let premiereDate = episode.premiereDate {
-            segments.append(Text("Aired \(premiereDate.formatted(date: .medium, time: .omitted))"))
+            segments.append(Text("Aired \(premiereDate.formatted(date: .abbreviated, time: .omitted))"))
         }
         if let remaining = episode.remainingTimeText {
             segments.append(Text(remaining).foregroundColor(Color.accentColor))

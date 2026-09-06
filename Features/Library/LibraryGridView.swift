@@ -46,6 +46,7 @@ struct LibraryGridView: View {
     let selectedItemID: Binding<MediaItem.ID?>?
     @StateObject private var viewModel: LibraryViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
     @State private var selectedItemForPlayback: MediaItem?
 
     init(destination: LibraryGridDestination, appState: AppState, selectedItemID: Binding<MediaItem.ID?>? = nil) {
@@ -181,7 +182,7 @@ struct LibraryGridView: View {
                 .padding(.horizontal, 16)
                 .frame(height: 44)
                 .background(isSelected ? Color.primary : Color.libraryGridFilterFill)
-                .foregroundStyle(isSelected ? Color.libraryGridSelectedLabel : Color.primary)
+                .foregroundStyle(isSelected ? Color.libraryGridSelectedLabel(for: colorScheme) : Color.primary)
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -296,11 +297,12 @@ private extension Color {
 
     /// Label color on a selected (label-colored) capsule: the background color,
     /// so the pair stays inverted in both light and dark appearance.
-    static var libraryGridSelectedLabel: Color {
+    static func libraryGridSelectedLabel(for colorScheme: ColorScheme) -> Color {
         #if os(iOS)
-            Color(uiColor: .systemBackground)
+            _ = colorScheme
+            return Color(uiColor: .systemBackground)
         #else
-            Color.black
+            return colorScheme == .dark ? Color.black : Color.white
         #endif
     }
 }

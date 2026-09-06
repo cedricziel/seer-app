@@ -245,6 +245,12 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         var videoRangeType: String?
         var audioSpatialFormat: String?
         var fileSizeBytes: Int64?
+
+        /// True when any field could still be filled in from `MediaSources`.
+        var isMissingAnyField: Bool {
+            container == nil || videoCodec == nil || audioCodec == nil || videoResolution == nil
+                || audioChannels == nil || videoRangeType == nil || audioSpatialFormat == nil || fileSizeBytes == nil
+        }
     }
 
     private struct APIMediaSource: Decodable {
@@ -276,6 +282,18 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
             case channels = "Channels"
             case videoRangeType = "VideoRangeType"
             case audioSpatialFormat = "AudioSpatialFormat"
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            type = try container.decodeIfPresent(String.self, forKey: .type)
+            codec = try container.decodeIfPresent(String.self, forKey: .codec)
+            width = try container.decodeIfPresent(Int.self, forKey: .width)
+            height = try container.decodeIfPresent(Int.self, forKey: .height)
+            channels = try container.decodeIfPresent(Int.self, forKey: .channels)
+            // Enum-valued fields: tolerate a non-string wire form rather than failing the item.
+            videoRangeType = (try? container.decodeIfPresent(String.self, forKey: .videoRangeType)) ?? nil
+            audioSpatialFormat = (try? container.decodeIfPresent(String.self, forKey: .audioSpatialFormat)) ?? nil
         }
     }
 
@@ -332,12 +350,12 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
             audioCodec: container.decodeIfPresent(String.self, forKey: .audioCodec),
             videoResolution: container.decodeIfPresent(String.self, forKey: .videoResolution),
             audioChannels: container.decodeIfPresent(Int.self, forKey: .audioChannels),
-            videoRangeType: container.decodeIfPresent(String.self, forKey: .videoRangeType),
-            audioSpatialFormat: container.decodeIfPresent(String.self, forKey: .audioSpatialFormat),
+            videoRangeType: Self.lenientString(in: container, forKey: .videoRangeType),
+            audioSpatialFormat: Self.lenientString(in: container, forKey: .audioSpatialFormat),
             fileSizeBytes: container.decodeIfPresent(Int64.self, forKey: .fileSizeBytes)
         )
 
-        guard info.container == nil || info.videoCodec == nil,
+        guard info.isMissingAnyField,
               let mediaSources = try container.decodeIfPresent([APIMediaSource].self, forKey: .mediaSources),
               let firstSource = mediaSources.first else { return info }
 
@@ -364,6 +382,16 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         }
 
         return info
+    }
+
+    /// Jellyfin serialises its enums as strings, but a server or proxy that emits the numeric
+    /// form must not make the whole item (and with it the whole page) fail to decode. Anything
+    /// that is not a string is treated as unknown.
+    private static func lenientString(
+        in container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys
+    ) -> String? {
+        (try? container.decodeIfPresent(String.self, forKey: key)) ?? nil
     }
 
     public func encode(to encoder: Encoder) throws {
