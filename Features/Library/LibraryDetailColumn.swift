@@ -1,47 +1,48 @@
 import JellyfinClient
+import SeerCore
 import SeerUI
 import SwiftUI
 
-/// Detail column for `LibraryView`'s regular-width `NavigationSplitView`
-/// path (iPad / Mac Designed for iPad). Given the split view's current
-/// `MediaItem.ID` selection, resolves it back to a full `MediaItem` and
-/// renders `MediaDetailView` for it.
+/// Detail column for `LibraryView`'s `NavigationSplitView` (iPad / Mac
+/// Designed for iPad). Renders `MediaDetailView` for the split view's
+/// current selection, or a placeholder when nothing is selected.
 ///
-/// Selection almost always resolves synchronously from data the view model
-/// has already loaded (`mediaItems`, `continueWatching`, `latestItems`);
-/// when an id isn't present in any of those, it falls back to
-/// `viewModel.getItemDetails(id:)`.
+/// The selection is the full `MediaItem`, not just its id, so an item
+/// chosen in a pushed `LibraryGridView` (which owns a separate
+/// `LibraryViewModel` and item list) renders immediately without a lookup;
+/// `MediaDetailView` fetches the richer detail record itself.
+///
+/// The column owns its own `NavigationStack` so pushes that originate
+/// inside the detail (cast member → `PersonDetailView`, filmography item →
+/// `MediaDetailView`) stay in this column; the home column's stack and its
+/// destinations are not visible from here. Changing the selection pops the
+/// column back to its root.
 struct LibraryDetailColumn: View {
-    let selectedItemID: MediaItem.ID?
+    let selectedItem: MediaItem?
     @ObservedObject var viewModel: LibraryViewModel
-    @State private var fetchedItem: MediaItem?
-    @State private var isFetching = false
-
-    /// Cheap, synchronous lookup across the view model's already-loaded
-    /// item collections.
-    private var knownItem: MediaItem? {
-        guard let selectedItemID else { return nil }
-        return viewModel.mediaItems.first { $0.id == selectedItemID }
-            ?? viewModel.continueWatching.first { $0.id == selectedItemID }
-            ?? viewModel.latestItems.first { $0.id == selectedItemID }
-    }
-
-    private var resolvedItem: MediaItem? {
-        knownItem ?? (fetchedItem?.id == selectedItemID ? fetchedItem : nil)
-    }
+    @EnvironmentObject private var appState: AppState
+    @State private var path = NavigationPath()
 
     var body: some View {
-        content
-            .task(id: selectedItemID) { await loadIfNeeded() }
+        NavigationStack(path: $path) {
+            content
+                .navigationDestination(for: MediaItem.self) { item in
+                    MediaDetailView(item: item, source: .library, viewModel: viewModel)
+                }
+                .navigationDestination(for: MediaItem.Person.self) { person in
+                    PersonDetailView(person: person, appState: appState)
+                }
+        }
+        .onChange(of: selectedItem?.id) {
+            path = NavigationPath()
+        }
     }
 
     @ViewBuilder
     private var content: some View {
-        if let item = resolvedItem {
+        if let item = selectedItem {
             MediaDetailView(item: item, source: .library, viewModel: viewModel)
                 .id(item.id)
-        } else if isFetching {
-            LoadingView(message: "Loading...")
         } else {
             EmptyContentView(
                 title: "Select a Title",
@@ -49,18 +50,5 @@ struct LibraryDetailColumn: View {
                 description: "Choose something from your library to see its details."
             )
         }
-    }
-
-    /// Fetches the selected item over the network only when it isn't
-    /// already present in one of the view model's loaded collections.
-    private func loadIfNeeded() async {
-        fetchedItem = nil
-        guard let selectedItemID, knownItem == nil else {
-            isFetching = false
-            return
-        }
-        isFetching = true
-        fetchedItem = await viewModel.getItemDetails(id: selectedItemID)
-        isFetching = false
     }
 }
