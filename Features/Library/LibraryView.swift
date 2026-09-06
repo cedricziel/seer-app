@@ -32,8 +32,10 @@ private struct LibraryContentView: View {
     /// Detail-column selection when the split view shows both columns
     /// (iPad / Mac Designed for iPad). On compact width the split view is
     /// collapsed and navigation pushes `MediaDetailView` onto `path`
-    /// instead, so this stays `nil` there.
-    @State private var selectedItemID: MediaItem.ID?
+    /// instead, so this stays `nil` there. Cleared whenever a grid screen
+    /// is pushed so the detail pane never shows an item from a previous
+    /// library.
+    @State private var selectedItem: MediaItem?
 
     #if os(tvOS)
         private let recentlyAddedCardWidth: CGFloat = 196
@@ -64,7 +66,7 @@ private struct LibraryContentView: View {
             .onDisappear { viewModel.cancelAllTasks() }
             .onChange(of: appState.activeServerID) {
                 path = NavigationPath()
-                selectedItemID = nil
+                selectedItem = nil
                 viewModel.serverChanged()
                 Task { await viewModel.refresh() }
             }
@@ -106,7 +108,7 @@ private struct LibraryContentView: View {
                     // that role on iPad.
                     .toolbar(removing: .sidebarToggle)
             } detail: {
-                LibraryDetailColumn(selectedItemID: selectedItemID, viewModel: viewModel)
+                LibraryDetailColumn(selectedItem: selectedItem, viewModel: viewModel)
             }
             .navigationSplitViewStyle(.balanced)
         #endif
@@ -145,7 +147,7 @@ private struct LibraryContentView: View {
             LibraryGridView(
                 destination: destination,
                 appState: appState,
-                selectedItemID: isSplitLayout ? $selectedItemID : nil
+                selectedItem: isSplitLayout ? $selectedItem : nil
             )
         }
     }
@@ -202,11 +204,18 @@ private struct LibraryContentView: View {
         }
     }
 
+    /// Pushes a grid screen and drops any detail-column selection, so the
+    /// detail pane doesn't keep showing an item from the previous context.
+    private func openGrid(_ destination: LibraryGridDestination) {
+        selectedItem = nil
+        path.append(destination)
+    }
+
     @ViewBuilder
     private var chipRow: some View {
         if !viewModel.libraries.isEmpty {
             LibraryChipRow(libraries: viewModel.libraries) { library in
-                path.append(LibraryGridDestination.library(library))
+                openGrid(.library(library))
             }
         }
     }
@@ -357,7 +366,7 @@ private struct LibraryContentView: View {
             Text("Recently Added").font(.title2).fontWeight(.bold)
             Spacer()
             Button {
-                path.append(LibraryGridDestination.recentlyAdded)
+                openGrid(.recentlyAdded)
             } label: {
                 Text("See All ›").font(.subheadline).foregroundStyle(Color.accentColor)
             }
@@ -383,7 +392,7 @@ private struct LibraryContentView: View {
             if isSplitLayout {
                 // Split layout shows the detail in the trailing column
                 // instead of pushing onto `path`.
-                Button { selectedItemID = item.id } label: { card }
+                Button { selectedItem = item } label: { card }
             } else {
                 NavigationLink(value: item) { card }
             }

@@ -24,14 +24,13 @@ enum LibraryGridDestination: Hashable {
 /// instance between them would let popping this screen silently corrupt
 /// Library home's own toolbar filter and currently-selected library.
 ///
-/// When the caller passes `selectedItemID` (the Library split view on iPad /
+/// When the caller passes `selectedItem` (the Library split view on iPad /
 /// Mac, when both columns are visible), item taps *select* into the caller's
 /// detail column instead of pushing `MediaDetailView` onto this screen's own
-/// `NavigationStack`. Selection is by id only, so the receiving detail column
-/// falls back to a network fetch (`LibraryViewModel.getItemDetails(id:)`)
-/// rather than an instant cache hit — this grid's `LibraryViewModel` instance
-/// intentionally doesn't share `mediaItems` with the home screen's, for the
-/// reason above.
+/// `NavigationStack`. The full `MediaItem` is handed over because this grid's
+/// `LibraryViewModel` instance intentionally doesn't share `mediaItems` with
+/// the home screen's (see above), so the detail column could not resolve an
+/// id from its own collections.
 struct LibraryGridView: View {
     let destination: LibraryGridDestination
     let appState: AppState
@@ -40,16 +39,16 @@ struct LibraryGridView: View {
     /// pushed onto this screen's `NavigationStack`. `nil` (the default)
     /// pushes. The caller decides — this view's own `horizontalSizeClass`
     /// is compact inside a split view column and cannot be used for that.
-    let selectedItemID: Binding<MediaItem.ID?>?
+    let selectedItem: Binding<MediaItem?>?
     @StateObject private var viewModel: LibraryViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedItemForPlayback: MediaItem?
 
-    init(destination: LibraryGridDestination, appState: AppState, selectedItemID: Binding<MediaItem.ID?>? = nil) {
+    init(destination: LibraryGridDestination, appState: AppState, selectedItem: Binding<MediaItem?>? = nil) {
         self.destination = destination
         self.appState = appState
-        self.selectedItemID = selectedItemID
+        self.selectedItem = selectedItem
         _viewModel = StateObject(wrappedValue: LibraryViewModel(appState: appState))
     }
 
@@ -210,15 +209,15 @@ struct LibraryGridView: View {
         }
     }
 
-    /// Routes to the caller-supplied `selectedItemID` when one was provided,
+    /// Routes to the caller-supplied `selectedItem` when one was provided,
     /// otherwise pushes `MediaDetailView` via the `MediaItem`
     /// `navigationDestination` declared by whichever `NavigationStack`
     /// hosts this screen.
     @ViewBuilder
     private func gridLink(for item: MediaItem) -> some View {
-        if let selectedItemID {
+        if let selectedItem {
             Button {
-                selectedItemID.wrappedValue = item.id
+                selectedItem.wrappedValue = item
             } label: {
                 gridCell(for: item)
             }
