@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/cedricziel/seer-app/compare/v0.6.2...v0.7.0) (2026-09-06)
+
+
+### Features
+
+* **library:** redesign Library home and detail screens across iPhone, iPad, Mac and tvOS ([#45](https://github.com/cedricziel/seer-app/issues/45)) ([47ad39d](https://github.com/cedricziel/seer-app/commit/47ad39d41affc58add9e4ea7dca236db3621c526))
+
 ## [0.6.2](https://github.com/cedricziel/seer-app/compare/v0.6.1...v0.6.2) (2026-09-04)
 
 
