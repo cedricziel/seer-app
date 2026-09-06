@@ -35,6 +35,9 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
     public let audioCodec: String?
     public let videoResolution: String?
     public let audioChannels: Int?
+    public let videoRangeType: String?
+    public let audioSpatialFormat: String?
+    public let fileSizeBytes: Int64?
 
     public init(
         id: String,
@@ -66,7 +69,10 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         videoCodec: String? = nil,
         audioCodec: String? = nil,
         videoResolution: String? = nil,
-        audioChannels: Int? = nil
+        audioChannels: Int? = nil,
+        videoRangeType: String? = nil,
+        audioSpatialFormat: String? = nil,
+        fileSizeBytes: Int64? = nil
     ) {
         self.id = id
         self.name = name
@@ -98,6 +104,9 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         self.audioCodec = audioCodec
         self.videoResolution = videoResolution
         self.audioChannels = audioChannels
+        self.videoRangeType = videoRangeType
+        self.audioSpatialFormat = audioSpatialFormat
+        self.fileSizeBytes = fileSizeBytes
     }
 
     public enum MediaType: String, Codable, Sendable {
@@ -217,17 +226,41 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         case audioCodec = "AudioCodec"
         case videoResolution = "VideoResolution"
         case audioChannels = "AudioChannels"
+        case videoRangeType = "VideoRangeType"
+        case audioSpatialFormat = "AudioSpatialFormat"
+        case fileSizeBytes = "Size"
         case mediaSources = "MediaSources"
     }
 
     // MARK: - Private Types for Parsing MediaSources
 
+    /// Format-related fields resolved during decoding, either from direct top-level keys
+    /// (round-trip re-encoding) or extracted from the first `MediaSources` entry.
+    private struct FormatInfo {
+        var container: String?
+        var videoCodec: String?
+        var audioCodec: String?
+        var videoResolution: String?
+        var audioChannels: Int?
+        var videoRangeType: String?
+        var audioSpatialFormat: String?
+        var fileSizeBytes: Int64?
+
+        /// True when any field could still be filled in from `MediaSources`.
+        var isMissingAnyField: Bool {
+            container == nil || videoCodec == nil || audioCodec == nil || videoResolution == nil
+                || audioChannels == nil || videoRangeType == nil || audioSpatialFormat == nil || fileSizeBytes == nil
+        }
+    }
+
     private struct APIMediaSource: Decodable {
         let container: String?
+        let size: Int64?
         let mediaStreams: [APIMediaStream]?
 
         enum CodingKeys: String, CodingKey {
             case container = "Container"
+            case size = "Size"
             case mediaStreams = "MediaStreams"
         }
     }
@@ -238,6 +271,8 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         let width: Int?
         let height: Int?
         let channels: Int?
+        let videoRangeType: String?
+        let audioSpatialFormat: String?
 
         enum CodingKeys: String, CodingKey {
             case type = "Type"
@@ -245,6 +280,20 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
             case width = "Width"
             case height = "Height"
             case channels = "Channels"
+            case videoRangeType = "VideoRangeType"
+            case audioSpatialFormat = "AudioSpatialFormat"
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            type = try container.decodeIfPresent(String.self, forKey: .type)
+            codec = try container.decodeIfPresent(String.self, forKey: .codec)
+            width = try container.decodeIfPresent(Int.self, forKey: .width)
+            height = try container.decodeIfPresent(Int.self, forKey: .height)
+            channels = try container.decodeIfPresent(Int.self, forKey: .channels)
+            // Enum-valued fields: tolerate a non-string wire form rather than failing the item.
+            videoRangeType = (try? container.decodeIfPresent(String.self, forKey: .videoRangeType)) ?? nil
+            audioSpatialFormat = (try? container.decodeIfPresent(String.self, forKey: .audioSpatialFormat)) ?? nil
         }
     }
 
@@ -278,45 +327,71 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         people = try container.decodeIfPresent([Person].self, forKey: .people)
         providerIds = try container.decodeIfPresent([String: String].self, forKey: .providerIds)
 
-        // Try to decode format properties directly first (for re-encoding)
-        var decodedContainer = try container.decodeIfPresent(String.self, forKey: .container)
-        var decodedVideoCodec = try container.decodeIfPresent(String.self, forKey: .videoCodec)
-        var decodedAudioCodec = try container.decodeIfPresent(String.self, forKey: .audioCodec)
-        var decodedVideoResolution = try container.decodeIfPresent(String.self, forKey: .videoResolution)
-        var decodedAudioChannels = try container.decodeIfPresent(Int.self, forKey: .audioChannels)
+        let formatInfo = try Self.decodeFormatInfo(from: container)
+        self.container = formatInfo.container
+        videoCodec = formatInfo.videoCodec
+        audioCodec = formatInfo.audioCodec
+        videoResolution = formatInfo.videoResolution
+        audioChannels = formatInfo.audioChannels
+        videoRangeType = formatInfo.videoRangeType
+        audioSpatialFormat = formatInfo.audioSpatialFormat
+        fileSizeBytes = formatInfo.fileSizeBytes
+    }
 
-        // If not present, extract from MediaSources (Jellyfin API response)
-        if decodedContainer == nil || decodedVideoCodec == nil {
-            if let mediaSources = try container.decodeIfPresent([APIMediaSource].self, forKey: .mediaSources),
-               let firstSource = mediaSources.first {
-                decodedContainer = decodedContainer ?? firstSource.container
+    /// Decodes format properties directly first (for re-encoding round-trips); if container or
+    /// video codec are still missing, falls back to extracting them from the first `MediaSources`
+    /// entry (the shape returned by the Jellyfin API).
+    private static func decodeFormatInfo(
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> FormatInfo {
+        var info = try FormatInfo(
+            container: container.decodeIfPresent(String.self, forKey: .container),
+            videoCodec: container.decodeIfPresent(String.self, forKey: .videoCodec),
+            audioCodec: container.decodeIfPresent(String.self, forKey: .audioCodec),
+            videoResolution: container.decodeIfPresent(String.self, forKey: .videoResolution),
+            audioChannels: container.decodeIfPresent(Int.self, forKey: .audioChannels),
+            videoRangeType: Self.lenientString(in: container, forKey: .videoRangeType),
+            audioSpatialFormat: Self.lenientString(in: container, forKey: .audioSpatialFormat),
+            fileSizeBytes: container.decodeIfPresent(Int64.self, forKey: .fileSizeBytes)
+        )
 
-                if let streams = firstSource.mediaStreams {
-                    // Extract video stream info
-                    if let videoStream = streams.first(where: { $0.type == "Video" }) {
-                        decodedVideoCodec = decodedVideoCodec ?? videoStream.codec
-                        if let width = videoStream.width, let height = videoStream.height {
-                            decodedVideoResolution = decodedVideoResolution ?? Self.formatResolution(
-                                width: width,
-                                height: height
-                            )
-                        }
-                    }
+        guard info.isMissingAnyField,
+              let mediaSources = try container.decodeIfPresent([APIMediaSource].self, forKey: .mediaSources),
+              let firstSource = mediaSources.first else { return info }
 
-                    // Extract audio stream info
-                    if let audioStream = streams.first(where: { $0.type == "Audio" }) {
-                        decodedAudioCodec = decodedAudioCodec ?? audioStream.codec
-                        decodedAudioChannels = decodedAudioChannels ?? audioStream.channels
-                    }
+        info.container = info.container ?? firstSource.container
+        info.fileSizeBytes = info.fileSizeBytes ?? firstSource.size
+
+        if let streams = firstSource.mediaStreams {
+            if let videoStream = streams.first(where: { $0.type == "Video" }) {
+                info.videoCodec = info.videoCodec ?? videoStream.codec
+                info.videoRangeType = info.videoRangeType ?? videoStream.videoRangeType
+                if let width = videoStream.width, let height = videoStream.height {
+                    info.videoResolution = info.videoResolution ?? Self.formatResolution(
+                        width: width,
+                        height: height
+                    )
                 }
+            }
+
+            if let audioStream = streams.first(where: { $0.type == "Audio" }) {
+                info.audioCodec = info.audioCodec ?? audioStream.codec
+                info.audioChannels = info.audioChannels ?? audioStream.channels
+                info.audioSpatialFormat = info.audioSpatialFormat ?? audioStream.audioSpatialFormat
             }
         }
 
-        self.container = decodedContainer
-        videoCodec = decodedVideoCodec
-        audioCodec = decodedAudioCodec
-        videoResolution = decodedVideoResolution
-        audioChannels = decodedAudioChannels
+        return info
+    }
+
+    /// Jellyfin serialises its enums as strings, but a server or proxy that emits the numeric
+    /// form must not make the whole item (and with it the whole page) fail to decode. Anything
+    /// that is not a string is treated as unknown.
+    private static func lenientString(
+        in container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys
+    ) -> String? {
+        (try? container.decodeIfPresent(String.self, forKey: key)) ?? nil
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -352,6 +427,9 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         try container.encodeIfPresent(audioCodec, forKey: .audioCodec)
         try container.encodeIfPresent(videoResolution, forKey: .videoResolution)
         try container.encodeIfPresent(audioChannels, forKey: .audioChannels)
+        try container.encodeIfPresent(videoRangeType, forKey: .videoRangeType)
+        try container.encodeIfPresent(audioSpatialFormat, forKey: .audioSpatialFormat)
+        try container.encodeIfPresent(fileSizeBytes, forKey: .fileSizeBytes)
         // Note: mediaSources is not encoded as it's only used for decoding from API
     }
 
@@ -384,41 +462,110 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         return "\(mins)m"
     }
 
+    /// Formatted runtime string using long-form units (e.g., "2 hr 8 min", "8 min")
+    public var formattedDurationLong: String? {
+        guard let minutes = runtimeMinutes else { return nil }
+        let hours = minutes / 60
+        let mins = minutes % 60
+        if hours > 0 {
+            return "\(hours) hr \(mins) min"
+        }
+        return "\(mins) min"
+    }
+
+    /// Remaining time text based on playback position (e.g., "1 hr 12 min left", "21 min left").
+    /// Returns nil when the runtime or a nonzero playback position is unavailable.
+    public var remainingTimeText: String? {
+        guard let totalTicks = runTimeTicks,
+              let positionTicks = userData?.playbackPositionTicks,
+              positionTicks > 0 else { return nil }
+
+        let remainingTicks = totalTicks - positionTicks
+        guard remainingTicks > 0 else { return nil }
+
+        let remainingMinutes = Int(remainingTicks / 600_000_000)
+        guard remainingMinutes > 0 else { return "Less than a minute left" }
+        let hours = remainingMinutes / 60
+        let mins = remainingMinutes % 60
+        if hours > 0 {
+            return "\(hours) hr \(mins) min left"
+        }
+        return "\(mins) min left"
+    }
+
     /// Whether the item can be played directly (movie or episode)
     public var isPlayable: Bool {
         type == .movie || type == .episode
     }
 
-    /// Formatted video info string (e.g., "H.264 1080p")
+    /// Formatted video info string. When HDR metadata is present the codec is dropped in
+    /// favor of a short resolution + HDR label (e.g., "4K · HDR10"); otherwise falls back to
+    /// codec + resolution (e.g., "H.264 1080p").
     public var formattedVideoInfo: String? {
         guard let codec = videoCodec else { return nil }
         let codecDisplay = codec.uppercased()
-        if let resolution = videoResolution {
-            return "\(codecDisplay) \(resolution)"
-        }
-        return codecDisplay
+        guard let resolution = videoResolution else { return codecDisplay }
+        guard let hdr = hdrLabel else { return "\(codecDisplay) \(resolution)" }
+        return "\(resolution) · \(hdr)"
     }
 
-    /// Formatted audio info string (e.g., "AAC 5.1")
+    /// Short HDR label derived from `videoRangeType` (e.g., "HDR10", "HDR10+", "Dolby Vision",
+    /// "HLG"). Returns nil for SDR or an unknown/missing range type.
+    private var hdrLabel: String? {
+        guard let rangeType = videoRangeType, !rangeType.isEmpty else { return nil }
+        let normalized = rangeType.lowercased()
+        guard normalized != "sdr", normalized != "unknown" else { return nil }
+        if normalized.contains("dovi") { return "Dolby Vision" }
+        if normalized == "hdr10plus" || normalized == "hdr10+" { return "HDR10+" }
+        if normalized == "hdr10" { return "HDR10" }
+        if normalized == "hlg" { return "HLG" }
+        return rangeType
+    }
+
+    /// Formatted audio info string. Uses a Dolby/DTS branded label when the stream's spatial
+    /// format signals immersive audio (e.g., "Atmos 7.1"); otherwise falls back to the codec
+    /// name and channel layout (e.g., "AAC 5.1").
     public var formattedAudioInfo: String? {
         guard let codec = audioCodec else { return nil }
-        let codecDisplay = codec.uppercased()
-        if let channels = audioChannels {
-            let channelString = switch channels {
-            case 1: "Mono"
-            case 2: "Stereo"
-            case 6: "5.1"
-            case 8: "7.1"
-            default: "\(channels)ch"
-            }
-            return "\(codecDisplay) \(channelString)"
-        }
-        return codecDisplay
+        let codecDisplay = spatialAudioLabel ?? codec.uppercased()
+        guard let channels = audioChannels else { return codecDisplay }
+        return "\(codecDisplay) \(Self.channelLabel(for: channels))"
     }
 
-    /// Formatted container string (e.g., "MP4")
+    /// Dolby/DTS branded label for a recognized immersive audio spatial format, if any.
+    private var spatialAudioLabel: String? {
+        guard let format = audioSpatialFormat else { return nil }
+        switch format.lowercased() {
+        case "dolbyatmos", "atmos": return "Atmos"
+        case "dtsx", "dts:x": return "DTS:X"
+        default: return nil
+        }
+    }
+
+    private static func channelLabel(for channels: Int) -> String {
+        switch channels {
+        case 1: "Mono"
+        case 2: "Stereo"
+        case 6: "5.1"
+        case 8: "7.1"
+        default: "\(channels)ch"
+        }
+    }
+
+    /// Formatted container string, appending a human-readable file size when known
+    /// (e.g., "MKV · 18 GB"); otherwise just the container (e.g., "MP4").
     public var formattedContainer: String? {
-        container?.uppercased()
+        guard let container else { return formattedFileSize }
+        guard let size = formattedFileSize else { return container.uppercased() }
+        return "\(container.uppercased()) · \(size)"
+    }
+
+    /// Human-readable file size (e.g., "18 GB"), or nil when unknown.
+    private var formattedFileSize: String? {
+        guard let bytes = fileSizeBytes, bytes > 0 else { return nil }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 }
 

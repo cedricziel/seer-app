@@ -70,24 +70,30 @@ struct AddServerView: View {
                 }
             }
             .navigationTitle("Add Server")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+            #if !os(tvOS)
+                .navigationBarTitleDisplayMode(.inline)
+            #endif
+                .toolbar {
+                    // `.cancellationAction` (rather than `.topBarLeading`, which
+                    // doesn't exist on tvOS) keeps this sheet reachable from
+                    // `ServerSwitcherView`'s tvOS branch while still rendering
+                    // as a leading bar button on iOS.
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
                     }
                 }
-            }
-            .alert("Error", isPresented: .init(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                Button("OK") {
-                    errorMessage = nil
+                .alert("Error", isPresented: .init(
+                    get: { errorMessage != nil },
+                    set: { if !$0 { errorMessage = nil } }
+                )) {
+                    Button("OK") {
+                        errorMessage = nil
+                    }
+                } message: {
+                    Text(errorMessage ?? "An unknown error occurred")
                 }
-            } message: {
-                Text(errorMessage ?? "An unknown error occurred")
-            }
         }
     }
 

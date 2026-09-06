@@ -150,7 +150,8 @@ public extension JellyfinService {
         sortOrder: String = "Ascending",
         limit: Int = 50,
         startIndex: Int = 0,
-        recursive: Bool = true
+        recursive: Bool = true,
+        filters: [String]? = nil
     ) async throws -> ItemsResponse {
         guard let userID else {
             throw JellyfinError.notAuthenticated
@@ -179,6 +180,10 @@ public extension JellyfinService {
         if let types = includeItemTypes {
             let typeStrings = types.map(\.rawValue)
             queryItems.append(URLQueryItem(name: "IncludeItemTypes", value: typeStrings.joined(separator: ",")))
+        }
+
+        if let filters, !filters.isEmpty {
+            queryItems.append(URLQueryItem(name: "Filters", value: filters.joined(separator: ",")))
         }
 
         components.queryItems = queryItems
@@ -360,7 +365,7 @@ public extension JellyfinService {
             URLQueryItem(name: "SortBy", value: "PremiereDate,SortName"),
             URLQueryItem(name: "SortOrder", value: "Descending"),
             URLQueryItem(name: "Limit", value: String(limit)),
-            URLQueryItem(name: "Fields", value: "Overview,Genres")
+            URLQueryItem(name: "Fields", value: "Overview,Genres,People")
         ]
 
         guard let url = components.url else {

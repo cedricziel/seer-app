@@ -1,3 +1,4 @@
+import DownloadClient
 import JellyfinClient
 import PlaybackClient
 import SeerCore
@@ -19,7 +20,34 @@ private struct LibraryContentView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var onboardingManager: OnboardingManager
     @StateObject private var viewModel: LibraryViewModel
+    @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedItemForPlayback: MediaItem?
+    @State private var path = NavigationPath()
+    /// Regular-width (`NavigationSplitView`) detail-column selection. Unused
+    /// on compact width, where navigation pushes `MediaDetailView` onto
+    /// `path` instead.
+    ///
+    /// NOTE(P14 scope): only the home screen's Recently Added row currently
+    /// sets this — see `latestItemCard(for:)`. Library-chip drill-down and
+    /// the pushed grid screen (`LibraryGridView`, owned by a different
+    /// package) still push `MediaDetailView` onto this column's own
+    /// `NavigationStack` `path` regardless of size class, so on regular
+    /// width they open detail inline in the content column rather than in
+    /// this split-view detail pane. Routing the grid screen's item taps
+    /// through `selectedItemID` as well requires editing
+    /// `LibraryGridView.swift`, which is out of scope for this package.
+    @State private var selectedItemID: MediaItem.ID?
+
+    #if os(tvOS)
+        private let recentlyAddedCardWidth: CGFloat = 196
+    #else
+        /// 140pt on compact width (iPhone), 180pt on regular width (iPad,
+        /// Mac Designed for iPad) per the home-layout spec.
+        private var recentlyAddedCardWidth: CGFloat {
+            horizontalSizeClass == .regular ? 180 : 140
+        }
+    #endif
 
     init(appState: AppState, onboardingManager: OnboardingManager) {
         self.appState = appState
@@ -28,30 +56,16 @@ private struct LibraryContentView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if viewModel.isLoading, viewModel.mediaItems.isEmpty, viewModel.continueWatching.isEmpty {
-                    LoadingView(message: "Loading library...")
-                } else if let error = viewModel.errorMessage, viewModel.mediaItems.isEmpty {
-                    ErrorView(error: error) {
-                        Task { await viewModel.refresh() }
-                    }
-                } else {
-                    contentView
-                }
-            }
-            .navigationTitle("Library")
-            .navigationDestination(for: MediaItem.self) { item in
-                MediaDetailView(item: item, source: .library, viewModel: viewModel)
-            }
-            .navigationDestination(for: MediaItem.Person.self) { person in
-                PersonDetailView(person: person, appState: appState)
-            }
-            .toolbar { toolbarContent }
+        SizeClassAdaptive {
+            compactBody
+        } regular: {
+            regularBody
         }
         .task { await viewModel.loadInitialData() }
         .onDisappear { viewModel.cancelAllTasks() }
         .onChange(of: appState.activeServerID) {
+            path = NavigationPath()
+            selectedItemID = nil
             viewModel.serverChanged()
             Task { await viewModel.refresh() }
         }
@@ -65,34 +79,84 @@ private struct LibraryContentView: View {
         }
     }
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) { ServerSwitcherButton() }
-        ToolbarItem(placement: .topBarTrailing) { filterMenu }
-        ToolbarItem(placement: .topBarTrailing) { refreshButton }
+    // MARK: - Compact (NavigationStack) / Regular (NavigationSplitView)
+
+    private var compactBody: some View {
+        navigationStackBody { contentView }
+            .toolbar { toolbarContent }
     }
 
-    private var filterMenu: some View {
-        Menu {
-            ForEach(LibraryViewModel.MediaTypeFilter.allCases, id: \.self) { filter in
-                Button {
-                    viewModel.selectedMediaType = filter
-                    Task { await viewModel.filterChanged() }
-                } label: {
-                    HStack {
-                        Text(filter.rawValue)
-                        if viewModel.selectedMediaType == filter { Image(systemName: "checkmark") }
-                    }
-                }
-            }
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
+    private var regularBody: some View {
+        NavigationSplitView {
+            navigationStackBody { regularContentView }
+                .toolbar { regularToolbarContent }
+                // Keep the content column within a normal sidebar-style
+                // width range so the detail column always has room,
+                // including on the narrowest current iPad (mini, 744pt
+                // portrait width). The hero card itself shrinks to fit
+                // (see `continueWatchingRegularSection`), so this column
+                // doesn't need to be wide enough for the hero's full
+                // ~600pt ideal size.
+                .navigationSplitViewColumnWidth(min: 320, ideal: 500, max: 700)
+        } detail: {
+            LibraryDetailColumn(selectedItemID: selectedItemID, viewModel: viewModel)
         }
     }
 
-    private var refreshButton: some View {
-        Button { Task { await viewModel.refresh() } } label: {
-            Image(systemName: "arrow.clockwise")
+    /// Shared `NavigationStack` scaffolding (loading/error switch plus the
+    /// push destinations) for both size classes; only the home content and
+    /// the toolbar differ between them.
+    private func navigationStackBody(@ViewBuilder content: () -> some View) -> some View {
+        NavigationStack(path: $path) {
+            Group {
+                if viewModel.isLoading, viewModel.libraries.isEmpty, viewModel.continueWatching.isEmpty {
+                    LoadingView(message: "Loading library...")
+                } else if let error = hostAwareErrorMessage, viewModel.libraries.isEmpty {
+                    ErrorView(error: error) {
+                        Task { await viewModel.refresh() }
+                    }
+                } else {
+                    content()
+                }
+            }
+            .navigationTitle("Library")
+            .navigationDestination(for: MediaItem.self) { item in
+                MediaDetailView(item: item, source: .library, viewModel: viewModel)
+            }
+            .navigationDestination(for: MediaItem.Person.self) { person in
+                PersonDetailView(person: person, appState: appState)
+            }
+            .navigationDestination(for: LibraryGridDestination.self) { destination in
+                LibraryGridView(destination: destination, appState: appState)
+            }
+        }
+    }
+
+    private var hostAwareErrorMessage: String? {
+        guard let error = viewModel.errorMessage else { return nil }
+        guard let host = appState.activeServer?.jellyfinHost else { return error }
+        return "\(error) (\(host))"
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) { ServerSwitcherButton() }
+    }
+
+    @ToolbarContentBuilder
+    private var regularToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) { ServerSwitcherButton() }
+        ToolbarItem(placement: .topBarTrailing) {
+            if !viewModel.libraries.isEmpty {
+                // `LibraryChipRow`'s internal `ScrollView(.horizontal)` has
+                // no intrinsic ideal width of its own, which a toolbar item
+                // needs to size itself; cap it so it renders as a bounded
+                // trailing capsule row instead of collapsing to zero width.
+                LibraryChipRow(libraries: viewModel.libraries) { library in
+                    path.append(LibraryGridDestination.library(library))
+                }
+                .frame(maxWidth: 320)
+            }
         }
     }
 
@@ -110,22 +174,35 @@ private struct LibraryContentView: View {
                 if onboardingManager.isFirstLaunchAfterSetup {
                     firstTimeTipSection
                 }
-                if viewModel.isLoadingContinueWatching {
-                    SkeletonCardRow(title: "Continue Watching", cardCount: 4, cardWidth: 140)
-                } else if !viewModel.continueWatching.isEmpty {
-                    continueWatchingSection
+                chipRow
+                continueWatchingBlock
+                recentlyAddedBlock
+            }
+            .padding(.vertical)
+        }
+        .refreshable { await viewModel.refresh() }
+    }
+
+    /// Regular-width (iPad / Mac Designed for iPad) home content. The
+    /// library chip row lives in `regularToolbarContent` instead of its own
+    /// row here; Continue Watching and Recently Added use the wider
+    /// hero+list and 180pt-poster layouts respectively.
+    private var regularContentView: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 24) {
+                if viewModel.isShowingCachedData {
+                    OfflineBanner(
+                        isOffline: true,
+                        lastSyncDate: viewModel.lastSyncDate,
+                        onRefresh: { Task { await viewModel.refresh() } }
+                    )
+                    .accessibilityIdentifier("library.offlineBanner")
                 }
-                if viewModel.isLoadingLatestItems {
-                    SkeletonCardRow(title: "Recently Added", cardCount: 5, cardWidth: 140)
-                } else if !viewModel.latestItems.isEmpty {
-                    latestItemsSection
-                } else if viewModel.hasLoadedLatestItems {
-                    recentlyAddedEmptySection
+                if onboardingManager.isFirstLaunchAfterSetup {
+                    firstTimeTipSection
                 }
-                if !viewModel.libraries.isEmpty { librariesSection }
-                if viewModel.selectedLibrary != nil || viewModel.selectedMediaType != .all {
-                    mediaGridSection
-                }
+                continueWatchingBlockRegular
+                recentlyAddedBlock
             }
             .padding(.vertical)
         }
@@ -150,24 +227,184 @@ private struct LibraryContentView: View {
         }
     }
 
-    private var continueWatchingSection: some View {
-        MediaCardRow(title: "Continue Watching") {
-            ForEach(viewModel.continueWatching) { item in
-                continueWatchingCard(for: item)
+    @ViewBuilder
+    private var chipRow: some View {
+        if !viewModel.libraries.isEmpty {
+            LibraryChipRow(libraries: viewModel.libraries) { library in
+                path.append(LibraryGridDestination.library(library))
             }
         }
     }
 
-    private func continueWatchingCard(for item: MediaItem) -> some View {
+    // MARK: - Continue Watching
+
+    @ViewBuilder
+    private var continueWatchingBlock: some View {
+        if viewModel.isLoadingContinueWatching {
+            continueWatchingSkeleton
+        } else if !viewModel.continueWatching.isEmpty {
+            continueWatchingSection
+        }
+    }
+
+    private var continueWatchingSkeleton: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Continue Watching").font(.title2).fontWeight(.bold).padding(.horizontal)
+            #if !os(tvOS)
+                SkeletonHeroRow().padding(.horizontal)
+            #endif
+            SkeletonLandscapeRow()
+        }
+    }
+
+    private var continueWatchingSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Continue Watching").font(.title2).fontWeight(.bold).padding(.horizontal)
+            #if os(tvOS)
+                landscapeRow(items: Array(viewModel.continueWatching.prefix(4)))
+            #else
+                if let hero = viewModel.continueWatching.first {
+                    heroCard(for: hero).padding(.horizontal)
+                }
+                let rest = Array(viewModel.continueWatching.dropFirst())
+                if !rest.isEmpty { landscapeRow(items: rest) }
+            #endif
+        }
+    }
+
+    private func landscapeRow(items: [MediaItem]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 12) {
+                ForEach(items) { item in landscapeCard(for: item) }
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    private func heroCard(for item: MediaItem) -> some View {
+        ContinueWatchingHeroCard(
+            caption: episodeCaption(for: item),
+            title: item.name,
+            subtitle: heroSubtitle(for: item),
+            imageURL: continueWatchingImageURL(for: item),
+            progress: progressFraction(for: item),
+            isDownloaded: offlineDimmingEnabled ? isItemDownloaded(item) : false,
+            showOfflineDimming: offlineDimmingEnabled,
+            onResume: { selectedItemForPlayback = item },
+            contextMenuConfig: contextMenuConfig(for: item, canPlay: true, showDetails: true),
+            contextMenuActions: contextMenuActions(for: item, canPlay: true)
+        )
+    }
+
+    private func landscapeCard(for item: MediaItem) -> some View {
         Button { selectedItemForPlayback = item } label: {
-            MediaCard(
+            ContinueWatchingLandscapeCard(
                 title: item.name,
-                subtitle: item.seriesName ?? item.formattedRuntime,
-                imageURL: viewModel.imageURL(for: item)
+                subtitle: landscapeSubtitle(for: item),
+                imageURL: continueWatchingImageURL(for: item),
+                progress: progressFraction(for: item),
+                isDownloaded: offlineDimmingEnabled ? isItemDownloaded(item) : false,
+                showOfflineDimming: offlineDimmingEnabled,
+                contextMenuConfig: contextMenuConfig(for: item, canPlay: true, showDetails: true),
+                contextMenuActions: contextMenuActions(for: item, canPlay: true)
             )
-            .frame(width: 140)
-            .overlay(alignment: .bottomTrailing) { playOverlay }
-            .overlay(alignment: .bottom) { progressOverlay(for: item) }
+        }
+        .buttonStyle(.plain)
+        .disabled(offlineDimmingEnabled && !isItemDownloaded(item))
+    }
+
+    private func continueWatchingImageURL(for item: MediaItem) -> URL? {
+        if let backdropTags = item.backdropImageTags, !backdropTags.isEmpty {
+            return viewModel.imageURL(for: item, type: .backdrop)
+        }
+        return viewModel.imageURL(for: item, type: .primary)
+    }
+
+    private func progressFraction(for item: MediaItem) -> Double? {
+        if let percentage = item.playedPercentage { return percentage / 100.0 }
+        guard let positionTicks = item.userData?.playbackPositionTicks,
+              let durationTicks = item.runTimeTicks, durationTicks > 0 else { return nil }
+        return Double(positionTicks) / Double(durationTicks)
+    }
+
+    private func episodeCaption(for item: MediaItem) -> String? {
+        guard item.type == .episode else { return nil }
+        var parts: [String] = []
+        if let seriesName = item.seriesName { parts.append(seriesName) }
+        if let season = item.parentIndexNumber { parts.append("S\(season)") }
+        if let episode = item.indexNumber { parts.append("E\(episode)") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func heroSubtitle(for item: MediaItem) -> String? {
+        item.remainingTimeText ?? item.seriesName ?? item.formattedRuntime
+    }
+
+    private func landscapeSubtitle(for item: MediaItem) -> String? {
+        guard let remaining = item.remainingTimeText else {
+            return item.seriesName ?? item.formattedRuntime
+        }
+        if let caption = episodeCaption(for: item) {
+            return "\(caption) · \(remaining)"
+        }
+        return remaining
+    }
+
+    // MARK: - Continue Watching (regular width)
+
+    @ViewBuilder
+    private var continueWatchingBlockRegular: some View {
+        if viewModel.isLoadingContinueWatching {
+            continueWatchingSkeleton
+        } else if !viewModel.continueWatching.isEmpty {
+            continueWatchingRegularSection
+        }
+    }
+
+    /// Hero (~600×338) beside a vertical list of the remaining items, in
+    /// place of compact width's full-width hero + horizontal landscape row.
+    private var continueWatchingRegularSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Continue Watching").font(.title2).fontWeight(.bold)
+            HStack(alignment: .top, spacing: 20) {
+                if let hero = viewModel.continueWatching.first {
+                    // `ContinueWatchingHeroCard` already sizes itself via a
+                    // 16:9 aspect ratio; cap it at the spec's ~600pt ideal
+                    // width but let it shrink on narrower content columns
+                    // (e.g. iPad mini) instead of forcing a fixed size.
+                    heroCard(for: hero).frame(maxWidth: 600)
+                }
+                let rest = Array(viewModel.continueWatching.dropFirst())
+                if !rest.isEmpty {
+                    VStack(spacing: 12) {
+                        ForEach(rest) { item in continueWatchingListRow(for: item) }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private func continueWatchingListRow(for item: MediaItem) -> some View {
+        Button { selectedItemForPlayback = item } label: {
+            HStack(spacing: 12) {
+                PosterImage(url: continueWatchingImageURL(for: item), aspectRatio: 136 / 77, cornerRadius: 6)
+                    .frame(width: 136, height: 77)
+                    .watchProgress(progressFraction(for: item), height: 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.name)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    if let subtitle = landscapeSubtitle(for: item) {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
         }
         .buttonStyle(.plain)
         .mediaContextMenu(
@@ -176,44 +413,87 @@ private struct LibraryContentView: View {
         )
     }
 
-    private var playOverlay: some View {
-        Image(systemName: "play.circle.fill").font(.title)
-            .foregroundStyle(.white).shadow(radius: 2).padding(8)
-    }
+    // MARK: - Recently Added
 
     @ViewBuilder
-    private func progressOverlay(for item: MediaItem) -> some View {
-        if let percentage = item.playedPercentage ?? progressPercentage(for: item) {
-            GeometryReader { geometry in
-                Rectangle().fill(Color.accentColor)
-                    .frame(width: geometry.size.width * (percentage / 100.0), height: 3)
-            }.frame(height: 3)
+    private var recentlyAddedBlock: some View {
+        if viewModel.isLoadingLatestItems {
+            SkeletonCardRow(title: "Recently Added", cardCount: 5, cardWidth: recentlyAddedCardWidth)
+        } else if !viewModel.latestItems.isEmpty {
+            latestItemsSection
+        } else if viewModel.hasLoadedLatestItems {
+            recentlyAddedEmptySection
         }
-    }
-
-    private func progressPercentage(for item: MediaItem) -> Double? {
-        guard let positionTicks = item.userData?.playbackPositionTicks,
-              let durationTicks = item.runTimeTicks, durationTicks > 0 else { return nil }
-        return Double(positionTicks) / Double(durationTicks) * 100.0
     }
 
     private var latestItemsSection: some View {
-        MediaCardRow(title: "Recently Added") {
-            ForEach(viewModel.latestItems) { item in
-                NavigationLink(value: item) {
-                    MediaCard(
-                        title: item.name,
-                        subtitle: item.year.map { String($0) },
-                        imageURL: viewModel.imageURL(for: item)
-                    ).frame(width: 140)
+        VStack(alignment: .leading, spacing: 12) {
+            latestItemsHeader
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(viewModel.latestItems) { item in
+                        latestItemCard(for: item)
+                    }
                 }
-                .buttonStyle(.plain)
-                .mediaContextMenu(
-                    config: contextMenuConfig(for: item, canPlay: item.isPlayable, showDetails: false),
-                    actions: contextMenuActions(for: item, canPlay: item.isPlayable)
-                )
+                .padding(.horizontal)
             }
         }
+    }
+
+    private var latestItemsHeader: some View {
+        HStack {
+            Text("Recently Added").font(.title2).fontWeight(.bold)
+            Spacer()
+            Button {
+                path.append(LibraryGridDestination.recentlyAdded)
+            } label: {
+                Text("See All ›").font(.subheadline).foregroundStyle(Color.accentColor)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private func latestItemCard(for item: MediaItem) -> some View {
+        let downloaded = offlineDimmingEnabled ? isItemDownloaded(item) : false
+        let card = ZStack(alignment: .topTrailing) {
+            MediaCard(
+                title: item.name,
+                subtitle: latestItemSubtitle(for: item, downloaded: downloaded),
+                imageURL: viewModel.imageURL(for: item)
+            )
+            .frame(width: recentlyAddedCardWidth)
+            .opacity(offlineDimmingEnabled && !downloaded ? 0.5 : 1)
+            if offlineDimmingEnabled, downloaded {
+                downloadedBadge
+            }
+        }
+        return Group {
+            if horizontalSizeClass == .regular {
+                // Regular width shows the detail in the split view's
+                // trailing column instead of pushing onto `path`.
+                Button { selectedItemID = item.id } label: { card }
+            } else {
+                NavigationLink(value: item) { card }
+            }
+        }
+        .buttonStyle(.plain)
+        .mediaContextMenu(
+            config: contextMenuConfig(for: item, canPlay: item.isPlayable, showDetails: false),
+            actions: contextMenuActions(for: item, canPlay: item.isPlayable)
+        )
+    }
+
+    private func latestItemSubtitle(for item: MediaItem, downloaded: Bool) -> String? {
+        if offlineDimmingEnabled, !downloaded { return "Not downloaded" }
+        return item.year.map { String($0) }
+    }
+
+    private var downloadedBadge: some View {
+        Image(systemName: "arrow.down.circle.fill")
+            .font(.caption)
+            .symbolRenderingMode(.palette)
+            .foregroundStyle(.white, .green)
+            .padding(6)
     }
 
     private var recentlyAddedEmptySection: some View {
@@ -223,78 +503,18 @@ private struct LibraryContentView: View {
         }
     }
 
-    private var librariesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Libraries").font(.title2).fontWeight(.bold).padding(.horizontal)
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(viewModel.libraries) { library in
-                        Button { Task { await viewModel.selectLibrary(library) } } label: {
-                            libraryCard(library)
-                        }.buttonStyle(.plain)
-                    }
-                }.padding(.horizontal)
-            }
-        }
+    // MARK: - Download / Offline Helpers
+
+    private var offlineDimmingEnabled: Bool {
+        downloadManager != nil && viewModel.isShowingCachedData
     }
 
-    private func libraryCard(_ library: Library) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray5))
-                .frame(width: 160, height: 90)
-                .overlay {
-                    Image(systemName: libraryIcon(for: library.collectionType)).font(.title)
-                        .foregroundStyle(.secondary)
-                }
-            Text(library.name).font(.subheadline).fontWeight(.medium).lineLimit(1)
-        }
-    }
-
-    private func libraryIcon(for type: Library.CollectionType?) -> String {
-        switch type {
-        case .movies: "film"
-        case .tvshows: "tv"
-        case .music: "music.note"
-        case .books: "book"
-        default: "folder"
-        }
-    }
-
-    private var mediaGridSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            mediaGridHeader
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16)], spacing: 16) {
-                ForEach(viewModel.mediaItems) { item in
-                    NavigationLink(value: item) {
-                        MediaCard(
-                            title: item.name,
-                            subtitle: item.year.map { String($0) },
-                            imageURL: viewModel.imageURL(for: item),
-                            contextMenuConfig: contextMenuConfig(
-                                for: item,
-                                canPlay: item.isPlayable,
-                                showDetails: false
-                            ),
-                            contextMenuActions: contextMenuActions(for: item, canPlay: item.isPlayable)
-                        ).onAppear { Task { await viewModel.loadMoreItemsIfNeeded(currentItem: item) } }
-                    }.buttonStyle(.plain)
-                }
-            }.padding(.horizontal)
-            if viewModel.isLoadingMore {
-                HStack { Spacer(); ProgressView(); Spacer() }.padding()
-            }
-        }
-    }
-
-    private var mediaGridHeader: some View {
-        HStack {
-            Text(viewModel.selectedLibrary?.name ?? viewModel.selectedMediaType.rawValue)
-                .font(.title2).fontWeight(.bold)
-            Spacer()
-            if viewModel.selectedLibrary != nil {
-                Button("Clear") { Task { await viewModel.selectLibrary(nil) } }.font(.subheadline)
-            }
-        }.padding(.horizontal)
+    private func isItemDownloaded(_ item: MediaItem) -> Bool {
+        guard let downloadManager else { return false }
+        return downloadManager.downloadSync(
+            forItemID: item.id,
+            serverID: appState.activeServerKey ?? "default"
+        )?.state == .completed
     }
 
     // MARK: - Context Menu Helpers
