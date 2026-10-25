@@ -170,6 +170,10 @@ public final class LibraryViewModel: ObservableObject {
         hasMoreItems = true
     }
 
+    var isOffline: Bool {
+        networkMonitor?.isConnected == false
+    }
+
     func loadHome(modelContext: ModelContext, networkMonitor: NetworkMonitor) async {
         setupOfflineSync(modelContext: modelContext, networkMonitor: networkMonitor)
         await loadInitialData()
@@ -296,14 +300,30 @@ public final class LibraryViewModel: ObservableObject {
         guard let id = serverConfigurationID, let sync = mediaItemSyncService else { return }
         do {
             var items = try sync.getCachedItems(for: selectedLibrary?.id, serverConfigurationID: id)
-            if let types = selectedMediaType.cachedMediaTypes {
+            if let types = effectiveIncludeItemTypes?.map(\.rawValue) {
                 items = items.filter { types.contains($0.mediaType) }
             }
+            switch watchStatusFilter {
+            case .all: break
+            case .unwatched: items = items.filter { !$0.isPlayed }
+            case .favorites: items = items.filter(\.isFavorite)
+            }
+            sortCachedItems(&items)
             if !items.isEmpty {
                 mediaItems = items.map { dataConverter.convertToMediaItem($0) }
                 isShowingCachedData = true
             }
         } catch { Self.logger.debug("Failed to load cached library items: \(error.localizedDescription)") }
+    }
+
+    private func sortCachedItems(_ items: inout [CachedMediaItem]) {
+        if isOffline, sortOption == .dateAdded { sortOption = .name }
+        switch sortOption {
+        case .dateAdded: break
+        case .name: items.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .year: items.sort { ($0.year ?? Int.min) > ($1.year ?? Int.min) }
+        case .rating: items.sort { ($0.communityRating ?? -.infinity) > ($1.communityRating ?? -.infinity) }
+        }
     }
 
     func loadMediaItems() async {

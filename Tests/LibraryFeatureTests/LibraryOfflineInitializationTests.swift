@@ -80,6 +80,64 @@ final class LibraryOfflineInitializationTests: XCTestCase {
         XCTAssertNil(model.errorMessage)
     }
 
+    func testOfflineGridHonorsFavoritesAndYearSort() async throws {
+        let context = container.mainContext
+        context.insert(CachedMediaItem(
+            id: "new", serverConfigurationID: server.id, name: "Z", year: 2025, mediaType: "Movie",
+            isFavorite: true, libraryId: "movies"
+        ))
+        context.insert(CachedMediaItem(
+            id: "old", serverConfigurationID: server.id, name: "A", year: 2020, mediaType: "Movie",
+            isFavorite: true, libraryId: "movies"
+        ))
+        try context.save()
+        let model = LibraryViewModel(appState: appState)
+        model.watchStatusFilter = .favorites
+        model.sortOption = .year
+        let library = try JSONDecoder().decode(
+            Library.self, from: Data(#"{"Id":"movies","Name":"Cached movies"}"#.utf8)
+        )
+
+        await model.enterDestination(.library(library), modelContext: context, networkMonitor: monitor)
+
+        XCTAssertEqual(model.mediaItems.map(\.id), ["new", "old"])
+    }
+
+    func testOfflineGridHonorsUnwatchedFilter() async throws {
+        let context = container.mainContext
+        context.insert(CachedMediaItem(
+            id: "watched", serverConfigurationID: server.id, name: "Watched", mediaType: "Movie",
+            isPlayed: true, libraryId: "movies"
+        ))
+        try context.save()
+        let model = LibraryViewModel(appState: appState)
+        model.watchStatusFilter = .unwatched
+        let library = try JSONDecoder().decode(
+            Library.self, from: Data(#"{"Id":"movies","Name":"Cached movies"}"#.utf8)
+        )
+
+        await model.enterDestination(.library(library), modelContext: context, networkMonitor: monitor)
+
+        XCTAssertEqual(model.mediaItems.map(\.id), ["movie"])
+    }
+
+    func testOfflineGridHonorsRatingSort() async throws {
+        let context = container.mainContext
+        context.insert(CachedMediaItem(
+            id: "high", serverConfigurationID: server.id, name: "Z", communityRating: 9, mediaType: "Movie"
+        ))
+        context.insert(CachedMediaItem(
+            id: "low", serverConfigurationID: server.id, name: "A", communityRating: 1, mediaType: "Movie"
+        ))
+        try context.save()
+        let model = LibraryViewModel(appState: appState)
+        model.sortOption = .rating
+
+        await model.enterDestination(.recentlyAdded, modelContext: context, networkMonitor: monitor)
+
+        XCTAssertEqual(model.mediaItems.map(\.id), ["high", "low", "movie"])
+    }
+
     func testCachedSeriesOpensSeasonsAndEpisodesOffline() async throws {
         let context = container.mainContext
         let series = CachedMediaItem(
@@ -87,7 +145,7 @@ final class LibraryOfflineInitializationTests: XCTestCase {
         )
         let season = CachedMediaItem(
             id: "season", serverConfigurationID: server.id, name: "Season 1", mediaType: "Season",
-            indexNumber: 1, parentSeries: series
+            seriesId: "series", indexNumber: 1, parentSeries: series
         )
         let episode = CachedMediaItem(
             id: "episode", serverConfigurationID: server.id, name: "Cached episode", mediaType: "Episode",
@@ -96,6 +154,16 @@ final class LibraryOfflineInitializationTests: XCTestCase {
         context.insert(series)
         context.insert(season)
         context.insert(episode)
+        let otherServerID = UUID()
+        let otherSeason = CachedMediaItem(
+            id: "season", serverConfigurationID: otherServerID, name: "Other account season",
+            mediaType: "Season", seriesId: "series"
+        )
+        context.insert(otherSeason)
+        context.insert(CachedMediaItem(
+            id: "episode", serverConfigurationID: otherServerID, name: "Other account episode",
+            mediaType: "Episode", parentSeason: otherSeason
+        ))
         try context.save()
         let model = SeriesDetailViewModel(
             series: MediaItem(id: "series", name: "Cached show", type: .series), appState: appState
@@ -119,7 +187,14 @@ final class LibraryOfflineInitializationTests: XCTestCase {
         XCTAssertEqual(item?.name, "Cached movie")
     }
 
-    func testIndependentRecentlyAddedEntryLoadsCachedItems() async {
+    func testIndependentRecentlyAddedEntryLoadsCachedItems() async throws {
+        container.mainContext.insert(CachedMediaItem(
+            id: "season", serverConfigurationID: server.id, name: "Season", mediaType: "Season"
+        ))
+        container.mainContext.insert(CachedMediaItem(
+            id: "episode", serverConfigurationID: server.id, name: "Episode", mediaType: "Episode"
+        ))
+        try container.mainContext.save()
         let model = LibraryViewModel(appState: appState)
 
         await model.enterDestination(
@@ -129,6 +204,7 @@ final class LibraryOfflineInitializationTests: XCTestCase {
         XCTAssertEqual(model.mediaItems.map(\.id), ["movie"])
         XCTAssertTrue(model.isShowingCachedData)
         XCTAssertTrue(model.isRecentlyAddedFeed)
+        XCTAssertEqual(model.sortOption, .name)
     }
 }
 

@@ -146,6 +146,7 @@ struct LibraryGridView: View {
                         }
                     }
                 }
+                .disabled(viewModel.isOffline && option == .dateAdded)
             }
         } label: {
             HStack(spacing: 4) {

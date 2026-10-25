@@ -134,8 +134,7 @@ public final class MediaItemSyncService {
         let descriptor = FetchDescriptor<CachedMediaItem>(
             predicate: #Predicate {
                 $0.serverConfigurationID == serverConfigurationID &&
-                    $0.playbackPositionTicks != nil &&
-                    $0.playbackPositionTicks! > 0 &&
+                    ($0.playbackPositionTicks ?? 0) > 0 &&
                     $0.isPlayed == false
             },
             sortBy: [SortDescriptor(\.lastPlayedDate, order: .reverse)]
@@ -146,10 +145,11 @@ public final class MediaItemSyncService {
     }
 
     /// Gets cached seasons for a series
-    public func getCachedSeasons(seriesId: String) throws -> [CachedMediaItem] {
+    public func getCachedSeasons(seriesId: String, serverConfigurationID: UUID) throws -> [CachedMediaItem] {
         let descriptor = FetchDescriptor<CachedMediaItem>(
             predicate: #Predicate {
-                $0.seriesId == seriesId && $0.mediaType == "Season"
+                $0.serverConfigurationID == serverConfigurationID &&
+                    $0.seriesId == seriesId && $0.mediaType == "Season"
             },
             sortBy: [SortDescriptor(\.indexNumber)]
         )
@@ -157,10 +157,11 @@ public final class MediaItemSyncService {
     }
 
     /// Gets cached episodes for a season
-    public func getCachedEpisodes(seasonId: String) throws -> [CachedMediaItem] {
+    public func getCachedEpisodes(seasonId: String, serverConfigurationID: UUID) throws -> [CachedMediaItem] {
         let descriptor = FetchDescriptor<CachedMediaItem>(
             predicate: #Predicate {
-                $0.parentSeasonStoredId == seasonId && $0.mediaType == "Episode"
+                $0.serverConfigurationID == serverConfigurationID &&
+                    $0.parentSeasonStoredId == seasonId && $0.mediaType == "Episode"
             },
             sortBy: [SortDescriptor(\.indexNumber)]
         )
