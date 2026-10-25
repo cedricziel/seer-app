@@ -6,8 +6,9 @@ import Foundation
 /// user has cached locally via `OfflineSync`. Surfaced to Siri,
 /// Shortcuts, and Spotlight semantic indexing.
 ///
-/// The identifier shape matches `CachedMediaItem.id` — Jellyfin's
-/// server-side identifier, which is stable across re-syncs.
+/// Cached entities use a server-qualified identifier so saved Shortcuts
+/// remain bound to their original server. Unbound catalog entities cannot
+/// be used for Jellyfin mutations.
 ///
 /// Conforms to `IndexedEntity` so the system can include this entity in
 /// the on-device semantic index when the user opts in via the
@@ -19,13 +20,19 @@ public struct MediaItemEntity: AppEntity, IndexedEntity, Equatable {
 
     public static let defaultQuery = MediaItemEntityQuery()
 
-    public let id: String
+    public var id: String {
+        serverID.map { "\($0.uuidString)/\(itemID)" } ?? itemID
+    }
+
+    public let itemID: String
+    public let serverID: UUID?
     public let title: String
     public let year: Int?
     public let mediaType: String
 
-    public init(id: String, title: String, year: Int? = nil, mediaType: String = "") {
-        self.id = id
+    public init(id: String, title: String, year: Int? = nil, mediaType: String = "", serverID: UUID? = nil) {
+        itemID = id
+        self.serverID = serverID
         self.title = title
         self.year = year
         self.mediaType = mediaType

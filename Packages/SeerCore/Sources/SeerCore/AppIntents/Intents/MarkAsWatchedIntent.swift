@@ -42,14 +42,15 @@ public struct MarkAsWatchedIntent: AppIntent {
         guard let appState = AppIntentsContext.appState, appState.isAuthenticated else {
             throw IntentError.needsConfiguration
         }
-        guard let serverID = appState.activeServerID else {
+        guard let serverID = item.serverID,
+              appState.configuration(for: serverID) != nil else {
             throw IntentError.needsConfiguration
         }
 
         try await Self.updater(
             MarkAsWatchedSubmission(
                 serverID: serverID,
-                itemID: item.id,
+                itemID: item.itemID,
                 watched: watched
             )
         )

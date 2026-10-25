@@ -61,9 +61,10 @@ public final class SpotlightIndexer {
             if let year = row.year {
                 attrs.contentDescription = "\(year)"
             }
-            attrs.identifier = row.id
+            let identifier = MediaItemEntity(id: row.id, title: row.name, serverID: row.serverConfigurationID).id
+            attrs.identifier = identifier
             return CSSearchableItem(
-                uniqueIdentifier: row.id,
+                uniqueIdentifier: identifier,
                 domainIdentifier: Self.domainIdentifier,
                 attributeSet: attrs
             )

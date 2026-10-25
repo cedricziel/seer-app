@@ -10,12 +10,17 @@ public struct MediaItemEntityQuery: EntityStringQuery {
 
     /// Resolve specific entities by id (used after Shortcut configuration).
     public func entities(for identifiers: [MediaItemEntity.ID]) async throws -> [MediaItemEntity] {
-        try await fetch { context in
+        let itemIDs = identifiers.compactMap { identifier -> String? in
+            let parts = identifier.split(separator: "/", maxSplits: 1)
+            guard parts.count == 2, UUID(uuidString: String(parts[0])) != nil else { return nil }
+            return String(parts[1])
+        }
+        return try await fetch { context in
             let descriptor = FetchDescriptor<CachedMediaItem>(
-                predicate: #Predicate { identifiers.contains($0.id) }
+                predicate: #Predicate { itemIDs.contains($0.id) }
             )
             let rows = (try? context.fetch(descriptor)) ?? []
-            return rows.map(Self.entity)
+            return rows.map(Self.entity).filter { identifiers.contains($0.id) }
         }
     }
 
@@ -79,7 +84,8 @@ public struct MediaItemEntityQuery: EntityStringQuery {
             id: cached.id,
             title: cached.name,
             year: cached.year,
-            mediaType: cached.mediaType
+            mediaType: cached.mediaType,
+            serverID: cached.serverConfigurationID
         )
     }
 }
