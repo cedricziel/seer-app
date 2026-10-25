@@ -44,7 +44,7 @@ public final class NotificationManager: NSObject {
     /// Register notification categories and set delegate
     public func setup() {
         #if !os(tvOS)
-        notificationCenter.setup(delegate: self)
+            notificationCenter.setup(delegate: self)
         #endif
     }
 
@@ -136,68 +136,68 @@ public final class NotificationManager: NSObject {
 // MARK: - UNUserNotificationCenterDelegate
 
 #if !os(tvOS)
-extension NotificationManager: UNUserNotificationCenterDelegate {
-    public nonisolated func userNotificationCenter(
-        _: UNUserNotificationCenter,
-        willPresent _: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        // Show notifications even when app is in foreground
-        [.banner, .sound, .badge]
-    }
+    extension NotificationManager: UNUserNotificationCenterDelegate {
+        public nonisolated func userNotificationCenter(
+            _: UNUserNotificationCenter,
+            willPresent _: UNNotification
+        ) async -> UNNotificationPresentationOptions {
+            // Show notifications even when app is in foreground
+            [.banner, .sound, .badge]
+        }
 
-    public nonisolated func userNotificationCenter(
-        _: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
-        let categoryID = response.notification.request.content.categoryIdentifier
-        let actionID = response.actionIdentifier
-        let userInfo = response.notification.request.content.userInfo
+        public nonisolated func userNotificationCenter(
+            _: UNUserNotificationCenter,
+            didReceive response: UNNotificationResponse
+        ) async {
+            let categoryID = response.notification.request.content.categoryIdentifier
+            let actionID = response.actionIdentifier
+            let userInfo = response.notification.request.content.userInfo
 
-        // Extract values before crossing actor boundary (Swift 6 concurrency safety)
-        let downloadIDString = userInfo[NotificationUserInfoKey.downloadID.rawValue] as? String
-        let requestID = userInfo[NotificationUserInfoKey.requestID.rawValue] as? Int
-        let mediaTitle = userInfo[NotificationUserInfoKey.mediaTitle.rawValue] as? String
-        let serverID = userInfo[NotificationUserInfoKey.serverID.rawValue] as? String
+            // Extract values before crossing actor boundary (Swift 6 concurrency safety)
+            let downloadIDString = userInfo[NotificationUserInfoKey.downloadID.rawValue] as? String
+            let requestID = userInfo[NotificationUserInfoKey.requestID.rawValue] as? Int
+            let mediaTitle = userInfo[NotificationUserInfoKey.mediaTitle.rawValue] as? String
+            let serverID = userInfo[NotificationUserInfoKey.serverID.rawValue] as? String
 
-        // Create a sendable info struct
-        let info = NotificationInfo(
-            downloadID: downloadIDString.flatMap { UUID(uuidString: $0) },
-            requestID: requestID,
-            mediaTitle: mediaTitle,
-            serverID: serverID
-        )
+            // Create a sendable info struct
+            let info = NotificationInfo(
+                downloadID: downloadIDString.flatMap { UUID(uuidString: $0) },
+                requestID: requestID,
+                mediaTitle: mediaTitle,
+                serverID: serverID
+            )
 
-        await MainActor.run { [weak self] in
-            guard let self, let delegate = actionDelegate else { return }
+            await MainActor.run { [weak self] in
+                guard let self, let delegate = actionDelegate else { return }
 
-            // Parse category
-            guard let category = NotificationCategory(rawValue: categoryID) else { return }
+                // Parse category
+                guard let category = NotificationCategory(rawValue: categoryID) else { return }
 
-            // Handle based on action
-            switch actionID {
-            case UNNotificationDefaultActionIdentifier:
-                // User tapped the notification
-                delegate.didTapNotification(category: category, info: info)
+                // Handle based on action
+                switch actionID {
+                case UNNotificationDefaultActionIdentifier:
+                    // User tapped the notification
+                    delegate.didTapNotification(category: category, info: info)
 
-            case NotificationAction.view.rawValue:
-                delegate.didTapNotification(category: category, info: info)
+                case NotificationAction.view.rawValue:
+                    delegate.didTapNotification(category: category, info: info)
 
-            case NotificationAction.retry.rawValue:
-                if let downloadID = info.downloadID {
-                    delegate.didTapRetryDownload(downloadID: downloadID)
+                case NotificationAction.retry.rawValue:
+                    if let downloadID = info.downloadID {
+                        delegate.didTapRetryDownload(downloadID: downloadID)
+                    }
+
+                case NotificationAction.cancel.rawValue:
+                    if let downloadID = info.downloadID {
+                        delegate.didTapCancelDownload(downloadID: downloadID)
+                    }
+
+                default:
+                    break
                 }
-
-            case NotificationAction.cancel.rawValue:
-                if let downloadID = info.downloadID {
-                    delegate.didTapCancelDownload(downloadID: downloadID)
-                }
-
-            default:
-                break
             }
         }
     }
-}
 
 #endif
 
