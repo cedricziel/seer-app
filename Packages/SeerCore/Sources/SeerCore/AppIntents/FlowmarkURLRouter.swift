@@ -2,7 +2,7 @@ import Foundation
 import OSLog
 
 /// Routes incoming `flowmark://` URLs to in-app navigation state.
-/// Wired to `ContentView.onOpenURL` and dispatched from the system
+/// Wired to `SeerApp.onOpenURL` and dispatched from the system
 /// when an `OpensIntent` returns a flowmark URL.
 ///
 /// Routes defined for v1:
@@ -13,14 +13,19 @@ import OSLog
 public final class FlowmarkURLRouter: ObservableObject {
     private static let logger = Logger(subsystem: "com.cedricziel.seer", category: "FlowmarkURLRouter")
 
-    /// The tab to display. Bound from `ContentView`'s `@State`.
+    /// The tab displayed by the main TabView.
     @Published public var selectedTab: AppTab = .library
 
-    /// The media id to navigate to inside the Library tab. Cleared
-    /// after the navigation has been consumed.
-    @Published public var pendingMediaID: String?
+    /// The Library detail target, retained until a successful navigation.
+    @Published public private(set) var pendingMedia: MediaRoute?
 
-    public static let scheme = "flowmark"
+    public struct MediaRoute: Identifiable, Equatable, Sendable {
+        public let id = UUID()
+        public let itemID: String
+        public let serverID: UUID?
+    }
+
+    public nonisolated static let scheme = "flowmark"
 
     public init() {}
 
@@ -29,10 +34,11 @@ public final class FlowmarkURLRouter: ObservableObject {
         case discover
         case search
         case requests
+        case downloads
     }
 
     public enum RouteResult: Equatable, Sendable {
-        case openMedia(id: String)
+        case openMedia(id: String, serverID: UUID? = nil)
         case openLibrary
         case unknown(URL)
     }
@@ -57,7 +63,10 @@ public final class FlowmarkURLRouter: ObservableObject {
             guard !id.isEmpty else {
                 return .unknown(url)
             }
-            return .openMedia(id: id)
+            let serverValue = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first(where: { $0.name == "server" })?.value
+            if let serverValue, UUID(uuidString: serverValue) == nil { return .unknown(url) }
+            return .openMedia(id: id, serverID: serverValue.flatMap(UUID.init(uuidString:)))
         case "library":
             return .openLibrary
         default:
@@ -71,15 +80,27 @@ public final class FlowmarkURLRouter: ObservableObject {
     public func route(_ url: URL) -> RouteResult {
         let result = Self.parse(url)
         switch result {
-        case let .openMedia(id):
+        case let .openMedia(id, serverID):
             selectedTab = .library
-            pendingMediaID = id
+            pendingMedia = MediaRoute(itemID: id, serverID: serverID)
         case .openLibrary:
             selectedTab = .library
-            pendingMediaID = nil
+            pendingMedia = nil
         case let .unknown(url):
             Self.logger.info("Unknown flowmark route: \(url.absoluteString)")
         }
         return result
+    }
+
+    /// Opens the resolved item once. Superseded routes and cancelled lookups cannot navigate.
+    public func consumePendingMedia<Item>(
+        resolve: (MediaRoute) async -> Item?,
+        open: (Item) -> Void
+    ) async {
+        guard let route = pendingMedia,
+              let item = await resolve(route),
+              !Task.isCancelled, pendingMedia?.id == route.id else { return }
+        pendingMedia = nil
+        open(item)
     }
 }

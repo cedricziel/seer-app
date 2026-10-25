@@ -88,19 +88,10 @@ struct ContentView: View {
 }
 
 struct MainTabView: View {
-    @State private var selectedTab: MainTab = .library
-
-    /// Named `MainTab` (not `Tab`) to avoid colliding with SwiftUI's `Tab` view type used below.
-    enum MainTab: Hashable {
-        case library
-        case discover
-        case search
-        case downloads
-        case requests
-    }
+    @EnvironmentObject private var router: FlowmarkURLRouter
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $router.selectedTab) {
             Tab("Library", systemImage: "play.square.stack", value: .library) {
                 LibraryView()
             }
@@ -130,4 +121,5 @@ struct MainTabView: View {
 #Preview {
     ContentView()
         .environmentObject(AppState())
+        .environmentObject(FlowmarkURLRouter())
 }

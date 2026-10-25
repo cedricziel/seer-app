@@ -72,6 +72,13 @@ For typed App Intent requests, run `JellyseerrClientTests/RequestSearchMatchTest
 and `SeerCoreTests/Tier1IntentTests`. An explicit type must not fall back to the
 other type, and owning a same-name movie must not suppress a show request.
 
+For Shortcut navigation, run `SeerCoreTests/FlowmarkURLRouterTests`. Cover one-time
+consumption, superseded lookups, and failed lookup retries. On an isolated app
+instance, open a server-qualified Resume Watching URL from another tab and verify
+that Library shows the target's details. Switch servers during resolution and
+verify that stale results cannot open. Visual navigation remains unverified when
+an isolated app instance is unavailable.
+
 For shared Swift tooling changes, run `python3 -m unittest scripts/test_swift_tools.py`.
 
 For App Intents server identity changes, run `SeerCoreTests/AppEntityQueryTests`,

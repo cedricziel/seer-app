@@ -19,6 +19,7 @@ struct LibraryView: View {
 
 /// Internal view that creates the view model with the correct AppState
 private struct LibraryContentView: View {
+    @EnvironmentObject private var router: FlowmarkURLRouter
     @ObservedObject var appState: AppState
     @ObservedObject var onboardingManager: OnboardingManager
     @Environment(\.modelContext) private var modelContext
@@ -71,6 +72,13 @@ private struct LibraryContentView: View {
     var body: some View {
         rootContainer
             .task { await viewModel.loadHome(modelContext: modelContext, networkMonitor: networkMonitor) }
+            .task(id: [router.pendingMedia?.id, appState.activeServerID]) {
+                await router.consumePendingMedia(resolve: resolveRoute) { item in
+                    path = NavigationPath()
+                    selectedItem = nil
+                    showDetails(for: item)
+                }
+            }
             .onDisappear { viewModel.cancelAllTasks() }
             .onChange(of: appState.activeServerID) {
                 path = NavigationPath()
@@ -86,6 +94,25 @@ private struct LibraryContentView: View {
                     onPiPStart: { selectedItemForPlayback = nil }
                 )
             }
+    }
+
+    private func resolveRoute(_ route: FlowmarkURLRouter.MediaRoute) async -> MediaItem? {
+        guard let serverID = route.serverID ?? appState.activeServerID,
+              appState.configuration(for: serverID) != nil else { return nil }
+        if appState.activeServerID != serverID {
+            appState.switchServer(to: serverID)
+            return nil
+        }
+        guard let credentials = appState.jellyfinCredentials(for: serverID) else { return nil }
+        let service = JellyfinService(
+            serverURL: credentials.serverURL,
+            accessToken: credentials.accessToken,
+            userID: credentials.userId,
+            deviceID: credentials.deviceId
+        )
+        let item = try? await service.getItem(id: route.itemID)
+        guard !Task.isCancelled, appState.activeServerID == serverID else { return nil }
+        return item
     }
 
     // MARK: - Navigation containers
@@ -496,4 +523,5 @@ private struct LibraryContentView: View {
         .environmentObject(AppState())
         .environmentObject(NetworkMonitor(isConnected: false))
         .environmentObject(OnboardingManager())
+        .environmentObject(FlowmarkURLRouter())
 }

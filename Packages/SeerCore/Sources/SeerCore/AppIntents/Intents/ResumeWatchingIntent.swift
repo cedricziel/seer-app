@@ -45,7 +45,7 @@ public struct ResumeWatchingIntent: AppIntent {
         guard let item = try? context.fetch(descriptor).first else {
             return Self.libraryURL
         }
-        return Self.mediaURL(for: item.id)
+        return Self.mediaURL(for: item.id, serverID: item.serverConfigurationID)
     }
 
     @MainActor
@@ -59,8 +59,15 @@ public struct ResumeWatchingIntent: AppIntent {
     // MARK: - URL helpers
 
     /// `flowmark://media/<id>` — opens the player or detail view.
-    public static func mediaURL(for id: String) -> URL {
-        URL(string: "flowmark://media/\(id)") ?? libraryURL
+    public static func mediaURL(for id: String, serverID: UUID? = nil) -> URL {
+        var components = URLComponents()
+        components.scheme = FlowmarkURLRouter.scheme
+        components.host = "media"
+        components.path = "/\(id)"
+        if let serverID {
+            components.queryItems = [URLQueryItem(name: "server", value: serverID.uuidString)]
+        }
+        return components.url ?? libraryURL
     }
 
     /// `flowmark://library` — opens the Library tab.

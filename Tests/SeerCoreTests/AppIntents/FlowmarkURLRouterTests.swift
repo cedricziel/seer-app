@@ -10,7 +10,7 @@ final class FlowmarkURLRouterTests: XCTestCase {
         let result = router.route(url)
 
         XCTAssertEqual(result, .openMedia(id: "abc-123"))
-        XCTAssertEqual(router.pendingMediaID, "abc-123")
+        XCTAssertEqual(router.pendingMedia?.itemID, "abc-123")
         XCTAssertEqual(router.selectedTab, .library)
     }
 
@@ -21,7 +21,7 @@ final class FlowmarkURLRouterTests: XCTestCase {
         let result = router.route(url)
 
         XCTAssertEqual(result, .openLibrary)
-        XCTAssertNil(router.pendingMediaID)
+        XCTAssertNil(router.pendingMedia)
         XCTAssertEqual(router.selectedTab, .library)
     }
 
@@ -29,7 +29,8 @@ final class FlowmarkURLRouterTests: XCTestCase {
     func testIgnoresUnknownPath() throws {
         let router = FlowmarkURLRouter()
         router.selectedTab = .discover
-        router.pendingMediaID = "preserved"
+        try router.route(XCTUnwrap(URL(string: "flowmark://media/preserved")))
+        router.selectedTab = .discover
 
         let url = try XCTUnwrap(URL(string: "flowmark://requests/42"))
         let result = router.route(url)
@@ -38,7 +39,50 @@ final class FlowmarkURLRouterTests: XCTestCase {
             XCTFail("Expected .unknown, got \(result)")
         }
         XCTAssertEqual(router.selectedTab, .discover)
-        XCTAssertEqual(router.pendingMediaID, "preserved")
+        XCTAssertEqual(router.pendingMedia?.itemID, "preserved")
+    }
+
+    func testConsumesMediaIntoNavigationOnlyOnce() async {
+        let router = FlowmarkURLRouter()
+        let serverID = UUID()
+        router.selectedTab = .search
+        router.route(ResumeWatchingIntent.mediaURL(for: "shared", serverID: serverID))
+        var opened: [String] = []
+
+        await router.consumePendingMedia { route in
+            XCTAssertEqual(route.serverID, serverID)
+            return route.itemID
+        } open: { opened.append($0) }
+        await router.consumePendingMedia { $0.itemID } open: { opened.append($0) }
+
+        XCTAssertEqual(router.selectedTab, .library)
+        XCTAssertEqual(opened, ["shared"])
+        XCTAssertNil(router.pendingMedia)
+    }
+
+    func testSupersededLookupCannotOpenOldDetail() async throws {
+        let router = FlowmarkURLRouter()
+        try router.route(XCTUnwrap(URL(string: "flowmark://media/old")))
+        var opened: [String] = []
+
+        await router.consumePendingMedia { route in
+            router.route(ResumeWatchingIntent.libraryURL)
+            return route.itemID
+        } open: { opened.append($0) }
+
+        XCTAssertTrue(opened.isEmpty)
+        XCTAssertNil(router.pendingMedia)
+    }
+
+    func testFailedLookupKeepsRouteForRetry() async throws {
+        let router = FlowmarkURLRouter()
+        try router.route(XCTUnwrap(URL(string: "flowmark://media/missing")))
+        await router.consumePendingMedia { _ -> String? in nil } open: { _ in XCTFail("Missing item opened") }
+        XCTAssertEqual(router.pendingMedia?.itemID, "missing")
+        var opened: String?
+        await router.consumePendingMedia { $0.itemID } open: { opened = $0 }
+        XCTAssertEqual(opened, "missing")
+        XCTAssertNil(router.pendingMedia)
     }
 
     /// Wrong-scheme URLs round-trip as `.unknown`.
