@@ -102,7 +102,11 @@ struct MediaDetailView: View {
             Text(requestError ?? "An error occurred")
         }
         .fullScreenCover(isPresented: $showPlayer) {
-            let playbackItem = selectedEpisodeForPlayback ?? item
+            let playbackItem = MediaPlaybackSelection.item(
+                original: item,
+                detailedItem: detailedItem,
+                selectedEpisode: selectedEpisodeForPlayback
+            )
             VideoPlayerView(
                 item: playbackItem,
                 appState: appState,

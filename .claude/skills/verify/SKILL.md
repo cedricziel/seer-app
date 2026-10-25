@@ -56,6 +56,8 @@ added to the shared resource only when diagnostics are enabled. Run
 `DiagnosticsPreferencesTests` and `DiagnosticsExporterTests` for default-on
 preferences, legacy opt-out preservation, and export-time category gates.
 
+For media detail playback selection, run `.claude/skills/verify/scripts/playback-selection-tests.sh` from the repository root. It compiles the real selection logic, media model, and regression tests in a disposable macOS package with isolated compiler caches. It covers refreshed movie/episode resume ticks, explicit series episode selection, and fallback before details load without app state or network access.
+
 For typed App Intent requests, run `JellyseerrClientTests/RequestSearchMatchTests`
 and `SeerCoreTests/Tier1IntentTests`. An explicit type must not fall back to the
 other type, and owning a same-name movie must not suppress a show request.

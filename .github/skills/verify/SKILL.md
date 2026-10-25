@@ -18,6 +18,8 @@ Report static checks and simulator results separately from telemetry ingestion v
 
 For request notification changes, run [scripts/request-tests.sh](scripts/request-tests.sh). This disposable macOS package tests the real poller, request models, and in-memory SwiftData store with controlled network responses and recorded notification output. It covers approval, decline, media completion with unchanged or completed request status, partial and 4K availability, unchanged polls, legacy cache baselines, and server scoping. It does not verify system notification delivery or app wiring; retain the native build and test checks above.
 
+For media detail playback selection, run `.claude/skills/verify/scripts/playback-selection-tests.sh` from the repository root. It compiles the real selection logic, media model, and regression tests in a disposable macOS package with isolated compiler caches. It covers refreshed movie/episode resume ticks, explicit series episode selection, and fallback before details load without app state or network access.
+
 For server URL resolution changes, run [the isolated resolver tests](../../../.claude/skills/verify/scripts/server-url-tests.sh). The macOS package uses the real resolver and configuration model with stubbed Wi-Fi and reachability, without app data or live servers. Verify the browsing connection gate separately on an isolated simulator.
 
 For shared Swift tooling changes, run `python3 -m unittest scripts/test_swift_tools.py`.
