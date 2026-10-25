@@ -46,7 +46,9 @@ final class OnboardingViewModelTests: XCTestCase {
         await Self.runManualEntry(model: model, url: "https://server.example.com")
 
         try await Self.waitFor(timeout: 2.0) {
-            if case .quickConnect = model.phase { return true }
+            if case .quickConnect = model.phase {
+                return true
+            }
             return false
         }
         if case let .quickConnect(host) = model.phase {
@@ -64,7 +66,9 @@ final class OnboardingViewModelTests: XCTestCase {
         await Self.runManualEntry(model: model, url: "https://server.example.com")
 
         try await Self.waitFor(timeout: 1.0) {
-            if case .password = model.phase { return true }
+            if case .password = model.phase {
+                return true
+            }
             return false
         }
         if case let .password(host) = model.phase {
@@ -89,7 +93,9 @@ final class OnboardingViewModelTests: XCTestCase {
 
         await Self.runManualEntry(model: model, url: "https://server.example.com")
         try await Self.waitFor(timeout: 1.0) {
-            if case .password = model.phase { return true }
+            if case .password = model.phase {
+                return true
+            }
             return false
         }
 
@@ -114,7 +120,9 @@ final class OnboardingViewModelTests: XCTestCase {
 
         await Self.runManualEntry(model: model, url: "https://server.example.com")
         try await Self.waitFor(timeout: 1.0) {
-            if case .password = model.phase { return true }
+            if case .password = model.phase {
+                return true
+            }
             return false
         }
 
@@ -188,7 +196,9 @@ final class OnboardingViewModelTests: XCTestCase {
         await Self.runManualEntry(model: model, url: "https://server.example.com")
 
         try await Self.waitFor(timeout: 3.0) {
-            if case .quickConnect = model.phase { return true }
+            if case .quickConnect = model.phase {
+                return true
+            }
             return false
         }
 
@@ -201,7 +211,14 @@ final class OnboardingViewModelTests: XCTestCase {
     func testBonjourAcceptanceStoresInternalURL() async throws {
         let stub = StubBonjourEngine()
         let bonjour = BonjourDiscovery(engine: stub)
-        let model = makeModel(quickConnectEnabled: false, bonjour: bonjour)
+        let model = makeModel(
+            quickConnectEnabled: false,
+            bonjour: bonjour,
+            passwordAuthenticator: { _, _, _ in
+                .init(response: Self.makeAuthResponse(), deviceID: "bonjour-test-device")
+            }
+        )
+        defer { model.stop() }
         model.start()
 
         let server = try DiscoveredJellyfinServer(
@@ -234,6 +251,16 @@ final class OnboardingViewModelTests: XCTestCase {
             model.selectedServer?.discoveredViaBonjour ?? false,
             "Bonjour-discovered servers must be flagged for dual-URL learning"
         )
+
+        try await Self.waitFor(timeout: 1) {
+            model.phase == .password(serverDisplay: "macmini")
+        }
+        model.passwordUsername = "tester"
+        await model.submitPassword()
+
+        XCTAssertEqual(appState.servers.count, 1)
+        XCTAssertEqual(appState.activeServer?.jellyfinURL, server.url)
+        XCTAssertNil(appState.activeServer?.internalJellyfinURL)
     }
 
     // MARK: - 8.12 — Onboarding completes without Jellyseerr
@@ -251,7 +278,9 @@ final class OnboardingViewModelTests: XCTestCase {
 
         await Self.runManualEntry(model: model, url: "https://server.example.com")
         try await Self.waitFor(timeout: 1.0) {
-            if case .password = model.phase { return true }
+            if case .password = model.phase {
+                return true
+            }
             return false
         }
 
@@ -268,6 +297,95 @@ final class OnboardingViewModelTests: XCTestCase {
             appState.jellyseerrAPIKey,
             "No Jellyseerr API key should have been written"
         )
+    }
+
+    func testPasswordSignInPreservesSavedServerIdentityAndSettings() async throws {
+        try await assertReauthenticationPreservesSavedServer(quickConnect: false)
+    }
+
+    func testQuickConnectPreservesSyncedServerIdentityAndSettings() async throws {
+        try await assertReauthenticationPreservesSavedServer(quickConnect: true)
+    }
+
+    private func assertReauthenticationPreservesSavedServer(quickConnect: Bool) async throws {
+        let original = try ServerConfiguration(
+            name: "Saved server",
+            emoji: "🎬",
+            jellyfinURL: XCTUnwrap(URL(string: "https://saved.example.com")),
+            jellyseerrURL: URL(string: "https://requests.example.com"),
+            jellyfinUserID: "old-user",
+            createdAt: Date(timeIntervalSince1970: 123),
+            internalJellyfinURL: URL(string: "http://192.168.1.20:8096"),
+            internalNetworkSSIDs: ["Home"]
+        )
+        appState.addServer(original)
+        let originalID = original.id
+        let auth = Self.makeAuthResponse(token: "new-token", userID: "new-user")
+        let transport = ScriptedQuickConnectTransport(
+            isEnabledResult: .success(quickConnect),
+            initiateResult: .success(.init(code: "TEST12", secret: "test-secret")),
+            authenticateResult: .success(auth)
+        )
+        transport.defaultStateResponse = .init(authenticated: true)
+        let model = makeModel(
+            quickConnectEnabled: quickConnect,
+            serverInfoResult: .success(makeServerInfo()),
+            quickConnectTransportFactory: { _ in transport },
+            passwordAuthenticator: { _, _, _ in
+                .init(response: auth, deviceID: "test-device")
+            }
+        )
+        defer { model.stop() }
+        try model.selectSuggestion(XCTUnwrap(model.welcomeSuggestions.primary))
+        if quickConnect {
+            try await Self.waitFor(timeout: 2) { appState.isAuthenticated }
+        } else {
+            try await Self.waitFor(timeout: 1) {
+                model.phase == .password(serverDisplay: "Saved server")
+            }
+            model.passwordUsername = "tester"
+            await model.submitPassword()
+        }
+
+        XCTAssertEqual(appState.servers.count, 1)
+        let saved = try XCTUnwrap(appState.activeServer)
+        XCTAssertEqual(saved.id, originalID)
+        XCTAssertEqual(saved.name, "Saved server")
+        XCTAssertEqual(saved.emoji, "🎬")
+        XCTAssertEqual(saved.jellyfinURL, URL(string: "https://saved.example.com"))
+        XCTAssertEqual(saved.jellyseerrURL, URL(string: "https://requests.example.com"))
+        XCTAssertEqual(saved.createdAt, Date(timeIntervalSince1970: 123))
+        XCTAssertEqual(saved.internalJellyfinURL, URL(string: "http://192.168.1.20:8096"))
+        XCTAssertEqual(saved.internalNetworkSSIDs, ["Home"])
+        XCTAssertEqual(saved.jellyfinUserID, "new-user")
+        XCTAssertEqual(appState.jellyfinAccessToken, "new-token")
+    }
+
+    func testManualAuthenticationAddsNewServerAlongsideSavedServer() async throws {
+        let original = try ServerConfiguration(
+            name: "Saved",
+            jellyfinURL: XCTUnwrap(URL(string: "https://saved.example.com"))
+        )
+        appState.addServer(original)
+        let model = makeModel(
+            quickConnectEnabled: false,
+            serverInfoResult: .success(makeServerInfo()),
+            passwordAuthenticator: { _, _, _ in
+                .init(response: Self.makeAuthResponse(userID: "new-user"), deviceID: "test-device")
+            }
+        )
+        defer { model.stop() }
+        await Self.runManualEntry(model: model, url: "https://new.example.com")
+        model.passwordUsername = "tester"
+
+        await model.submitPassword()
+
+        XCTAssertEqual(appState.servers.count, 2)
+        let added = try XCTUnwrap(appState.activeServer)
+        XCTAssertNotEqual(added.id, original.id)
+        XCTAssertEqual(added.jellyfinURL, URL(string: "https://new.example.com"))
+        XCTAssertEqual(added.internalJellyfinURL, makeServerInfo().localAddress)
+        XCTAssertEqual(added.jellyfinUserID, "new-user")
     }
 
     // MARK: - Model construction helpers
@@ -337,7 +455,9 @@ final class OnboardingViewModelTests: XCTestCase {
     ) async throws {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if condition() { return }
+            if condition() {
+                return
+            }
             try await Task.sleep(for: .milliseconds(10))
         }
         XCTFail("Condition not met within \(timeout)s")

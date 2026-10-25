@@ -21,6 +21,7 @@ final class OnboardingViewModel: ObservableObject {
         let displayName: String
         let url: URL
         let discoveredViaBonjour: Bool
+        var configurationID: UUID?
     }
 
     // MARK: - Welcome state
@@ -171,7 +172,8 @@ final class OnboardingViewModel: ObservableObject {
             selectedServer = SelectedServer(
                 displayName: config.name,
                 url: config.jellyfinURL,
-                discoveredViaBonjour: false
+                discoveredViaBonjour: false,
+                configurationID: config.id
             )
             TelemetryService.shared.recordOnboardingPathSelected(.icloud)
             Task { await advanceToAuth() }
@@ -373,29 +375,27 @@ final class OnboardingViewModel: ObservableObject {
     ) async {
         phase = .completing
 
-        let externalURL: URL
-        let internalURL: URL?
-        if selected.discoveredViaBonjour {
-            // Bonjour-discovered URL is the LAN URL. We don't have a WAN URL
-            // yet — caller can add one later.
-            externalURL = selected.url
-            internalURL = selected.url
+        let config: ServerConfiguration
+        if let configurationID = selected.configurationID,
+           let existing = appState.configuration(for: configurationID) {
+            config = existing
         } else {
-            // Manual entry — fetch /System/Info/Public to learn LAN URL.
-            externalURL = selected.url
-            internalURL = await fetchLocalAddress(from: selected.url)
+            let internalURL = if selected.discoveredViaBonjour {
+                selected.url
+            } else {
+                await fetchLocalAddress(from: selected.url)
+            }
+            config = ServerConfiguration(
+                name: selected.displayName,
+                jellyfinURL: selected.url,
+                jellyfinUserID: userID,
+                lastUsed: Date(),
+                createdAt: Date(),
+                internalJellyfinURL: internalURL == selected.url ? nil : internalURL,
+                internalNetworkSSIDs: []
+            )
+            appState.addServer(config)
         }
-
-        let config = ServerConfiguration(
-            name: selected.displayName,
-            jellyfinURL: externalURL,
-            jellyfinUserID: userID,
-            lastUsed: Date(),
-            createdAt: Date(),
-            internalJellyfinURL: internalURL == externalURL ? nil : internalURL,
-            internalNetworkSSIDs: []
-        )
-        appState.addServer(config)
         appState.saveJellyfinCredentials(
             serverID: config.id,
             accessToken: accessToken,
