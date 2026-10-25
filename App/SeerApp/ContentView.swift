@@ -1,3 +1,4 @@
+import NotificationClient
 import PlaybackClient
 import SeerCore
 import SeerUI
@@ -6,6 +7,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var notificationNavigation: NotificationNavigation
     @StateObject private var onboardingManager = OnboardingManager()
     @StateObject private var wifiMonitor = WiFiSSIDMonitor.shared
     @State private var resolvedContext: ServerURLResolver.Context?
@@ -47,6 +49,13 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut, value: appState.isAuthenticated)
+        .onChange(of: notificationNavigation.pendingDestination?.id, initial: true) { _, _ in
+            guard let destination = notificationNavigation.pendingDestination,
+                  appState.servers.contains(where: { $0.id == destination.serverID }),
+                  appState.activeServerID != destination.serverID
+            else { return }
+            appState.switchServer(to: destination.serverID)
+        }
         .playerCover(isPresented: $showPiPRestorePlayer) {
             let pipManager = PiPPlaybackManager.shared
             if let item = pipManager.pipItem,
@@ -88,10 +97,14 @@ struct ContentView: View {
 }
 
 struct MainTabView: View {
-    @EnvironmentObject private var router: FlowmarkURLRouter
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var flowmarkRouter: FlowmarkURLRouter
+    @EnvironmentObject private var notificationNavigation: NotificationNavigation
+    @State private var showNotificationError = false
+    @State private var notificationDestination: NotificationNavigation.Destination?
 
     var body: some View {
-        TabView(selection: $router.selectedTab) {
+        TabView(selection: $flowmarkRouter.selectedTab) {
             Tab("Library", systemImage: "play.square.stack", value: .library) {
                 LibraryView()
             }
@@ -112,9 +125,41 @@ struct MainTabView: View {
                 RequestsView()
             }
         }
+        .task(id: notificationNavigation.pendingDestination?.id) {
+            openNotificationDestination()
+        }
+        .sheet(item: $notificationDestination) { destination in
+            NotificationDestinationView(destination: destination)
+                .id(destination.id)
+        }
+        .alert("Notification unavailable", isPresented: $showNotificationError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The notification's server is no longer configured.")
+        }
         #if os(iOS)
         .tabViewStyle(.sidebarAdaptable)
         #endif
+    }
+
+    private func openNotificationDestination() {
+        guard let pending = notificationNavigation.pendingDestination else { return }
+        guard appState.servers.contains(where: { $0.id == pending.serverID }) else {
+            notificationNavigation.clear()
+            showNotificationError = true
+            return
+        }
+        guard let destination = notificationNavigation.consume(activateServer: { serverID in
+            if appState.activeServerID != serverID {
+                appState.switchServer(to: serverID)
+            }
+            return appState.activeServerID == serverID && appState.isAuthenticated
+        }) else { return }
+        switch destination {
+        case .request: flowmarkRouter.selectedTab = .requests
+        case .download: flowmarkRouter.selectedTab = .downloads
+        }
+        notificationDestination = destination
     }
 }
 
@@ -122,4 +167,5 @@ struct MainTabView: View {
     ContentView()
         .environmentObject(AppState())
         .environmentObject(FlowmarkURLRouter())
+        .environmentObject(NotificationNavigation())
 }

@@ -13,6 +13,8 @@ import SeerCore
 /// App delegate for handling background URL session callbacks and background tasks
 @MainActor
 final class SeerAppDelegate: NSObject {
+    let notificationNavigation = NotificationNavigation()
+
     /// Reference to the download manager (set by SeerApp)
     weak var downloadManager: DownloadManager?
 
@@ -151,9 +153,7 @@ final class SeerAppDelegate: NSObject {
 extension SeerAppDelegate: NotificationActionDelegate {
     @MainActor
     func didTapNotification(category: NotificationCategory, info: NotificationInfo) {
-        // Handle notification tap - navigate to appropriate screen
-        // Deep linking can be implemented based on category and info
-        print("[SeerAppDelegate] Notification tapped: \(category), info: \(info)")
+        notificationNavigation.receive(category: category, info: info)
     }
 
     @MainActor
