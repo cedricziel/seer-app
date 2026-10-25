@@ -164,8 +164,10 @@ final class MediaItemSyncServiceTests: XCTestCase {
     }
 
     func testSeriesSyncLinksOnlyTheSyncingAccountsItems() async throws {
-        URLProtocol.registerClass(SeriesSyncFixtureProtocol.self)
-        defer { URLProtocol.unregisterClass(SeriesSyncFixtureProtocol.self) }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SeriesSyncFixtureProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
         let otherServer = try ServerConfiguration(
             name: "Other", jellyfinURL: XCTUnwrap(URL(string: "https://series-sync.invalid"))
         )
@@ -177,7 +179,7 @@ final class MediaItemSyncServiceTests: XCTestCase {
         try await service.syncItems([series], serverConfig: serverConfig, library: nil)
         let client = try JellyfinService(
             serverURL: XCTUnwrap(URL(string: "https://series-sync.invalid")),
-            accessToken: "test-token", userID: "test-user", deviceID: "test-device"
+            accessToken: "test-token", userID: "test-user", deviceID: "test-device", session: session
         )
 
         try await service.syncSeriesDetails(seriesId: "series", serverConfig: serverConfig, service: client)

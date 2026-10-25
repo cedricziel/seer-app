@@ -12,10 +12,13 @@ final class LibraryOfflineInitializationTests: XCTestCase {
     private var appState: AppState!
     private var monitor: NetworkMonitor!
     private var server: ServerConfiguration!
+    private var session: URLSession!
 
     override func setUp() async throws {
         OfflineRequestTrap.requests.withLock { $0 = 0 }
-        URLProtocol.registerClass(OfflineRequestTrap.self)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OfflineRequestTrap.self]
+        session = URLSession(configuration: configuration)
         let schema = Schema([
             ServerConfiguration.self, CachedLibrary.self, CachedMediaItem.self,
             CachedUserProgress.self, CachedRequest.self
@@ -45,7 +48,8 @@ final class LibraryOfflineInitializationTests: XCTestCase {
 
     override func tearDown() async throws {
         XCTAssertEqual(OfflineRequestTrap.requests.withLock { $0 }, 0, "Offline browsing must not request the server")
-        URLProtocol.unregisterClass(OfflineRequestTrap.self)
+        session.invalidateAndCancel()
+        session = nil
         KeychainManager.shared.deleteServerCredentials(for: server.id)
         monitor = nil
         appState = nil
@@ -54,7 +58,7 @@ final class LibraryOfflineInitializationTests: XCTestCase {
     }
 
     func testHomeEntryLoadsCachedLibrariesAndContinueWatching() async {
-        let model = LibraryViewModel(appState: appState)
+        let model = LibraryViewModel(appState: appState, session: session)
 
         await model.loadHome(modelContext: container.mainContext, networkMonitor: monitor)
 
@@ -66,7 +70,7 @@ final class LibraryOfflineInitializationTests: XCTestCase {
     }
 
     func testIndependentGridEntryLoadsCachedLibraryItems() async throws {
-        let model = LibraryViewModel(appState: appState)
+        let model = LibraryViewModel(appState: appState, session: session)
 
         try await model.enterDestination(
             .library(JSONDecoder().decode(
@@ -91,7 +95,7 @@ final class LibraryOfflineInitializationTests: XCTestCase {
             isFavorite: true, libraryId: "movies"
         ))
         try context.save()
-        let model = LibraryViewModel(appState: appState)
+        let model = LibraryViewModel(appState: appState, session: session)
         model.watchStatusFilter = .favorites
         model.sortOption = .year
         let library = try JSONDecoder().decode(
@@ -110,7 +114,7 @@ final class LibraryOfflineInitializationTests: XCTestCase {
             isPlayed: true, libraryId: "movies"
         ))
         try context.save()
-        let model = LibraryViewModel(appState: appState)
+        let model = LibraryViewModel(appState: appState, session: session)
         model.watchStatusFilter = .unwatched
         let library = try JSONDecoder().decode(
             Library.self, from: Data(#"{"Id":"movies","Name":"Cached movies"}"#.utf8)
@@ -130,7 +134,7 @@ final class LibraryOfflineInitializationTests: XCTestCase {
             id: "low", serverConfigurationID: server.id, name: "A", communityRating: 1, mediaType: "Movie"
         ))
         try context.save()
-        let model = LibraryViewModel(appState: appState)
+        let model = LibraryViewModel(appState: appState, session: session)
         model.sortOption = .rating
 
         await model.enterDestination(.recentlyAdded, modelContext: context, networkMonitor: monitor)
@@ -166,7 +170,7 @@ final class LibraryOfflineInitializationTests: XCTestCase {
         ))
         try context.save()
         let model = SeriesDetailViewModel(
-            series: MediaItem(id: "series", name: "Cached show", type: .series), appState: appState
+            series: MediaItem(id: "series", name: "Cached show", type: .series), appState: appState, session: session
         )
         model.setupOfflineSync(modelContext: context, networkMonitor: monitor)
 
@@ -179,7 +183,7 @@ final class LibraryOfflineInitializationTests: XCTestCase {
     }
 
     func testMovieDetailsUseCacheWhileOffline() async {
-        let model = LibraryViewModel(appState: appState)
+        let model = LibraryViewModel(appState: appState, session: session)
         await model.loadHome(modelContext: container.mainContext, networkMonitor: monitor)
 
         let item = await model.getItemDetails(id: "movie")
@@ -195,7 +199,7 @@ final class LibraryOfflineInitializationTests: XCTestCase {
             id: "episode", serverConfigurationID: server.id, name: "Episode", mediaType: "Episode"
         ))
         try container.mainContext.save()
-        let model = LibraryViewModel(appState: appState)
+        let model = LibraryViewModel(appState: appState, session: session)
 
         await model.enterDestination(
             .recentlyAdded, modelContext: container.mainContext, networkMonitor: monitor

@@ -104,6 +104,7 @@ public final class LibraryViewModel: ObservableObject {
     private var jellyfinService: JellyfinService?
     private var serverURL: URL?
     private let appState: AppState
+    private let session: URLSession?
     private var currentPage: Int = 0
     private let pageSize: Int = 50
     private var hasMoreItems: Bool = true
@@ -116,8 +117,9 @@ public final class LibraryViewModel: ObservableObject {
     private weak var networkMonitor: NetworkMonitor?
     private let dataConverter = CachedDataConverter()
 
-    public init(appState: AppState) {
+    public init(appState: AppState, session: URLSession? = nil) {
         self.appState = appState
+        self.session = session
         setupService()
     }
 
@@ -141,7 +143,7 @@ public final class LibraryViewModel: ObservableObject {
         self.serverURL = serverURL
         jellyfinService = JellyfinService(
             serverURL: serverURL, accessToken: accessToken,
-            userID: userID, deviceID: appState.jellyfinDeviceID
+            userID: userID, deviceID: appState.jellyfinDeviceID, session: session
         )
     }
 

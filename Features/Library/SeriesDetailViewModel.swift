@@ -44,7 +44,7 @@ final class SeriesDetailViewModel {
 
     // MARK: - Initialization
 
-    init(series: MediaItem, appState: AppState) {
+    init(series: MediaItem, appState: AppState, session: URLSession? = nil) {
         self.series = series
         self.appState = appState
 
@@ -61,7 +61,8 @@ final class SeriesDetailViewModel {
             serverURL: serverURL,
             accessToken: accessToken,
             userID: userID,
-            deviceID: appState.jellyfinDeviceID
+            deviceID: appState.jellyfinDeviceID,
+            session: session
         )
     }
 

@@ -48,7 +48,10 @@ public actor JellyfinService {
         case banner = "Banner"
     }
 
-    public init(serverURL: URL, accessToken: String? = nil, userID: String? = nil, deviceID: String? = nil) {
+    public init(
+        serverURL: URL, accessToken: String? = nil, userID: String? = nil,
+        deviceID: String? = nil, session: URLSession? = nil
+    ) {
         self.serverURL = serverURL
         self.accessToken = accessToken
         self.userID = userID
@@ -57,7 +60,7 @@ public actor JellyfinService {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
-        session = URLSession(configuration: config)
+        self.session = session ?? URLSession(configuration: config)
 
         decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
