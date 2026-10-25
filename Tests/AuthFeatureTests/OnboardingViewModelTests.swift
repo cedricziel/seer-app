@@ -184,6 +184,7 @@ final class OnboardingViewModelTests: XCTestCase {
             initiateResult: .success(.init(code: "OLD123", secret: "old-secret"))
         )
         let replacement = SuspendedQuickConnectTransport()
+        defer { replacement.initiation?.resume(throwing: CancellationError()) }
         var nextTransport: any QuickConnectTransport = failed
         let model = makeModel(
             quickConnectEnabled: true,
@@ -194,6 +195,7 @@ final class OnboardingViewModelTests: XCTestCase {
         await Self.runManualEntry(model: model, url: "https://server.example.com")
         try await Self.waitFor(timeout: 1) { model.quickConnectError != nil }
         let selected = model.selectedServer
+        XCTAssertEqual(model.quickConnectError, "Network error: Server returned an unexpected response.")
         XCTAssertNil(model.quickConnectCode)
         XCTAssertFalse(model.quickConnectIsPolling)
 
@@ -203,7 +205,7 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertNil(model.quickConnectCode)
         XCTAssertNil(model.quickConnectError)
         XCTAssertTrue(model.quickConnectIsPolling)
-        replacement.initiation?.resume(returning: .init(code: "NEW456", secret: "new-secret"))
+        try XCTUnwrap(replacement.initiation).resume(returning: .init(code: "NEW456", secret: "new-secret"))
         replacement.initiation = nil
         await retry.value
         try await Self.waitFor(timeout: 1) { model.quickConnectCode == "NEW456" }
@@ -262,6 +264,7 @@ final class OnboardingViewModelTests: XCTestCase {
 
     func testCancellingWhileRequestingCodeIgnoresLateResponse() async throws {
         let transport = SuspendedQuickConnectTransport()
+        defer { transport.initiation?.resume(throwing: CancellationError()) }
         let model = makeModel(
             quickConnectEnabled: true,
             serverInfoResult: .success(makeServerInfo()),
@@ -276,7 +279,7 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertTrue(model.quickConnectIsPolling)
 
         model.cancelQuickConnect()
-        transport.initiation?.resume(returning: .init(code: "LATE12", secret: "late-secret"))
+        try XCTUnwrap(transport.initiation).resume(returning: .init(code: "LATE12", secret: "late-secret"))
         transport.initiation = nil
         await request.value
         await Task.yield()
