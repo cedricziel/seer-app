@@ -104,7 +104,7 @@ public actor DownloadStore {
 
         download.progress = progress
         download.bytesDownloaded = bytesDownloaded
-        download.totalBytes = totalBytes
+        download.totalBytes = max(0, totalBytes)
 
         try context.save()
     }

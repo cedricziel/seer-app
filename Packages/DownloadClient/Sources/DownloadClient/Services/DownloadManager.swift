@@ -118,6 +118,21 @@ public final class DownloadManager {
         }
     }
 
+    init(
+        modelContainer: ModelContainer,
+        storage: DownloadStorage,
+        sessionManager: BackgroundSessionManager,
+        queue: DownloadQueue
+    ) {
+        self.modelContainer = modelContainer
+        store = DownloadStore(modelContainer: modelContainer)
+        self.storage = storage
+        self.sessionManager = sessionManager
+        self.queue = queue
+        wifiOnlyEnabled = false
+        sessionManager.delegate = self
+    }
+
     // MARK: - Configuration
 
     /// Configure with server credentials
@@ -239,6 +254,10 @@ public final class DownloadManager {
 
         // Check if already downloaded or downloading
         if let existing = try await store.fetchDownload(itemID: item.id, serverID: serverID) {
+            if existing.state == .paused || existing.state == .failed {
+                try await resumeDownload(existing.id)
+                return
+            }
             if existing.state == .completed {
                 throw DownloadError.alreadyDownloaded
             }

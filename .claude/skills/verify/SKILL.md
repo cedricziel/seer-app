@@ -16,6 +16,12 @@ For PiP restoration changes, run `.claude/skills/verify/scripts/pip-tests.sh SIM
 7. For runtime checks, create a dedicated simulator, use test servers and credentials, and delete the simulator in a cleanup trap. Never launch on a user's existing simulator or device. If isolation is unavailable, report runtime checks as unverified.
 8. For dependency maintenance, run `python3 -m unittest discover -s scripts -p 'test_*.py'` and `actionlint .github/workflows/dependency-audit.yml`. Run `python3 scripts/dependency_audit.py` with authenticated `gh`; exit 1 with a release table means unreviewed newer candidates exist, while an API or parsing error means the audit did not complete.
 
+For download changes, run `DownloadClientTests/DownloadRegressionTests` and
+`LibraryFeatureTests/EpisodeDownloadActionTests` on the disposable simulator.
+They cover episode retry and cancellation actions, unknown content lengths, and
+completed file sizes. Keep download fixtures on an ephemeral URLSession with a request trap, in-memory SwiftData, and temporary
+storage. Do not instantiate the production background session in these fixtures.
+
 For server URL resolution changes, run [scripts/server-url-tests.sh](scripts/server-url-tests.sh). It runs the real resolver, SwiftData configuration, and resolver tests in a disposable macOS package with stubbed Wi-Fi and reachability. It does not access app data, credentials, or live servers. This checks resolution and cache behavior; verify the browsing connection gate separately on an isolated simulator.
 
 Debug hosted unit tests enter `HostedUnitTestApp` through `SeerAppEntryPoint` when XCTest is injected. This bypasses `SeerApp.init` and its CloudKit stores, telemetry, and background services. UI tests still enter the production app because XCTest runs in a separate runner process. An unsigned host was verified with all 11 LibrarySearchModelTests on an isolated iOS simulator. Do not launch an unsigned production app to run hosted unit tests: CloudKit requires entitlements and can trap before the test suite starts. The SDK invalidDigitCount warning can appear during successful runs; inspect the crash report before diagnosing a startup timeout.

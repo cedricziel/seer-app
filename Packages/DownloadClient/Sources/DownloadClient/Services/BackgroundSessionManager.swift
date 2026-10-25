@@ -88,6 +88,12 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
         session = URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }
 
+    init(configuration: URLSessionConfiguration) {
+        session = URLSession.shared
+        super.init()
+        session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+    }
+
     /// Create a properly configured background session
     public static func createSession(delegate: URLSessionDelegate?) -> URLSession {
         let config = URLSessionConfiguration.background(withIdentifier: sessionIdentifier)

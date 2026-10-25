@@ -130,6 +130,9 @@ extension MediaDetailView {
                     onDownload: {
                         await downloadEpisode(episode)
                     },
+                    onCancelDownload: {
+                        await cancelEpisodeDownload(episode)
+                    },
                     downloadState: downloadStateFor(episodeID: episode.id)
                 )
             }
