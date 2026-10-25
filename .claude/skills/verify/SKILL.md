@@ -5,6 +5,8 @@ description: Verify Seer changes with isolated search-model tests, native builds
 
 # Verify Seer
 
+For PiP restoration changes, run `.claude/skills/verify/scripts/pip-tests.sh SIMULATOR_RUNTIME_IDENTIFIER`. The script creates and deletes its own simulator and test project. It compiles the real manager and covers paused, buffering, and playing restoration plus artwork callback isolation without launching the app or loading media URLs.
+
 1. Check `git status --short`. Preserve unrelated changes and peer worktrees.
 2. Run [scripts/search-tests.sh](scripts/search-tests.sh) for library-search changes. It compiles the real search model, Jellyfin media types, and regression tests in a disposable macOS Swift package. It does not launch the app or access credentials, preferences, or CloudKit. Requires macOS and the Xcode Swift toolchain. This checks model behavior, not SwiftUI integration.
 3. Run [scripts/request-tests.sh](scripts/request-tests.sh) for request-loading changes. It compiles the real request view model, API models, scheduler, and SwiftData cache model in a disposable macOS package. The [AppState fixture](fixtures/RequestDependencies.swift) and [API fixture](fixtures/RequestService.swift) prevent credentials, preferences, CloudKit, and network access. Continuation-controlled tests cover stale server/filter/sort responses, refresh/pagination ownership, and actions on obsolete rows.
