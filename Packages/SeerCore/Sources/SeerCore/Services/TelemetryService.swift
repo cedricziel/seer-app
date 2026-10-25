@@ -136,12 +136,20 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
     }
 
     private func buildOtlpConfig() -> OtlpConfiguration {
-        var headers: [(String, String)]?
+        var headers: [(String, String)] = []
         if let authHeader = Self.otlpAuthHeader {
-            headers = [authHeader]
+            headers.append((authHeader.0.lowercased(), authHeader.1))
             Self.logger.debug("OTLP configured with auth header: \(authHeader.0)")
         }
-        return OtlpConfiguration(headers: headers)
+        if let tenant = Bundle.main.object(forInfoDictionaryKey: "OTLPTenantID") as? String,
+           !tenant.isEmpty, !tenant.contains("$(") {
+            headers.append(("x-tenant-id", tenant))
+        }
+        if let dataset = Bundle.main.object(forInfoDictionaryKey: "OTLPDatasetID") as? String,
+           !dataset.isEmpty, !dataset.contains("$(") {
+            headers.append(("x-dataset-id", dataset))
+        }
+        return OtlpConfiguration(headers: headers.isEmpty ? nil : headers)
     }
 
     private func setupTracerProvider(
