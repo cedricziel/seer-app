@@ -93,6 +93,7 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
 
     init(configuration: URLSessionConfiguration) {
         session = URLSession.shared
+        pendingDirectoryOverride = nil
         super.init()
         session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
     }
