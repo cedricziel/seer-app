@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 
 /// Probes whether a candidate server URL is currently reachable. Production
@@ -6,32 +7,51 @@ public protocol ReachabilityProber: Sendable {
     func probe(url: URL) async -> Bool
 }
 
+private final class ProbeRedirectDelegate: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _: URLSession,
+        task _: URLSessionTask,
+        willPerformHTTPRedirection _: HTTPURLResponse,
+        newRequest _: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
+    }
+}
+
 public struct URLSessionReachabilityProber: ReachabilityProber {
     public init() {}
 
     public func probe(url: URL) async -> Bool {
         let endpoint = url.appendingPathComponent("System/Info/Public")
         var request = URLRequest(url: endpoint)
-        request.httpMethod = "HEAD"
+        request.httpMethod = "GET"
         request.timeoutInterval = 1
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse else { return false }
-            return (200 ... 499).contains(http.statusCode)
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.httpCookieStorage = nil
+            configuration.urlCredentialStorage = nil
+            configuration.urlCache = nil
+            configuration.timeoutIntervalForResource = 1
+            let session = URLSession(
+                configuration: configuration,
+                delegate: ProbeRedirectDelegate(),
+                delegateQueue: nil
+            )
+            defer { session.invalidateAndCancel() }
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse,
+                  (200 ... 299).contains(http.statusCode)
+            else { return false }
+            _ = try ServerInfoFetcher.parse(data)
+            return true
         } catch {
             return false
         }
     }
 }
 
-/// Resolves the appropriate server URL based on the current network context.
-///
-/// Two paths:
-/// - **SSID fast path** (sync `resolveJellyfinURL`): if `currentSSID` is in
-///   `internalNetworkSSIDs`, return the internal URL.
-/// - **Reachability fallback** (async `probeAndResolve`): when SSID is
-///   unknown (location permission denied, on cellular, etc.), probe the
-///   internal URL with a 1s timeout and cache the result for 60s.
+/// Resolves configured Jellyfin addresses using SSID or credential-free reachability.
 @MainActor
 public final class ServerURLResolver: ObservableObject {
     /// Singleton instance
@@ -42,7 +62,37 @@ public final class ServerURLResolver: ObservableObject {
     private let dateProvider: @MainActor @Sendable () -> Date
     private var probeCache: [UUID: CachedProbe] = [:]
 
+    public struct Context: Hashable, Sendable {
+        let serverID: UUID
+        let externalURL: URL
+        let internalURL: URL?
+        let ssids: [String]
+        let currentSSID: String?
+        let isOnWiFi: Bool
+        let networkRevision: UInt64
+
+        /// Whether existing clients still target this configuration's destinations.
+        public func matchesConfiguration(of other: Context) -> Bool {
+            serverID == other.serverID && externalURL == other.externalURL &&
+                internalURL == other.internalURL && ssids == other.ssids
+        }
+    }
+
+    /// Identifies the configured destinations and network used by a resolution.
+    public func context(for config: ServerConfiguration) -> Context {
+        Context(
+            serverID: config.id,
+            externalURL: config.jellyfinURL,
+            internalURL: config.internalJellyfinURL,
+            ssids: config.internalNetworkSSIDs,
+            currentSSID: wifiMonitor.currentSSID,
+            isOnWiFi: wifiMonitor.isOnWiFi,
+            networkRevision: wifiMonitor.networkRevision
+        )
+    }
+
     private struct CachedProbe {
+        let context: Context
         let reachable: Bool
         let timestamp: Date
     }
@@ -59,27 +109,31 @@ public final class ServerURLResolver: ObservableObject {
         self.dateProvider = dateProvider
     }
 
-    /// Resolve the Jellyfin URL for a server configuration
-    /// Returns internal URL if on a configured internal network, otherwise external URL
+    /// Returns the SSID choice or last probe result for the current configuration and network.
+    /// Async callers must resolve before constructing clients when SSID is unavailable.
     public func resolveJellyfinURL(for config: ServerConfiguration) -> URL {
-        guard config.hasInternalURL,
-              let internalURL = config.internalJellyfinURL,
-              let currentSSID = wifiMonitor.currentSSID
-        else {
+        guard config.hasInternalURL, let internalURL = config.internalJellyfinURL else {
             return config.jellyfinURL
         }
-
-        // Check if current SSID matches any configured internal networks
-        if config.internalNetworkSSIDs.contains(currentSSID) {
+        if let ssid = wifiMonitor.currentSSID {
+            return config.internalNetworkSSIDs.contains(ssid) ? internalURL : config.jellyfinURL
+        }
+        if let cached = validProbe(for: config, requireFresh: false), cached.reachable {
             return internalURL
         }
-
         return config.jellyfinURL
     }
 
-    /// Async resolution that consults the reachability probe when the SSID
-    /// fast path doesn't apply. Probe results are cached for 60 seconds per
-    /// server configuration.
+    private func validProbe(for config: ServerConfiguration, requireFresh: Bool = true) -> CachedProbe? {
+        guard let cached = probeCache[config.id],
+              cached.context == context(for: config),
+              !requireFresh || dateProvider().timeIntervalSince(cached.timestamp) < Self.cacheTTL
+        else { return nil }
+        return cached
+    }
+
+    /// Probes when SSID is unavailable. Results expire after 60 seconds and are
+    /// discarded when configured destinations or network state change during the probe.
     public func probeAndResolve(for config: ServerConfiguration) async -> URL {
         guard config.hasInternalURL,
               let internalURL = config.internalJellyfinURL
@@ -88,33 +142,30 @@ public final class ServerURLResolver: ObservableObject {
         }
 
         // SSID fast path
-        if let currentSSID = wifiMonitor.currentSSID,
-           config.internalNetworkSSIDs.contains(currentSSID) {
-            return internalURL
+        if let currentSSID = wifiMonitor.currentSSID {
+            return config.internalNetworkSSIDs.contains(currentSSID) ? internalURL : config.jellyfinURL
         }
 
-        // Cache hit?
-        let now = dateProvider()
-        if let cached = probeCache[config.id],
-           now.timeIntervalSince(cached.timestamp) < Self.cacheTTL {
+        if let cached = validProbe(for: config) {
             return cached.reachable ? internalURL : config.jellyfinURL
         }
 
-        // Probe + cache
+        let initialContext = context(for: config)
         let reachable = await prober.probe(url: internalURL)
-        probeCache[config.id] = CachedProbe(reachable: reachable, timestamp: now)
+        guard !Task.isCancelled, initialContext == context(for: config) else {
+            return config.jellyfinURL
+        }
+        probeCache[config.id] = CachedProbe(
+            context: initialContext,
+            reachable: reachable,
+            timestamp: dateProvider()
+        )
         return reachable ? internalURL : config.jellyfinURL
     }
 
     /// Check if currently using internal URL for a server
     public func isUsingInternalURL(for config: ServerConfiguration) -> Bool {
-        guard config.hasInternalURL,
-              let currentSSID = wifiMonitor.currentSSID
-        else {
-            return false
-        }
-
-        return config.internalNetworkSSIDs.contains(currentSSID)
+        config.hasInternalURL && resolveJellyfinURL(for: config) == config.internalJellyfinURL
     }
 
     /// Get the current WiFi SSID (if available)

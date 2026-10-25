@@ -217,6 +217,28 @@ public final class AppState: ObservableObject {
         )
     }
 
+    /// Resolves and publishes a configured address for view and background clients.
+    /// Returns nil if the configuration or network changes during the probe.
+    public func resolveJellyfinURL(for serverID: UUID) async -> URL? {
+        guard let server = configuration(for: serverID) else { return nil }
+        let resolver = ServerURLResolver.shared
+        let context = resolver.context(for: server)
+        let serverURL = await resolver.probeAndResolve(for: server)
+        guard !Task.isCancelled,
+              let current = configuration(for: serverID),
+              context == resolver.context(for: current)
+        else { return nil }
+        objectWillChange.send()
+        return serverURL
+    }
+
+    /// Resolves the configured address before reading credentials for that server.
+    /// Returns nil if the configuration changes while the probe is in flight.
+    public func resolvedJellyfinCredentials(for serverID: UUID) async -> JellyfinCredentials? {
+        guard await resolveJellyfinURL(for: serverID) != nil else { return nil }
+        return jellyfinCredentials(for: serverID)
+    }
+
     // MARK: - Initialization
 
     public init() {

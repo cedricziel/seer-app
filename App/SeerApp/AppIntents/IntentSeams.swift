@@ -119,7 +119,8 @@ enum IntentSeams {
     private static func installMarkAsWatchedUpdater(appState: AppState) {
         MarkAsWatchedIntent.updater = { submission in
             let creds = await Task { @MainActor in
-                appState.jellyfinCredentials
+                guard let serverID = appState.activeServerID else { return nil as AppState.JellyfinCredentials? }
+                return await appState.resolvedJellyfinCredentials(for: serverID)
             }.value
             guard let creds else {
                 throw IntentError.needsConfiguration
@@ -155,7 +156,7 @@ enum IntentSeams {
             // active server). Multi-server scenario: an intent can
             // target a non-active server via its ServerEntity param.
             let creds = await Task { @MainActor in
-                appState.jellyfinCredentials(for: payload.serverID)
+                await appState.resolvedJellyfinCredentials(for: payload.serverID)
             }.value
             guard let creds else {
                 throw IntentError.needsConfiguration
