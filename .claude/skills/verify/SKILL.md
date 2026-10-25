@@ -15,6 +15,14 @@ description: Verify Seer changes with isolated search-model tests, native builds
 
 Debug hosted unit tests enter `HostedUnitTestApp` through `SeerAppEntryPoint` when XCTest is injected. This bypasses `SeerApp.init` and its CloudKit stores, telemetry, and background services. UI tests still enter the production app because XCTest runs in a separate runner process. An unsigned host was verified with all 11 LibrarySearchModelTests on an isolated iOS simulator. Do not launch an unsigned production app to run hosted unit tests: CloudKit requires entitlements and can trap before the test suite starts. The SDK invalidDigitCount warning can appear during successful runs; inspect the crash report before diagnosing a startup timeout.
 
+For catalog pagination, request-cache, or offline progress changes, include
+`LibraryFeatureTests/CatalogSearchPaginationTests`,
+`LibraryFeatureTests/RequestCacheTests`, and
+`OfflineSyncTests/UserProgressSyncServiceTests` in the isolated native test run.
+These suites use controlled search responses and in-memory SwiftData stores.
+They cover stale pagination responses, preservation of requests outside a page
+or filter, and progress isolation between servers with matching media IDs.
+
 Check these journeys on an isolated simulator:
 
 - Search defaults to Library without Jellyseerr; a result opens existing media details and playback.

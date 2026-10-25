@@ -135,6 +135,7 @@ public final class OfflineSyncService: ObservableObject {
         // Also update the cached media item
         mediaItemSyncService.updateCachedItemProgress(
             mediaItemId: mediaItemId,
+            serverConfigurationID: serverConfigurationID,
             playbackPositionTicks: playbackPositionTicks,
             isFavorite: isFavorite,
             isPlayed: isPlayed

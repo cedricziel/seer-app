@@ -30,6 +30,7 @@ public final class UserProgressSyncService {
         let descriptor = FetchDescriptor<CachedUserProgress>(
             predicate: #Predicate {
                 $0.mediaItemId == mediaItemId &&
+                    $0.serverConfigurationID == serverConfigurationID &&
                     $0.syncStatus == "pending"
             }
         )

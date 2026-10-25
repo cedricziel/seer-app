@@ -122,16 +122,17 @@ public final class RequestsViewModel: ObservableObject {
             return
         }
 
+        guard let serverID = appState.activeServerID else { return }
+        let filter = selectedFilter
         isLoading = true
         errorMessage = nil
         currentSkip = 0
         hasMoreItems = true
-
         do {
             let response = try await jellyseerrService!.getRequests(
                 take: pageSize,
                 skip: 0,
-                filter: selectedFilter.apiFilter,
+                filter: filter.apiFilter,
                 sort: selectedSort.apiSort
             )
 
@@ -148,9 +149,7 @@ public final class RequestsViewModel: ObservableObject {
             // CheckRequestStatusIntent has data to surface. Errors
             // during cache write are swallowed to OS log — UI must
             // never break because of a cache hiccup.
-            Task {
-                await cacheLiveRequestsToSwiftData()
-            }
+            cacheLiveRequestsToSwiftData(response, filter: filter, serverID: serverID)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -158,75 +157,74 @@ public final class RequestsViewModel: ObservableObject {
         isLoading = false
     }
 
-    /// Upserts the current `requests` array into the `CachedRequest`
-    /// SwiftData store. Removes rows for the active server that are
-    /// no longer in the live response. Cache failures are logged to
-    /// OS log but never surface to the UI.
-    func cacheLiveRequestsToSwiftData() async {
-        guard let context = appState.sharedModelContext,
-              let serverID = appState.activeServerID
-        else { return }
-
+    private func cacheLiveRequestsToSwiftData(
+        _ response: RequestsResponse, filter: RequestFilter, serverID: UUID
+    ) {
+        guard let context = appState.sharedModelContext else { return }
         do {
-            let liveIDs = Set(requests.map { request -> String in
-                "\(serverID.uuidString):\(request.id)"
-            })
+            try Self.cacheRequests(response, filter: filter, serverID: serverID, context: context)
+        } catch {
+            Self.logger.error("Failed to cache requests for AppEntity query: \(String(describing: error))")
+        }
+    }
 
-            // Fetch existing rows for this server.
-            let existingDescriptor = FetchDescriptor<CachedRequest>(
-                predicate: #Predicate { $0.serverConfigurationID == serverID }
-            )
-            let existing = try context.fetch(existingDescriptor)
-            // The CloudKit-backed store cannot enforce uniqueness, so keep
-            // the first row per id and drop duplicates rather than trapping.
-            var existingByID: [String: CachedRequest] = [:]
-            for row in existing {
-                if existingByID[row.id] == nil {
-                    existingByID[row.id] = row
-                } else {
-                    context.delete(row)
-                }
+    static func cacheRequests(
+        _ response: RequestsResponse, filter: RequestFilter, serverID: UUID, context: ModelContext
+    ) throws {
+        let liveIDs = Set(response.results.map { request -> String in
+            "\(serverID.uuidString):\(request.id)"
+        })
+
+        let existingDescriptor = FetchDescriptor<CachedRequest>(
+            predicate: #Predicate { $0.serverConfigurationID == serverID }
+        )
+        let existing = try context.fetch(existingDescriptor)
+        // The CloudKit-backed store cannot enforce uniqueness, so keep
+        // the first row per id and drop duplicates rather than trapping.
+        var existingByID: [String: CachedRequest] = [:]
+        for row in existing {
+            if existingByID[row.id] == nil {
+                existingByID[row.id] = row
+            } else {
+                context.delete(row)
             }
+        }
 
-            // Upsert: update existing or insert new.
-            for live in requests {
-                let title = live.media.displayTitle ?? "Untitled"
-                if let row = existingByID[
-                    "\(serverID.uuidString):\(live.id)"
-                ] {
-                    row.title = title
-                    row.mediaType = live.type.rawValue
-                    row.statusRawValue = live.status.rawValue
-                    row.mediaTmdbId = live.media.tmdbId
-                    row.availabilityRawValue = live.media.status
-                    row.lastSyncedAt = Date()
-                } else {
-                    context.insert(
-                        CachedRequest(
-                            serverConfigurationID: serverID,
-                            requestID: live.id,
-                            title: title,
-                            mediaType: live.type.rawValue,
-                            statusRawValue: live.status.rawValue,
-                            requestedAt: Date(),
-                            mediaTmdbId: live.media.tmdbId,
-                            availabilityRawValue: live.media.status
-                        )
+        for live in response.results {
+            let title = live.media.displayTitle ?? "Untitled"
+            if let row = existingByID[
+                "\(serverID.uuidString):\(live.id)"
+            ] {
+                row.title = title
+                row.mediaType = live.type.rawValue
+                row.statusRawValue = live.status.rawValue
+                row.mediaTmdbId = live.media.tmdbId
+                row.availabilityRawValue = live.media.status
+                row.lastSyncedAt = Date()
+            } else {
+                context.insert(
+                    CachedRequest(
+                        serverConfigurationID: serverID,
+                        requestID: live.id,
+                        title: title,
+                        mediaType: live.type.rawValue,
+                        statusRawValue: live.status.rawValue,
+                        requestedAt: Date(),
+                        mediaTmdbId: live.media.tmdbId,
+                        availabilityRawValue: live.media.status
                     )
-                }
+                )
             }
+        }
 
-            // Delete orphaned rows.
+        // A filtered or partial page cannot establish that an absent request was deleted.
+        if filter == .all, response.pageInfo.page == 1, response.results.count == response.pageInfo.results {
             for row in existing where !liveIDs.contains(row.id) {
                 context.delete(row)
             }
-
-            try context.save()
-        } catch {
-            Self.logger.error(
-                "Failed to cache requests for AppEntity query: \(String(describing: error))"
-            )
         }
+
+        try context.save()
     }
 
     func loadMoreRequestsIfNeeded(currentRequest: MediaRequest) async {
@@ -249,19 +247,21 @@ public final class RequestsViewModel: ObservableObject {
             return
         }
 
+        guard let serverID = appState.activeServerID else { return }
+        let filter = selectedFilter
         isLoadingMore = true
         currentSkip += pageSize
-
         do {
             let response = try await service.getRequests(
                 take: pageSize,
                 skip: currentSkip,
-                filter: selectedFilter.apiFilter,
+                filter: filter.apiFilter,
                 sort: selectedSort.apiSort
             )
 
             requests.append(contentsOf: response.results)
             hasMoreItems = requests.count < response.pageInfo.results
+            cacheLiveRequestsToSwiftData(response, filter: filter, serverID: serverID)
         } catch {
             currentSkip -= pageSize
             Self.logger.debug("Failed to load more requests: \(error.localizedDescription)")
@@ -305,11 +305,13 @@ public final class RequestsViewModel: ObservableObject {
         // freshly-loaded rows or yanking the list mid-scroll.
         guard !isLoading, !isLoadingMore else { return }
         guard let service = jellyseerrService else { return }
+        guard let serverID = appState.activeServerID else { return }
+        let filter = selectedFilter
         do {
             let response = try await service.getRequests(
                 take: pageSize,
                 skip: 0,
-                filter: selectedFilter.apiFilter,
+                filter: filter.apiFilter,
                 sort: selectedSort.apiSort
             )
             requests = response.results
@@ -320,9 +322,7 @@ public final class RequestsViewModel: ObservableObject {
 
             // Refresh the AppEntity cache so CheckRequestStatusIntent
             // reflects the latest state.
-            Task {
-                await cacheLiveRequestsToSwiftData()
-            }
+            cacheLiveRequestsToSwiftData(response, filter: filter, serverID: serverID)
         } catch {
             // Background refresh failures shouldn't surface — the user will
             // see the next manual refresh attempt if it persists.
@@ -398,7 +398,9 @@ public final class RequestsViewModel: ObservableObject {
             guard let tmdbId = request.media.tmdbId else { continue }
 
             // Skip if already cached
-            if mediaTitles[tmdbId] != nil { continue }
+            if mediaTitles[tmdbId] != nil {
+                continue
+            }
 
             do {
                 if request.type == .movie {

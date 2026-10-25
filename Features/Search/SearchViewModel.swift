@@ -43,6 +43,7 @@ public final class SearchViewModel: ObservableObject {
     private let historyStore: SearchHistoryStore
     private let debounceMilliseconds: Int
     private var searchTask: Task<Void, Never>?
+    private let searchLoader: (@MainActor (String, Int) async throws -> SearchResponse)?
     /// Bumped before each new search Task. Older tasks check it before
     /// mutating state so a stale debounce/cancel can't clobber the
     /// freshest search.
@@ -53,11 +54,13 @@ public final class SearchViewModel: ObservableObject {
     public init(
         appState: AppState,
         historyStore: SearchHistoryStore = SearchHistoryStore(),
-        debounceMilliseconds: Int = SearchViewModel.defaultDebounceMilliseconds
+        debounceMilliseconds: Int = SearchViewModel.defaultDebounceMilliseconds,
+        searchLoader: (@MainActor (String, Int) async throws -> SearchResponse)? = nil
     ) {
         self.appState = appState
         self.historyStore = historyStore
         self.debounceMilliseconds = debounceMilliseconds
+        self.searchLoader = searchLoader
         setupService()
         recentQueries = historyStore.recentQueries(scope: historyScope)
     }
@@ -101,16 +104,11 @@ public final class SearchViewModel: ObservableObject {
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !query.isEmpty else {
-            searchTask?.cancel()
-            searchResults = []
-            hasSearched = false
-            isSearching = false
-            isDebouncing = false
-            errorMessage = nil
+            clearSearch()
             return
         }
 
-        guard jellyseerrService != nil else {
+        guard jellyseerrService != nil || searchLoader != nil else {
             errorMessage = "Jellyseerr not configured"
             return
         }
@@ -125,6 +123,8 @@ public final class SearchViewModel: ObservableObject {
         errorMessage = nil
         hasSearched = true
         currentPage = 1
+        totalPages = 1
+        isLoadingMore = false
 
         let debounce = debounceMilliseconds
         searchTask = Task {
@@ -143,7 +143,7 @@ public final class SearchViewModel: ObservableObject {
                 isDebouncing = false
                 isSearching = true
 
-                let response = try await jellyseerrService!.search(query: query, page: 1)
+                let response = try await performSearch(query: query, page: 1)
 
                 guard !Task.isCancelled, generation == searchGeneration else { return }
 
@@ -157,6 +157,17 @@ public final class SearchViewModel: ObservableObject {
                 }
             }
         }
+        await searchTask?.value
+    }
+
+    private func performSearch(query: String, page: Int) async throws -> SearchResponse {
+        if let searchLoader {
+            return try await searchLoader(query, page)
+        }
+        guard let service = jellyseerrService else {
+            throw JellyseerrService.JellyseerrError.notAuthenticated
+        }
+        return try await service.search(query: query, page: page)
     }
 
     /// Re-runs a query the user picked from the recents list.
@@ -177,31 +188,48 @@ public final class SearchViewModel: ObservableObject {
     }
 
     func loadMoreResults() async {
-        guard let service = jellyseerrService,
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard jellyseerrService != nil || searchLoader != nil,
               currentPage < totalPages,
-              !isLoadingMore,
-              !searchQuery.isEmpty
+              !isLoadingMore, !isSearching, !isDebouncing,
+              !query.isEmpty
         else {
             return
         }
 
+        let generation = searchGeneration
+        let serverID = appState.activeServerID
+        let nextPage = currentPage + 1
         isLoadingMore = true
-        currentPage += 1
-
-        do {
-            let response = try await service.search(query: searchQuery, page: currentPage)
-            let newResults = response.results.filter { $0.mediaType != .person }
-            searchResults.append(contentsOf: newResults)
-        } catch {
-            currentPage -= 1
-            Self.logger.debug("Failed to load more results: \(error.localizedDescription)")
+        defer {
+            if generation == searchGeneration {
+                isLoadingMore = false
+            }
         }
 
-        isLoadingMore = false
+        do {
+            let response = try await performSearch(query: query, page: nextPage)
+            guard !Task.isCancelled,
+                  generation == searchGeneration,
+                  serverID == appState.activeServerID,
+                  query == searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+            else { return }
+            let newResults = response.results.filter { $0.mediaType != .person }
+            searchResults.append(contentsOf: newResults)
+            currentPage = nextPage
+            totalPages = response.totalPages
+        } catch {
+            guard !Task.isCancelled, generation == searchGeneration else { return }
+            Self.logger.debug("Failed to load more results: \(error.localizedDescription)")
+        }
     }
 
     func clearSearch() {
+        searchGeneration += 1
         searchTask?.cancel()
+        currentPage = 1
+        totalPages = 1
+        isLoadingMore = false
         searchQuery = ""
         searchResults = []
         hasSearched = false

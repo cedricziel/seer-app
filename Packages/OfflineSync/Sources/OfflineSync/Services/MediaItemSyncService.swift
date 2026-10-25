@@ -84,9 +84,17 @@ public final class MediaItemSyncService {
     }
 
     public func updateCachedItemProgress(
-        mediaItemId: String, playbackPositionTicks: Int64, isFavorite: Bool, isPlayed: Bool
+        mediaItemId: String,
+        serverConfigurationID: UUID,
+        playbackPositionTicks: Int64,
+        isFavorite: Bool,
+        isPlayed: Bool
     ) {
-        let desc = FetchDescriptor<CachedMediaItem>(predicate: #Predicate { $0.id == mediaItemId })
+        let desc = FetchDescriptor<CachedMediaItem>(
+            predicate: #Predicate {
+                $0.id == mediaItemId && $0.serverConfigurationID == serverConfigurationID
+            }
+        )
         guard let item = try? modelContext.fetch(desc).first else { return }
         item.playbackPositionTicks = playbackPositionTicks
         item.isFavorite = isFavorite
