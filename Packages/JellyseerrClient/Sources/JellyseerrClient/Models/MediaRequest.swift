@@ -56,6 +56,7 @@ public struct MediaRequest: Identifiable, Codable, Sendable, Hashable {
         public let tmdbId: Int?
         public let tvdbId: Int?
         public let status: Int?
+        public let status4k: Int?
         public let mediaType: String?
         public let externalServiceId: Int?
         public let externalServiceSlug: String?
