@@ -123,7 +123,7 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
     }
 
     private func buildResource() -> Resource {
-        DefaultResources().get().merging(
+        var resource = DefaultResources().get().merging(
             other: Resource(
                 attributes: [
                     ResourceAttributes.serviceName.rawValue: AttributeValue.string("seer-ios"),
@@ -133,6 +133,10 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
                 ]
             )
         )
+        if let installationID = InstallationIDStore().installationID() {
+            resource.merge(other: Resource(attributes: ["app.installation.id": .string(installationID)]))
+        }
+        return resource
     }
 
     private func buildOtlpConfig() -> OtlpConfiguration {
