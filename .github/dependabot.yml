@@ -31,9 +31,8 @@ updates:
   # and resolved by Xcode into SeerApp.xcodeproj/.../swiftpm/Package.resolved.
   # Dependabot's swift ecosystem requires a Package.swift in the target
   # directory and can't track Xcode-managed SPM directly. We commit the
-  # resolved file for reproducibility; updates to those deps happen via
-  # Xcode's "Update to Latest Package Versions" and ship as a regular PR
-  # showing the lockfile diff.
+  # resolved file for reproducibility. The weekly dependency-audit workflow
+  # reports newer releases; refresh both lockfiles in a verified regular PR.
 
   # Local Swift package (external deps used by JellyseerrAPI)
   - package-ecosystem: "swift"

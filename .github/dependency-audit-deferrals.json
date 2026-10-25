@@ -1,0 +1,34 @@
+{
+  "grpc/grpc-swift": {
+    "version": "1.27.6",
+    "reason": "OpenTelemetry 1.17.1 requires exactly gRPC Swift 1.26.1."
+  },
+  "jellyfin/jellyfin-sdk-swift": {
+    "version": "3.3.0",
+    "reason": "Adopt the SDK behind JellyfinService in a separate migration."
+  },
+  "open-telemetry/opentelemetry-swift": {
+    "version": "2.6.0",
+    "reason": "Requires metrics API and package-product migration."
+  },
+  "apple/swift-collections": {
+    "version": "1.7.4",
+    "reason": "Requires Swift 6.4; retain Swift 6.2 support."
+  },
+  "pointfreeco/swift-custom-dump": {
+    "version": "1.7.3",
+    "reason": "Requires Swift 6.4; retain Swift 6.2 support."
+  },
+  "pointfreeco/xctest-dynamic-overlay": {
+    "version": "1.13.1",
+    "reason": "Requires Swift 6.4; retain Swift 6.2 support."
+  },
+  "realm/SwiftLint": {
+    "version": "0.65.1",
+    "reason": "New rules require a separate source cleanup."
+  },
+  "nicklockwood/SwiftFormat": {
+    "version": "0.64.2",
+    "reason": "New formatting rules require a separate source cleanup."
+  }
+}
