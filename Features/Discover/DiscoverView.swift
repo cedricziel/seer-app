@@ -272,7 +272,7 @@ private struct DiscoverContentView: View {
                     .clipped()
             } else {
                 Rectangle()
-                    .fill(Color.secondary.opacity(0.2))
+                    .fill(Color.mediaPlaceholder)
                     .frame(width: 200, height: 112)
             }
 

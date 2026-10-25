@@ -31,7 +31,7 @@ struct RequestOptionsSheet: View {
                                     .aspectRatio(contentMode: .fill)
                             } placeholder: {
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.secondary.opacity(0.2))
+                                    .fill(Color.mediaPlaceholder)
                             }
                             .frame(width: 60, height: 90)
                             .clipShape(RoundedRectangle(cornerRadius: 6))

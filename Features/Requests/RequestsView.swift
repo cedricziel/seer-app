@@ -377,7 +377,7 @@ struct RequestRowView: View {
 
     private var posterPlaceholder: some View {
         RoundedRectangle(cornerRadius: 6)
-            .fill(Color.secondary.opacity(0.2))
+            .fill(Color.mediaPlaceholder)
             .frame(width: 50, height: 75)
             .overlay {
                 Image(systemName: request.type == .movie ? "film" : "tv")

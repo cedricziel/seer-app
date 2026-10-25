@@ -87,7 +87,7 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
             AsyncImage(url: URL(string: "https://image.tmdb.org/t/p/w92\(posterPath)")) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
-                RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.2))
+                RoundedRectangle(cornerRadius: 6).fill(Color.mediaPlaceholder)
             }
             .frame(width: 60, height: 90)
             .clipShape(RoundedRectangle(cornerRadius: 6))

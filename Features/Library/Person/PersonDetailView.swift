@@ -80,7 +80,7 @@ struct PersonDetailHeader: View {
             headshot
                 .frame(width: 110, height: 110)
                 .clipShape(Circle())
-                .overlay(Circle().stroke(Color.secondary.opacity(0.2), lineWidth: 1))
+                .overlay(Circle().stroke(Color.mediaPlaceholder, lineWidth: 1))
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(name)
@@ -124,7 +124,7 @@ struct PersonDetailHeader: View {
 
     private var headshotPlaceholder: some View {
         Circle()
-            .fill(Color.secondary.opacity(0.2))
+            .fill(Color.mediaPlaceholder)
             .overlay {
                 Image(systemName: "person.fill")
                     .font(.largeTitle)
