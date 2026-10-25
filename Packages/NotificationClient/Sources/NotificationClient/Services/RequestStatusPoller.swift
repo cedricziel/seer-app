@@ -19,6 +19,7 @@ public actor RequestStatusPoller {
     /// already in flight (including one started by a background task) does
     /// not write to the cache or notify after the poller was retired.
     private var isStopped = false
+    private var isRetired = false
 
     /// Polling configuration
     private let pollingInterval: TimeInterval = 15 * 60 // 15 minutes
@@ -52,6 +53,7 @@ public actor RequestStatusPoller {
 
     /// Configure with Jellyseerr credentials
     public func configure(serverURL: URL, apiKey: String) {
+        guard !isRetired else { return }
         jellyseerrService = JellyseerrService(serverURL: serverURL, apiKey: apiKey)
     }
 
@@ -59,7 +61,7 @@ public actor RequestStatusPoller {
 
     /// Start background polling
     public func startPolling() {
-        guard pollingTask == nil else { return }
+        guard !isRetired, pollingTask == nil else { return }
         isStopped = false
 
         pollingTask = Task { [weak self] in
@@ -77,17 +79,17 @@ public actor RequestStatusPoller {
         pollingTask = nil
     }
 
+    /// Permanently discards credentials and rejects subsequent background work.
+    public func retire() {
+        isRetired = true
+        stopPolling()
+        jellyseerrService = nil
+    }
+
     /// Perform a single poll (can be called from background task)
     public func poll() async {
         do {
-            let response: RequestsResponse
-            if let fetchRequests {
-                response = try await fetchRequests()
-            } else if let service = jellyseerrService {
-                response = try await service.getRequests(take: 50, skip: 0, filter: .all, sort: .modified)
-            } else {
-                return
-            }
+            guard let response = try await fetchCurrentRequests() else { return }
             guard !isStopped else { return }
             let currentRequests = response.results
 
@@ -128,6 +130,13 @@ public actor RequestStatusPoller {
         } catch {
             print("[RequestStatusPoller] Poll failed: \(error)")
         }
+    }
+
+    private func fetchCurrentRequests() async throws -> RequestsResponse? {
+        guard !isStopped else { return nil }
+        if let fetchRequests { return try await fetchRequests() }
+        guard let service = jellyseerrService else { return nil }
+        return try await service.getRequests(take: 50, skip: 0, filter: .all, sort: .modified)
     }
 
     // MARK: - Change Detection

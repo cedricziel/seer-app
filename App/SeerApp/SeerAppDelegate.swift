@@ -22,6 +22,9 @@ final class SeerAppDelegate: NSObject {
     /// Reference to the request status poller (set by SeerApp)
     var requestStatusPoller: RequestStatusPoller?
 
+    /// A background relaunch can reschedule before the UI creates a poller.
+    var requestPollingAllowed: () -> Bool = { false }
+
     /// Background task identifier for request status polling
     static let requestPollTaskIdentifier = "com.cedricziel.seer.requestpoll"
 
@@ -126,14 +129,17 @@ final class SeerAppDelegate: NSObject {
         }
 
         /// Schedule the request status polling background task
-        func scheduleRequestPollTask() {
+        func scheduleRequestPollTask(
+            submit: (BGProcessingTaskRequest) throws -> Void = { try BGTaskScheduler.shared.submit($0) }
+        ) {
+            guard requestPollingAllowed() else { return }
             let request = BGProcessingTaskRequest(identifier: Self.requestPollTaskIdentifier)
             request.requiresNetworkConnectivity = true
             request.requiresExternalPower = false
             request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 minutes
 
             do {
-                try BGTaskScheduler.shared.submit(request)
+                try submit(request)
             } catch {
                 print("Failed to schedule request poll task: \(error)")
             }

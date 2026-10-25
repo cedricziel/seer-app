@@ -51,3 +51,5 @@ platform-specific entitlements and ensure the Mac app has App Sandbox enabled.
 Release-lane tests cover iOS default behavior, tvOS signing and IPA selection,
 macOS installer signing and PKG selection, and rejection of unknown targets. tvOS development signing fetches the certificate
 without a development profile, so TestFlight does not require a registered Apple TV.
+
+For notification permission or logout changes, run [the isolated notification tests](scripts/notification-tests.sh). The macOS harness uses an injected notification center and in-memory SwiftData. It covers Settings grants/revocations, inactive sessions, and retirement during authorization, including suppression of permission prompts. Run `NotificationClientTests` and `AuthFeatureTests/RequestPollingSchedulingTests` on a disposable iOS simulator for permanent poller retirement, in-flight fetch suppression, and cold-background rescheduling without an initialized poller. Check notification navigation after What's New or PiP dismissal and after switching saved servers; use test accounts and app data.
