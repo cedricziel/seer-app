@@ -37,6 +37,7 @@ an active PR. UX001 replaces the archived sign-in task after PR 75 merged.
 | UX007 | P2 | Queued | Internal URL settings accept unsupported schemes and hostless addresses, then dismiss as if saved successfully. | Network settings | Accept HTTP/HTTPS with a host; keep actionable validation beside the field and test invalid inputs. |
 | UX008 | P2 | Queued | Custom filter and season buttons expose selection only through color. | Library accessibility | Expose the selected trait or value and verify the active choice with VoiceOver. |
 | UX009 | P3 | Validate | Continue Watching text may overlap Resume at compact widths or large text sizes. | Library layout | Render a long title and subtitle at compact width and AX5. If overlap occurs, reserve button space or stack the content. |
+| UX010 | P2 | Queued | Download actions can fail silently, while failed rows hide the stored reason. | Downloads | Show enqueue errors immediately and expose an actionable failure reason with Retry. Recheck after the active download PRs merge. |
 
 ## Evidence
 
@@ -56,6 +57,9 @@ an active PR. UX001 replaces the archived sign-in task after PR 75 merged.
   permission controls and save validation.
 - UX009: [ContinueWatchingCards](../Features/Library/ContinueWatchingCards.swift)
   caption and Resume overlays. This is a source-backed risk, not confirmed clipping.
+- UX010: [media detail download actions](../Features/Library/MediaDetailView+Downloads.swift)
+  discard enqueue/action errors; [DownloadRow](../Features/Downloads/DownloadsView.swift)
+  displays the failed state without its stored error reason.
 
 ## Completed or excluded
 
