@@ -3,9 +3,9 @@ import OpenTelemetrySdk
 
 final class DiagnosticsSpanExporter: SpanExporter {
     private let exporter: any SpanExporter
-    private let isEnabled: () -> Bool
+    private let isEnabled: @Sendable () -> Bool
 
-    init(exporter: any SpanExporter, isEnabled: @escaping () -> Bool) {
+    init(exporter: any SpanExporter, isEnabled: @escaping @Sendable () -> Bool) {
         self.exporter = exporter
         self.isEnabled = isEnabled
     }
@@ -27,7 +27,7 @@ final class DiagnosticsSpanExporter: SpanExporter {
 
 struct DiagnosticsLogExporter: LogRecordExporter {
     let exporter: any LogRecordExporter
-    let isEnabled: () -> Bool
+    let isEnabled: @Sendable () -> Bool
 
     func export(logRecords: [ReadableLogRecord], explicitTimeout: TimeInterval?) -> ExportResult {
         guard isEnabled() else { return .success }
@@ -44,11 +44,11 @@ struct DiagnosticsLogExporter: LogRecordExporter {
     }
 }
 
-struct DiagnosticsMetricExporter: StableMetricExporter {
-    let exporter: any StableMetricExporter
-    let isEnabled: () -> Bool
+struct DiagnosticsMetricExporter: MetricExporter {
+    let exporter: any MetricExporter
+    let isEnabled: @Sendable () -> Bool
 
-    func export(metrics: [StableMetricData]) -> ExportResult {
+    func export(metrics: [MetricData]) -> ExportResult {
         guard isEnabled() else { return .success }
         return exporter.export(metrics: metrics)
     }

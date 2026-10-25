@@ -23,10 +23,11 @@ requests through `URLSession` and decodes app-owned models. Adopting the SDK req
 migrating those requests behind the existing service interface. SDK 1.0 replaced
 its API generator; the current SDK 3.x requires a separate compatibility review.
 
-OpenTelemetry 2.x changes metrics APIs. Later 2.x releases also move core products
-into `opentelemetry-swift-core`. Upgrade the package declarations and telemetry
-implementation together, and verify consent and export behavior. OpenTelemetry
-1.17.1 pins gRPC Swift to 1.26.1, so its newer minor release cannot resolve yet.
+OpenTelemetry upgrades move API/SDK products and exporters together when their
+package boundaries change. Verify real in-memory metric collection as well as
+compilation: the SDK view registry requires an explicit app histogram view.
+Keep dynamic diagnostics export gates and collection preferences intact. No durable
+offline span buffer or automatic URLSession instrumentation is enabled.
 
 Resolve with the declared minimum Swift toolchain. The locks retain Collections
 1.7.1, CustomDump 1.7.0, and XCTestDynamicOverlay 1.11.0 because their newer releases

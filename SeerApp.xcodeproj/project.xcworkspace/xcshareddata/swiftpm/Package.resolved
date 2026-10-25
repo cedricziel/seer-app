@@ -1,5 +1,5 @@
 {
-  "originHash" : "78c10d7a4bb72578442dc0740a85190b433b1383c9e3ac4a8c062eba96fc0f0a",
+  "originHash" : "0506085ea3cabc4b00c9132daf7ce791a2d211d737ac953285712e3e9bb3814a",
   "pins" : [
     {
       "identity" : "get",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/grpc/grpc-swift.git",
       "state" : {
-        "revision" : "a56a157218877ef3e9625f7e1f7b2cb7e46ead1b",
-        "version" : "1.26.1"
+        "revision" : "65d0084f6d7db34b0dfcb1c956b8dd8da8ef9d23",
+        "version" : "1.27.6"
       }
     },
     {
@@ -42,8 +42,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-telemetry/opentelemetry-swift",
       "state" : {
-        "revision" : "ef63c346d05f4fa7c9ca883f92631fd139eb2cfe",
-        "version" : "1.17.1"
+        "revision" : "9f350e65e1ae4555da5a0c215b2f1883dbffd2ef",
+        "version" : "2.6.0"
+      }
+    },
+    {
+      "identity" : "opentelemetry-swift-core",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/open-telemetry/opentelemetry-swift-core",
+      "state" : {
+        "revision" : "c6fcee77cfc21ba400366f12475217c7b6e1d605",
+        "version" : "2.6.0"
       }
     },
     {
@@ -134,6 +143,15 @@
       "state" : {
         "revision" : "e9c34fd54ece006b491a0e6d23fe9a6024b9a828",
         "version" : "1.7.0"
+      }
+    },
+    {
+      "identity" : "swift-distributed-tracing",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-distributed-tracing.git",
+      "state" : {
+        "revision" : "297b5b9c82a5631e3199ce3ec0993a3cfb0fbb84",
+        "version" : "1.7.2"
       }
     },
     {

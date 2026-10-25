@@ -28,7 +28,10 @@ packages:
     path: Packages/JellyseerrAPI
   OpenTelemetrySwift:
     url: https://github.com/open-telemetry/opentelemetry-swift
-    from: "1.10.0"
+    from: "2.6.0"
+  OpenTelemetrySwiftCore:
+    url: https://github.com/open-telemetry/opentelemetry-swift-core
+    from: "2.6.0"
   PLCrashReporter:
     url: https://github.com/microsoft/plcrashreporter
     from: "1.11.0"
@@ -113,24 +116,16 @@ targets:
         excludes:
           - "**/.DS_Store"
     dependencies:
-      - package: OpenTelemetrySwift
+      - package: OpenTelemetrySwiftCore
         product: OpenTelemetryApi
-      - package: OpenTelemetrySwift
+      - package: OpenTelemetrySwiftCore
         product: OpenTelemetrySdk
-      - package: OpenTelemetrySwift
-        product: StdoutExporter
       - package: OpenTelemetrySwift
         product: OpenTelemetryProtocolExporterHTTP
       - package: OpenTelemetrySwift
         product: ResourceExtension
       - package: OpenTelemetrySwift
-        product: URLSessionInstrumentation
-      - package: OpenTelemetrySwift
         product: SignPostIntegration
-      - package: OpenTelemetrySwift
-        product: OTelSwiftLog
-      - package: OpenTelemetrySwift
-        product: PersistenceExporter
       - package: PLCrashReporter
         product: CrashReporter
     settings:
@@ -294,7 +289,9 @@ targets:
           - "**/.DS_Store"
     dependencies:
       - target: SeerCore
-      - package: OpenTelemetrySwift
+      - package: OpenTelemetrySwiftCore
+        product: OpenTelemetryApi
+      - package: OpenTelemetrySwiftCore
         product: OpenTelemetrySdk
     settings:
       base:
