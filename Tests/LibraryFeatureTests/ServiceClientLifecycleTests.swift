@@ -130,6 +130,35 @@ final class ServiceClientLifecycleTests: XCTestCase {
         XCTAssertEqual(LifecycleRequestTrap.requests.withLock { $0.last?.url?.host }, "updated.invalid")
     }
 
+    func testRequestsReconnectBuildsClientWithoutServerSwitch() async throws {
+        first.jellyseerrURL = nil
+        state.updateServer(first)
+        let model = RequestsViewModel(appState: state)
+        try state.saveJellyseerrCredentials(
+            serverURL: XCTUnwrap(URL(string: "https://first.invalid")), apiKey: "replacement-test-key",
+            permissions: 2
+        )
+
+        await model.loadRequests()
+
+        let request = try XCTUnwrap(LifecycleRequestTrap.requests.withLock { $0.last })
+        XCTAssertEqual(request.url?.host, "first.invalid")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-Api-Key"), "replacement-test-key")
+        XCTAssertTrue(model.canManageRequests)
+    }
+
+    func testRequestsURLChangeRebuildsClientWithoutServerSwitch() async throws {
+        let model = RequestsViewModel(appState: state)
+        try state.saveJellyseerrCredentials(
+            serverURL: XCTUnwrap(URL(string: "https://updated.invalid")),
+            apiKey: "replacement-test-key"
+        )
+
+        await model.loadRequests()
+
+        XCTAssertEqual(LifecycleRequestTrap.requests.withLock { $0.last?.url?.host }, "updated.invalid")
+    }
+
     func testConfigurationIdentityChangesOnReauthentication() {
         let original = state.serviceConfigurationID
 

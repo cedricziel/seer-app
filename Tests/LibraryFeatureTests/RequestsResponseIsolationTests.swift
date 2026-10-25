@@ -5,6 +5,24 @@ import XCTest
 
 @MainActor
 final class RequestsResponseIsolationTests: XCTestCase {
+    func testCredentialChangeRejectsOldResponseWithoutServerSwitch() async {
+        let api = DelayedRequestService()
+        let state = AppState()
+        let serverID = UUID()
+        let model = RequestsViewModel(appState: state, service: api, serverIdentity: { serverID })
+        let old = Task { await model.loadRequests() }
+        await api.waitForCalls(1)
+        state.logout()
+        let current = Task { await model.loadRequests() }
+        await api.waitForCalls(2)
+        api.succeed(1, ids: [2])
+        await current.value
+        api.succeed(0, ids: [1])
+        await old.value
+
+        XCTAssertEqual(model.requests.map(\.id), [2])
+    }
+
     func testPreviousServerSuccessCannotReplaceNewServersRows() async {
         let api = DelayedRequestService()
         let identity = ServerIdentity()
