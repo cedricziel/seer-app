@@ -344,7 +344,11 @@ public final class LibraryViewModel: ObservableObject {
             totalItemCount = selectedLibrary != nil ? response.totalRecordCount : nil
             isShowingCachedData = false
             if let cfg = appState.activeServer, let lib = selectedLibrary, let ctx = modelContext {
-                let desc = FetchDescriptor<CachedLibrary>(predicate: #Predicate { $0.id == lib.id })
+                let libraryID = lib.id
+                let serverID = cfg.id
+                let desc = FetchDescriptor<CachedLibrary>(predicate: #Predicate {
+                    $0.id == libraryID && $0.serverConfigurationID == serverID
+                })
                 if let cachedLib = try? ctx.fetch(desc).first {
                     try? await mediaItemSyncService?.syncLibraryItems(
                         library: cachedLib, serverConfig: cfg, service: service
