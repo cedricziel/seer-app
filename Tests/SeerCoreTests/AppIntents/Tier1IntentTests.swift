@@ -147,6 +147,20 @@ final class Tier1IntentTests: XCTestCase {
         )
     }
 
+    func testMovieInLibraryDoesNotSuppressShowRequestWithSameTitle() async throws {
+        _ = insertActiveServer()
+        insertItem(id: "movie", name: "Same Title")
+        let captured = AtomicValue<RequestSubmission>()
+        RequestMediaIntent.submitter = { submission in
+            captured.set(submission)
+            return .created(title: submission.title)
+        }
+
+        _ = try await RequestMediaIntent(title: "Same Title", mediaType: .show).perform()
+
+        XCTAssertEqual(captured.value?.mediaType, .show)
+    }
+
     /// 4.1 — Voice request reaches Jellyseerr (via the submitter test seam).
     func testRequestsViaJellyseerr() async throws {
         _ = insertActiveServer()

@@ -47,18 +47,10 @@ enum IntentSeams {
             // Resolve the title to a Jellyseerr media id by searching.
             let response = try await service.search(query: submission.title)
 
-            // When the user supplied a media type, prefer matches of
-            // that type; only fall back to a non-person match if the
-            // typed match is missing. When no type was supplied, take
-            // the first non-person match directly.
             let typed: SearchResult.MediaType? = submission.mediaType.map { type in
                 type == .show ? .tvShow : .movie
             }
-            let typedMatch = typed.flatMap { type in
-                response.results.first(where: { $0.mediaType == type })
-            }
-            let fallbackMatch = response.results.first(where: { $0.mediaType != .person })
-            guard let match = typedMatch ?? fallbackMatch else {
+            guard let match = SearchResult.requestMatch(in: response.results, mediaType: typed) else {
                 throw IntentError.notFound(submission.title)
             }
 

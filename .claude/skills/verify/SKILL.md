@@ -56,4 +56,8 @@ added to the shared resource only when diagnostics are enabled. Run
 `DiagnosticsPreferencesTests` and `DiagnosticsExporterTests` for default-on
 preferences, legacy opt-out preservation, and export-time category gates.
 
+For typed App Intent requests, run `JellyseerrClientTests/RequestSearchMatchTests`
+and `SeerCoreTests/Tier1IntentTests`. An explicit type must not fall back to the
+other type, and owning a same-name movie must not suppress a show request.
+
 For shared Swift tooling changes, run `python3 -m unittest scripts/test_swift_tools.py`.

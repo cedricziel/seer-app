@@ -47,6 +47,13 @@ public struct SearchResult: Identifiable, Codable, Sendable, Hashable {
         }
     }
 
+    /// Selects a requestable result, requiring the supplied media type when present.
+    public static func requestMatch(in results: [SearchResult], mediaType: MediaType?) -> SearchResult? {
+        results.first { result in
+            result.mediaType != .person && (mediaType == nil || result.mediaType == mediaType)
+        }
+    }
+
     /// Display title (handles both movies and TV shows)
     public var displayTitle: String {
         title ?? name ?? originalTitle ?? originalName ?? "Unknown"
