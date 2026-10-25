@@ -14,6 +14,7 @@ struct LibraryView: View {
 
     var body: some View {
         LibraryContentView(appState: appState, onboardingManager: onboardingManager)
+            .id(appState.serviceConfigurationID)
     }
 }
 

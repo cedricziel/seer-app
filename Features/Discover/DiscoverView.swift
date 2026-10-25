@@ -10,6 +10,7 @@ struct DiscoverView: View {
 
     var body: some View {
         DiscoverContentView(appState: appState)
+            .id(appState.serviceConfigurationID)
     }
 }
 
@@ -111,9 +112,6 @@ private struct DiscoverContentView: View {
                 await viewModel.loadInitialData()
             }
         }
-        .onChange(of: appState.activeServerID) {
-            viewModel.serverChanged()
-        }
     }
 
     // MARK: - Not Configured View
@@ -122,12 +120,7 @@ private struct DiscoverContentView: View {
         JellyseerrConnectPrompt(
             title: "Discover Movies & Shows",
             description: "Connect Jellyseerr to browse trending content and request new media.",
-            onSuccess: {
-                Task {
-                    viewModel.serverChanged()
-                    await viewModel.loadInitialData()
-                }
-            }
+            onSuccess: {}
         )
     }
 

@@ -89,9 +89,11 @@ public final class SearchViewModel: ObservableObject {
     /// Load user permissions from Jellyseerr
     private func loadUserPermissions() async {
         guard let service = jellyseerrService else { return }
+        let configurationID = appState.serviceConfigurationID
 
         do {
             let userInfo = try await service.verifyAuth()
+            guard configurationID == appState.serviceConfigurationID else { return }
             appState.setJellyseerrPermissions(userInfo.permissions)
         } catch {
             Self.logger.debug("Failed to load Jellyseerr permissions: \(error.localizedDescription)")

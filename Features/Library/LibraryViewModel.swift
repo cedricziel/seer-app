@@ -101,7 +101,15 @@ public final class LibraryViewModel: ObservableObject {
         return selectedMediaType.jellyfinTypes ?? [.movie, .series]
     }
 
-    private var jellyfinService: JellyfinService?
+    private var service: JellyfinService?
+    private var serviceConfigurationID: AppState.ServiceConfigurationID?
+    private var jellyfinService: JellyfinService? {
+        if serviceConfigurationID != appState.serviceConfigurationID {
+            serverChanged()
+        }
+        return service
+    }
+
     private var serverURL: URL?
     private let appState: AppState
     private let session: URLSession?
@@ -132,16 +140,17 @@ public final class LibraryViewModel: ObservableObject {
     }
 
     private func setupService() {
+        serviceConfigurationID = appState.serviceConfigurationID
         guard let serverURL = appState.jellyfinServerURL,
               let accessToken = appState.jellyfinAccessToken,
               let userID = appState.jellyfinUserID
         else {
             serverURL = nil
-            jellyfinService = nil
+            service = nil
             return
         }
         self.serverURL = serverURL
-        jellyfinService = JellyfinService(
+        service = JellyfinService(
             serverURL: serverURL, accessToken: accessToken,
             userID: userID, deviceID: appState.jellyfinDeviceID, session: session
         )
@@ -198,10 +207,15 @@ public final class LibraryViewModel: ObservableObject {
     }
 
     func loadInitialData() async {
+        if serviceConfigurationID != appState.serviceConfigurationID {
+            serverChanged()
+        }
         loadTask?.cancel()
         await loadCachedDataIfAvailable()
         guard jellyfinService != nil else {
-            if libraries.isEmpty { errorMessage = "Not connected to Jellyfin" }
+            if libraries.isEmpty {
+                errorMessage = "Not connected to Jellyfin"
+            }
             return
         }
         guard networkMonitor?.isConnected ?? true else {
@@ -211,7 +225,9 @@ public final class LibraryViewModel: ObservableObject {
         }
         loadTask = Task {
             guard !Task.isCancelled else { return }
-            if libraries.isEmpty { isLoading = true }
+            if libraries.isEmpty {
+                isLoading = true
+            }
             errorMessage = nil
             async let lib: Void = loadLibraries()
             async let cont: Void = loadContinueWatching()
@@ -244,47 +260,66 @@ public final class LibraryViewModel: ObservableObject {
 
     func loadLibraries() async {
         guard let service = jellyfinService, !Task.isCancelled else { return }
+        let configurationID = appState.serviceConfigurationID
         do {
             let result = try await service.getLibraries()
-            guard !Task.isCancelled else { return }
+            guard configurationID == appState.serviceConfigurationID, !Task.isCancelled else { return }
             libraries = result
             if let cfg = appState.activeServer {
                 try? await librarySyncService?.syncLibraries(serverConfig: cfg, service: service)
             }
-        } catch { if !Task.isCancelled, libraries.isEmpty { errorMessage = error.localizedDescription } }
+        } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
+
+            if !Task.isCancelled, libraries.isEmpty {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     func loadContinueWatching() async {
         guard let service = jellyfinService, !Task.isCancelled else { return }
+        let configurationID = appState.serviceConfigurationID
         isLoadingContinueWatching = true
         do {
             let result = try await service.getContinueWatching(limit: 10)
-            guard !Task.isCancelled else { return }
+            guard configurationID == appState.serviceConfigurationID, !Task.isCancelled else { return }
             continueWatching = result
             if let cfg = appState.activeServer {
                 try? await mediaItemSyncService?.syncContinueWatching(serverConfig: cfg, service: service)
             }
         } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
+
             if !Task
-                .isCancelled { Self.logger.debug("Failed to load continue watching: \(error.localizedDescription)") }
+                .isCancelled {
+                Self.logger.debug("Failed to load continue watching: \(error.localizedDescription)")
+            }
         }
+        guard configurationID == appState.serviceConfigurationID else { return }
         hasLoadedContinueWatching = true
         isLoadingContinueWatching = false
     }
 
     func loadLatestItems() async {
         guard let service = jellyfinService, !Task.isCancelled else { return }
+        let configurationID = appState.serviceConfigurationID
         isLoadingLatestItems = true
         do {
             let result = try await service.getLatestItems(limit: 20)
-            guard !Task.isCancelled else { return }
+            guard configurationID == appState.serviceConfigurationID, !Task.isCancelled else { return }
             latestItems = result
             if let cfg = appState.activeServer {
                 try? await mediaItemSyncService?.syncLatestItems(serverConfig: cfg, service: service)
             }
         } catch {
-            if !Task.isCancelled { Self.logger.debug("Failed to load latest items: \(error.localizedDescription)") }
+            guard configurationID == appState.serviceConfigurationID else { return }
+
+            if !Task.isCancelled {
+                Self.logger.debug("Failed to load latest items: \(error.localizedDescription)")
+            }
         }
+        guard configurationID == appState.serviceConfigurationID else { return }
         hasLoadedLatestItems = true
         isLoadingLatestItems = false
     }
@@ -330,6 +365,7 @@ public final class LibraryViewModel: ObservableObject {
 
     func loadMediaItems() async {
         guard let service = jellyfinService, !Task.isCancelled else { return }
+        let configurationID = appState.serviceConfigurationID
         guard networkMonitor?.isConnected ?? true else { isShowingCachedData = true; return }
         isLoading = mediaItems.isEmpty
         errorMessage = nil
@@ -340,7 +376,7 @@ public final class LibraryViewModel: ObservableObject {
                 limit: pageSize, startIndex: currentPage * pageSize,
                 filters: watchStatusFilter.jellyfinFilters
             )
-            guard !Task.isCancelled else { return }
+            guard configurationID == appState.serviceConfigurationID, !Task.isCancelled else { return }
             mediaItems = response.items
             hasMoreItems = mediaItems.count < response.totalRecordCount
             totalItemCount = selectedLibrary != nil ? response.totalRecordCount : nil
@@ -357,7 +393,14 @@ public final class LibraryViewModel: ObservableObject {
                     )
                 }
             }
-        } catch { if !Task.isCancelled, mediaItems.isEmpty { errorMessage = error.localizedDescription } }
+        } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
+
+            if !Task.isCancelled, mediaItems.isEmpty {
+                errorMessage = error.localizedDescription
+            }
+        }
+        guard configurationID == appState.serviceConfigurationID else { return }
         isLoading = false
     }
 
@@ -369,6 +412,7 @@ public final class LibraryViewModel: ObservableObject {
     func loadMoreItems() async {
         guard let service = jellyfinService, hasMoreItems, !isLoadingMore,
               networkMonitor?.isConnected ?? true, !Task.isCancelled else { return }
+        let configurationID = appState.serviceConfigurationID
         isLoadingMore = true
         currentPage += 1
         do {
@@ -378,14 +422,20 @@ public final class LibraryViewModel: ObservableObject {
                 limit: pageSize, startIndex: currentPage * pageSize,
                 filters: watchStatusFilter.jellyfinFilters
             )
+            guard configurationID == appState.serviceConfigurationID else { return }
             guard !Task.isCancelled else { currentPage -= 1; isLoadingMore = false; return }
             mediaItems.append(contentsOf: response.items)
             hasMoreItems = mediaItems.count < response.totalRecordCount
             totalItemCount = selectedLibrary != nil ? response.totalRecordCount : nil
         } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
+
             currentPage -= 1; if !Task
-                .isCancelled { Self.logger.debug("Failed to load more items: \(error.localizedDescription)") }
+                .isCancelled {
+                Self.logger.debug("Failed to load more items: \(error.localizedDescription)")
+            }
         }
+        guard configurationID == appState.serviceConfigurationID else { return }
         isLoadingMore = false
     }
 
@@ -408,7 +458,9 @@ public final class LibraryViewModel: ObservableObject {
             hasLoadedContinueWatching = false
             await loadInitialData()
             guard !Task.isCancelled else { return }
-            if selectedLibrary != nil || isRecentlyAddedFeed { await loadMediaItems() }
+            if selectedLibrary != nil || isRecentlyAddedFeed {
+                await loadMediaItems()
+            }
         }
         await refreshTask?.value
     }

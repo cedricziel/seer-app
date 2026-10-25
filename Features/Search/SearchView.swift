@@ -172,7 +172,7 @@ private struct SearchContentView: View {
                 .presentationDetents([.medium, .large])
             }
         }
-        .onChange(of: appState.activeServerID) {
+        .onChange(of: appState.serviceConfigurationID) {
             viewModel.serverChanged()
         }
     }
