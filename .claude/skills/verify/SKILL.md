@@ -24,4 +24,6 @@ For telemetry installation-ID changes, run `SeerCoreTests/InstallationIDStoreTes
 These tests use an in-memory Keychain boundary to cover UUID reuse, local-only
 storage, unavailable reads, failed writes, concurrent creation, and invalid stored
 values without accessing user credentials. Verify that `app.installation.id` is
-added to the shared resource only through the consent-gated telemetry setup.
+added to the shared resource only when diagnostics are enabled. Run
+`DiagnosticsPreferencesTests` and `DiagnosticsExporterTests` for default-on
+preferences, legacy opt-out preservation, and export-time category gates.

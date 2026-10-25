@@ -19,7 +19,7 @@ FEATURES
 
 PRIVACY
 
-Flowmark Media talks only to the Jellyfin and Jellyseerr servers you configure. Diagnostic data (crashes, performance) is fully opt-in and never linked to your identity. No tracking, no ads, no third-party analytics.
+Flowmark Media connects directly to your Jellyfin and Jellyseerr servers. Diagnostics help us fix bugs and improve performance, include a random installation ID, and can be disabled in Privacy settings. No tracking, no ads, no third-party analytics.
 
 REQUIREMENTS
 

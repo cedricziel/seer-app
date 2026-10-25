@@ -88,25 +88,29 @@
 <main>
   <header>
     <h1>Privacy Policy</h1>
-    <p class="meta"><strong>Effective:</strong> 2 May 2026 &middot; <strong>App:</strong> Flowmark Media (com.cedricziel.seer) &middot; <strong>Developer:</strong> Cedric Ziel</p>
+    <p class="meta"><strong>Effective:</strong> 25 October 2026 &middot; <strong>App:</strong> Flowmark Media (com.cedricziel.seer) &middot; <strong>Developer:</strong> Cedric Ziel</p>
   </header>
 
   <h2>Summary</h2>
-  <p>Flowmark Media is a client app for Jellyfin and Jellyseerr media servers. The app talks only to the servers you explicitly configure. By default, no data is sent anywhere else. Optional diagnostic data is opt-in and never linked to your identity.</p>
+  <p>Flowmark Media is a client app for Jellyfin and Jellyseerr media servers. The app connects directly to the media servers you configure and sends diagnostics to our diagnostics service. Diagnostics are enabled by default to maintain app stability and performance. You can disable them in Settings.</p>
 
   <h2>What we collect</h2>
 
-  <h3>By default: nothing</h3>
-  <p>The app does not collect personal information, browsing history, viewing habits, location, contacts, or any usage data unless you explicitly opt in.</p>
+  <h3>Media and account data</h3>
+  <p>We do not use diagnostics to collect your media browsing history, viewing habits, server credentials, location, or contacts. Your media requests go directly to the servers you configure.</p>
 
-  <h3>Opt-in diagnostics</h3>
-  <p>If you enable Diagnostics in Settings, the app sends anonymous diagnostic data:</p>
+  <h3>Diagnostics and legitimate interest</h3>
+  <p>We process diagnostics on the basis of our legitimate interest under GDPR Article 6(1)(f) in identifying crashes, fixing defects, and maintaining app reliability. Diagnostics are enabled by default, with separate controls for crash reports and performance data in Settings. Existing disabled preferences remain disabled. Reports can include:</p>
   <ul>
     <li><strong>Crash reports</strong>: stack traces, exception types, termination reasons.</li>
     <li><strong>Performance metrics</strong>: app launch time, hang duration, peak memory usage, cumulative CPU usage.</li>
-    <li><strong>Device context</strong>: device model identifier (e.g., <code>iPhone15,2</code>), iOS or tvOS version, app version and build number, locale, timezone.</li>
+    <li><strong>Device context</strong>: device model identifier (e.g., <code>iPhone15,2</code>), operating system version, app version and build number, and OpenTelemetry SDK version.</li>
+    <li><strong>Diagnostic events</strong>: onboarding steps, discovery path, and authentication method, without server addresses or account names.</li>
+    <li><strong>Installation identifier</strong>: a random UUID kept in local Keychain storage, without iCloud sync. It links reports from this installation across launches and can survive app reinstallation. It is not an advertising identifier.</li>
   </ul>
-  <p>This data is not linked to your identity, your Apple ID, or your Jellyfin account. It is used solely to identify and fix bugs and performance regressions. You can disable it at any time in <em>Settings &rsaquo; Diagnostics</em>. Because reports are anonymous, already-sent data cannot be retroactively deleted &mdash; there is no link back to you.</p>
+  <p>Reports are pseudonymous, not completely anonymous. We do not attach your Apple ID or media-server account. Crash messages and stack traces can contain contextual information, so access is restricted to diagnosing app faults. We do not use diagnostics for advertising, cross-service tracking, or profiling.</p>
+  <p>Diagnostic reports are retained for 30 days. The local installation identifier remains in Keychain until removed; turning off diagnostics stops its use for new reports but does not delete the identifier or already-uploaded reports.</p>
+  <p>You can object to this processing at any time by disabling either diagnostics category in <em>Server Management &rsaquo; Privacy &amp; Diagnostics</em>. Turning both off stops new diagnostic exports; requests already in flight may finish. This does not affect app functionality. To request access, deletion, or restriction of reports already received, contact us below and include the Diagnostics ID shown in Privacy settings if available. You may lodge a complaint with your data-protection supervisory authority.</p>
 
   <h3>Server credentials</h3>
   <p>When you connect to a Jellyfin or Jellyseerr server, your username, password or API token, and the server URL are stored in the iOS Keychain. If you have iCloud Keychain enabled, these credentials sync across your Apple devices using Apple's standard end-to-end-encrypted iCloud Keychain mechanism. Credentials are never sent to the app's developer.</p>
