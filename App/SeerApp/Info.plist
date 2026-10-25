@@ -100,6 +100,10 @@
     <false/>
     <key>OTLPEndpoint</key>
     <string>$(OTLP_ENDPOINT)</string>
+    <key>OTLPDatasetID</key>
+    <string>$(OTLP_DATASET_ID)</string>
+    <key>OTLPTenantID</key>
+    <string>$(OTLP_TENANT_ID)</string>
     <key>OTLPAuthHeader</key>
     <string>$(OTLP_AUTH_HEADER)</string>
 </dict>

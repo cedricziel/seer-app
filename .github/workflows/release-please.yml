@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 90
     environment: staging
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ needs.release-please.outputs.tag_name }}
@@ -67,6 +67,8 @@ jobs:
         env:
           OTLP_ENDPOINT:    ${{ secrets.OTLP_ENDPOINT }}
           OTLP_AUTH_HEADER: ${{ secrets.OTLP_AUTH_HEADER }}
+          OTLP_TENANT_ID:   ${{ secrets.OTLP_TENANT_ID }}
+          OTLP_DATASET_ID:  ${{ secrets.OTLP_DATASET_ID }}
         run: |
           if [ ! -f Config/Secrets.xcconfig ]; then
             cp Config/Secrets.xcconfig.template Config/Secrets.xcconfig
@@ -78,6 +80,8 @@ jobs:
             {
               echo "OTLP_ENDPOINT = $ENDPOINT_ESCAPED"
               echo "OTLP_AUTH_HEADER = $OTLP_AUTH_HEADER"
+              echo "OTLP_TENANT_ID = $OTLP_TENANT_ID"
+              echo "OTLP_DATASET_ID = $OTLP_DATASET_ID"
             } >> Config/Secrets.xcconfig
             echo "OTLP endpoint configured"
           else
@@ -128,7 +132,7 @@ jobs:
     timeout-minutes: 30
     environment: production
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name }}

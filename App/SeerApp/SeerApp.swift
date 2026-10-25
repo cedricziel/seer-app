@@ -6,7 +6,6 @@ import SeerCore
 import SwiftData
 import SwiftUI
 
-@main
 struct SeerApp: App {
     @UIApplicationDelegateAdaptor(SeerAppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
