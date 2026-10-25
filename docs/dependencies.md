@@ -5,8 +5,10 @@ The weekly Dependency audit workflow checks both Swift lockfiles and the SwiftLi
 and SwiftFormat versions pinned in CI, plus the OpenAPI generator and schema
 versions documented in the API package guide. Run it manually from GitHub Actions or run
 `python3 scripts/dependency_audit.py` locally with an authenticated `gh` CLI.
-A failed audit lists newer stable releases in the job summary. API failures also
-fail the job. The audit reports candidates, including transitive packages; it does
+The job summary lists newer stable releases. Reviewed deferrals are recorded in
+`.github/dependency-audit-deferrals.json` with a version and reason. A release newer
+than that reviewed version fails the audit; unchanged deferrals remain visible
+without repeated alerts. API failures also fail the job. The audit reports candidates, including transitive packages; it does
 not prove that the package resolver can select every release.
 
 Refresh the app's packages in a temporary checkout. Generate the project with

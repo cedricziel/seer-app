@@ -9,7 +9,7 @@ description: Verify Seer changes with native builds, isolated hosted unit tests,
 2. Use the SwiftLint and SwiftFormat versions pinned in `.github/workflows/ci.yml`. Run `swiftlint lint --strict --no-cache` and `swiftformat --lint . --cache ignore`. Compare failures with the baseline and format only changed files.
 3. Regenerate the project with `xcodegen generate`. Build with `xcodebuild`, temporary derived-data and cloned-package directories, and `CODE_SIGNING_ALLOWED=NO`.
 4. Run hosted unit tests on a dedicated disposable simulator with test credentials. Delete the simulator in a cleanup trap. Never use an existing user simulator or device.
-5. For dependency maintenance, run `python3 -m unittest discover -s scripts -p 'test_*.py'` and `actionlint .github/workflows/dependency-audit.yml`. Run `python3 scripts/dependency_audit.py` with authenticated `gh`; exit 1 with a release table means newer candidates exist, while an API or parsing error means the audit did not complete.
+5. For dependency maintenance, run `python3 -m unittest discover -s scripts -p 'test_*.py'` and `actionlint .github/workflows/dependency-audit.yml`. Run `python3 scripts/dependency_audit.py` with authenticated `gh`; exit 1 with a release table means unreviewed newer candidates exist, while an API or parsing error means the audit did not complete.
 
 Debug hosted unit tests enter `HostedUnitTestApp` through `SeerAppEntryPoint` when XCTest is injected. This bypasses `SeerApp.init`, its CloudKit stores, telemetry, and background services. Ordinary and Release launches retain `SeerApp.main()`. UI tests run XCTest in a separate runner and retain production startup.
 

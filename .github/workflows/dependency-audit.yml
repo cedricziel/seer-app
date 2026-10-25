@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - '.github/dependency-audit-deferrals.json'
       - 'scripts/dependency_audit.py'
       - 'scripts/test_dependency_audit.py'
       - '.github/workflows/dependency-audit.yml'

@@ -1,6 +1,6 @@
 import unittest
 
-from dependency_audit import release_version, update_kind
+from dependency_audit import deferred_reason, release_version, update_kind
 
 
 class ReleaseComparisonTests(unittest.TestCase):
@@ -17,6 +17,17 @@ class ReleaseComparisonTests(unittest.TestCase):
     def test_prereleases_are_rejected(self):
         with self.assertRaises(ValueError):
             release_version('2.0.0-rc.1')
+
+    def test_reviewed_release_retains_its_reason(self):
+        deferrals = {'example/sdk': {'version': '2.0.0', 'reason': 'Requires migration'}}
+        self.assertEqual(deferred_reason('example/sdk', 'v2.0.0', deferrals), 'Requires migration')
+
+    def test_release_after_reviewed_version_needs_new_review(self):
+        deferrals = {'example/sdk': {'version': '2.0.0', 'reason': 'Requires migration'}}
+        self.assertIsNone(deferred_reason('example/sdk', '2.0.1', deferrals))
+
+    def test_unreviewed_dependency_has_no_deferral(self):
+        self.assertIsNone(deferred_reason('example/sdk', '2.0.0', {}))
 
     def test_patch_upgrade(self):
         self.assertEqual(update_kind('1.19.2', '1.19.7'), 'patch')

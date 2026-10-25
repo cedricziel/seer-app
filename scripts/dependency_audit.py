@@ -23,6 +23,13 @@ def update_kind(current, latest):
     return next(kind for a, b, kind in zip(old, new, ('major', 'minor', 'patch')) if a != b)
 
 
+def deferred_reason(repo, latest, deferrals):
+    entry = deferrals.get(repo)
+    if entry and release_version(latest) <= release_version(entry['version']):
+        return entry['reason']
+    return None
+
+
 def dependency_pins():
     lockfiles = [
         ROOT / 'SeerApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved',
@@ -52,6 +59,8 @@ def dependency_pins():
 def audit():
     releases = {}
     rows = []
+    needs_review = False
+    deferrals = json.loads((ROOT / '.github/dependency-audit-deferrals.json').read_text())
     for repo, current, source in dependency_pins():
         if repo not in releases:
             result = subprocess.run(
@@ -63,20 +72,24 @@ def audit():
         latest = release['tag_name']
         kind = update_kind(current, latest)
         if kind:
-            rows.append(f'| {repo} | {current} | [{latest}]({release["html_url"]}) | {kind} | {source} |')
+            reason = deferred_reason(repo, latest, deferrals)
+            needs_review |= reason is None
+            status = f'Deferred: {reason}' if reason else 'New release: review required'
+            rows.append(f'| {repo} | {current} | [{latest}]({release["html_url"]}) | {kind} | {source} | {status} |')
     report = '\n'.join([
         '# Dependency audit', '',
         'Newer stable releases are candidates for review; transitive constraints may prevent updates.',
         'Major updates require migration review. Dependabot covers Bundler and GitHub Actions.', '',
-        '| Dependency | Pinned | Latest | Change | Source |',
-        '| --- | --- | --- | --- | --- |',
+        'Reviewed deferrals remain visible; only newer unreviewed releases fail the audit.', '',
+        '| Dependency | Pinned | Latest | Change | Source | Review |',
+        '| --- | --- | --- | --- | --- | --- |',
         *rows,
     ]) if rows else '# Dependency audit\n\nAll audited pins match or exceed the latest stable releases.'
     print(report)
     if summary := os.environ.get('GITHUB_STEP_SUMMARY'):
         with open(summary, 'a') as output:
             output.write(report + '\n')
-    return bool(rows)
+    return needs_review
 
 
 if __name__ == '__main__':
