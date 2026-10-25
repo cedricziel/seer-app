@@ -1,14 +1,22 @@
 .PHONY: generate build build-release lint format clean open test version setup resolve \
+        openapi-generate \
         fastlane-install fastlane-test fastlane-build fastlane-beta fastlane-release fastlane-match fastlane-bootstrap-signing \
         fastlane-sync-metadata fastlane-screenshots \
         _ensure-brew-ruby
 
 # Default simulator destination
 SIMULATOR ?= iPhone 17
+OPENAPI_GENERATOR ?= swift-openapi-generator
 
 generate:
 	@echo "Generating Xcode project..."
 	xcodegen generate
+
+openapi-generate:
+	$(OPENAPI_GENERATOR) generate \
+		Packages/JellyseerrAPI/Sources/JellyseerrAPI/openapi.json \
+		--config Packages/JellyseerrAPI/Sources/JellyseerrAPI/openapi-generator-config.yaml \
+		--output-directory Packages/JellyseerrAPI/Sources/JellyseerrAPI/Generated
 
 build: generate
 	@echo "Building for simulator..."

@@ -1,8 +1,3 @@
-// JellyseerrAPI - Generated OpenAPI Client
-//
-// This module provides a Swift client generated from the Jellyseerr OpenAPI specification.
-// The code is generated at build time by swift-openapi-generator.
-
 import Foundation
 import HTTPTypes
 @_exported import OpenAPIRuntime
