@@ -109,7 +109,7 @@ struct EpisodeRow: View {
                             .aspectRatio(contentMode: .fill)
                     } placeholder: {
                         Rectangle()
-                            .fill(Color(.systemGray5))
+                            .fill(Color.secondary.opacity(0.2))
                             .overlay {
                                 Image(systemName: "play.rectangle")
                                     .foregroundStyle(.secondary)

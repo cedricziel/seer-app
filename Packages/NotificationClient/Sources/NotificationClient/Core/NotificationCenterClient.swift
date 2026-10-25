@@ -10,6 +10,17 @@ protocol NotificationCenterClient {
     func removeAllDeliveredNotifications()
 }
 
+#if os(tvOS)
+@MainActor
+final class SystemNotificationCenter: NotificationCenterClient {
+    func authorizationStatus() async -> UNAuthorizationStatus { .denied }
+    func requestAuthorization() async throws -> Bool { false }
+    func setup(delegate: any UNUserNotificationCenterDelegate) {}
+    func add(_ request: UNNotificationRequest) async throws {}
+    func removePendingNotificationRequests(withIdentifiers identifiers: [String]) {}
+    func removeAllDeliveredNotifications() {}
+}
+#else
 @MainActor
 final class SystemNotificationCenter: NotificationCenterClient {
     private let center = UNUserNotificationCenter.current()
@@ -39,3 +50,5 @@ final class SystemNotificationCenter: NotificationCenterClient {
         center.removeAllDeliveredNotifications()
     }
 }
+
+#endif

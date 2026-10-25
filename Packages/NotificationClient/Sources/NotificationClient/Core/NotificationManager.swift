@@ -43,7 +43,9 @@ public final class NotificationManager: NSObject {
 
     /// Register notification categories and set delegate
     public func setup() {
+        #if !os(tvOS)
         notificationCenter.setup(delegate: self)
+        #endif
     }
 
     /// Refresh state from store and notification center
@@ -133,6 +135,7 @@ public final class NotificationManager: NSObject {
 
 // MARK: - UNUserNotificationCenterDelegate
 
+#if !os(tvOS)
 extension NotificationManager: UNUserNotificationCenterDelegate {
     public nonisolated func userNotificationCenter(
         _: UNUserNotificationCenter,
@@ -195,6 +198,8 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         }
     }
 }
+
+#endif
 
 // MARK: - NotificationInfo
 

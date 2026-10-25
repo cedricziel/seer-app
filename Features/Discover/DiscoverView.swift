@@ -49,7 +49,7 @@ private struct DiscoverContentView: View {
             }
             .navigationTitle("Discover")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .navigation) {
                     ServerSwitcherButton()
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -272,7 +272,7 @@ private struct DiscoverContentView: View {
                     .clipped()
             } else {
                 Rectangle()
-                    .fill(Color(.systemGray5))
+                    .fill(Color.secondary.opacity(0.2))
                     .frame(width: 200, height: 112)
             }
 

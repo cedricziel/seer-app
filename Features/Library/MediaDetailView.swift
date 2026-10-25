@@ -1,11 +1,9 @@
 import DownloadClient
 import JellyfinClient
 import JellyseerrClient
-import OfflineSync
 import PlaybackClient
 import SeerCore
 import SeerUI
-import SwiftData
 import SwiftUI
 
 /// Indicates whether a media item came from the library or search results
@@ -19,8 +17,6 @@ struct MediaDetailView: View {
     let item: MediaItem
     let source: MediaItemSource
     @ObservedObject var viewModel: LibraryViewModel
-    @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @EnvironmentObject var appState: AppState
 
     @Environment(DownloadManager.self) var downloadManager: DownloadManager?
@@ -79,59 +75,65 @@ struct MediaDetailView: View {
             }
         }
         #if !os(tvOS)
-        .navigationBarTitleDisplayMode(.inline)
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+            #endif
         #endif
-        .task {
-            // Fetch detailed item info with MediaSources for format info
-            if source == .library, item.isPlayable {
-                detailedItem = await viewModel.getItemDetails(id: item.id)
-            }
-
-            // Load series details
-            guard item.type == .series, source == .library else { return }
-            seriesViewModel = SeriesDetailViewModel(series: item, appState: appState)
-            seriesViewModel?.setupOfflineSync(modelContext: modelContext, networkMonitor: networkMonitor)
-            await seriesViewModel?.loadSeasons()
-        }
-        .alert("Request Submitted", isPresented: $showRequestSuccess) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Your request has been submitted successfully.")
-        }
-        .alert("Request Failed", isPresented: .init(
-            get: { requestError != nil },
-            set: { if !$0 { requestError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(requestError ?? "An error occurred")
-        }
-        .fullScreenCover(isPresented: $showPlayer) {
-            let playbackItem = MediaPlaybackSelection.item(
-                original: item,
-                detailedItem: detailedItem,
-                selectedEpisode: selectedEpisodeForPlayback
-            )
-            VideoPlayerView(
-                item: playbackItem,
-                appState: appState,
-                startPositionTicks: playbackItem.userData?.playbackPositionTicks ?? 0,
-                onPiPStart: { showPlayer = false }
-            )
-        }
-        .onChange(of: showPlayer) { _, isShowing in
-            if !isShowing {
-                selectedEpisodeForPlayback = nil
-            }
-        }
-        #if os(tvOS)
-        .navigationDestination(isPresented: $showEpisodeDetail) {
-            episodeDetailDestination
-        }
-        #else
-        .sheet(isPresented: $showEpisodeDetail) {
-                    episodeDetailDestination
+            .task {
+                // Fetch detailed item info with MediaSources for format info
+                if source == .library, item.isPlayable {
+                    detailedItem = await viewModel.getItemDetails(id: item.id)
                 }
+
+                // Load series details
+                guard item.type == .series, source == .library else { return }
+                seriesViewModel = SeriesDetailViewModel(series: item, appState: appState)
+                seriesViewModel?.setupOfflineSync(modelContext: modelContext, networkMonitor: networkMonitor)
+                await seriesViewModel?.loadSeasons()
+            }
+            .alert("Request Submitted", isPresented: $showRequestSuccess) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Your request has been submitted successfully.")
+            }
+            .alert("Request Failed", isPresented: .init(
+                get: { requestError != nil },
+                set: {
+                    if !$0 {
+                        requestError = nil
+                    }
+                }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(requestError ?? "An error occurred")
+            }
+            .playerCover(isPresented: $showPlayer) {
+                let playbackItem = MediaPlaybackSelection.item(
+                    original: item,
+                    detailedItem: detailedItem,
+                    selectedEpisode: selectedEpisodeForPlayback
+                )
+                VideoPlayerView(
+                    item: playbackItem,
+                    appState: appState,
+                    startPositionTicks: playbackItem.userData?.playbackPositionTicks ?? 0,
+                    onPiPStart: { showPlayer = false }
+                )
+            }
+            .onChange(of: showPlayer) { _, isShowing in
+                if !isShowing {
+                    selectedEpisodeForPlayback = nil
+                }
+            }
+        #if os(tvOS)
+            .navigationDestination(isPresented: $showEpisodeDetail) {
+                episodeDetailDestination
+            }
+        #else
+            .sheet(isPresented: $showEpisodeDetail) {
+                episodeDetailDestination
+            }
         #endif
     }
 
@@ -345,6 +347,5 @@ struct MediaDetailView: View {
             viewModel: LibraryViewModel(appState: AppState())
         )
         .environmentObject(AppState())
-        .environmentObject(NetworkMonitor(isConnected: false))
     }
 }

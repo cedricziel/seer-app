@@ -68,7 +68,15 @@ struct DownloadSettingsView: View {
                             Text(maxStorageGB == 0 ? "Unlimited" : "\(Int(maxStorageGB)) GB")
                                 .foregroundStyle(.secondary)
                         }
-                        Slider(value: $maxStorageGB, in: 0 ... 100, step: 5)
+                        #if os(tvOS)
+                            Picker("Storage Limit", selection: $maxStorageGB) {
+                                ForEach(Array(stride(from: 0, through: 100, by: 5)), id: \.self) { limit in
+                                    Text(limit == 0 ? "Unlimited" : "\(limit) GB").tag(Double(limit))
+                                }
+                            }
+                        #else
+                            Slider(value: $maxStorageGB, in: 0 ... 100, step: 5)
+                        #endif
                     }
                 } header: {
                     Text("Storage")
@@ -114,19 +122,21 @@ struct DownloadSettingsView: View {
                 }
             }
             .navigationTitle("Download Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+            #endif
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Done") {
+                            dismiss()
+                        }
                     }
                 }
-            }
-            .task {
-                await loadStorageInfo()
-                // Sync WiFi-only setting with download manager on load
-                await downloadManager?.setWiFiOnlyEnabled(wifiOnlyDownloads)
-            }
+                .task {
+                    await loadStorageInfo()
+                    // Sync WiFi-only setting with download manager on load
+                    await downloadManager?.setWiFiOnlyEnabled(wifiOnlyDownloads)
+                }
         }
     }
 
@@ -142,9 +152,14 @@ struct DownloadSettingsView: View {
         }
 
         do {
-            let resourceValues = try documentsPath
-                .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-            availableStorage = resourceValues.volumeAvailableCapacityForImportantUsage ?? 0
+            #if os(tvOS)
+                let resourceValues = try documentsPath.resourceValues(forKeys: [.volumeAvailableCapacityKey])
+                availableStorage = Int64(resourceValues.volumeAvailableCapacity ?? 0)
+            #else
+                let resourceValues = try documentsPath
+                    .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+                availableStorage = resourceValues.volumeAvailableCapacityForImportantUsage ?? 0
+            #endif
         } catch {
             availableStorage = 0
         }
@@ -174,7 +189,9 @@ struct AutoDownloadRulesView: View {
             }
         }
         .navigationTitle("Auto-Download Rules")
-        .navigationBarTitleDisplayMode(.inline)
+        #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 

@@ -57,8 +57,8 @@ private struct SearchScopeView: View {
             }
             .navigationTitle("Search")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { ServerSwitcherButton() }
-                ToolbarItem(placement: .topBarTrailing) { SettingsButton() }
+                ToolbarItem(placement: .navigation) { ServerSwitcherButton() }
+                ToolbarItem(placement: .primaryAction) { SettingsButton() }
             }
         }
     }
@@ -68,7 +68,11 @@ private struct SearchScopeView: View {
 private struct SearchContentView: View {
     @ObservedObject var appState: AppState
     @StateObject private var viewModel: SearchViewModel
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #if os(macOS)
+        private let horizontalSizeClass: MediaSizeClass? = .regular
+    #else
+        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     @Binding var query: String
 
     @State private var selectedResult: SearchResult?
@@ -254,13 +258,23 @@ private struct SearchContentView: View {
                         }
                     }
                     .accessibilityLabel("Search again for \(query)")
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            viewModel.removeRecentQuery(query)
-                        } label: {
-                            Label("Remove", systemImage: "trash")
+                    #if os(tvOS)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                viewModel.removeRecentQuery(query)
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
                         }
-                    }
+                    #else
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                viewModel.removeRecentQuery(query)
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
+                        }
+                    #endif
                 }
             } header: {
                 HStack {

@@ -25,12 +25,16 @@ private struct LibraryContentView: View {
     @EnvironmentObject private var networkMonitor: NetworkMonitor
     @StateObject private var viewModel: LibraryViewModel
     @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
-    /// Read at this level — *outside* the `NavigationSplitView` below — on
-    /// purpose. The split view hands its sidebar column a compact
-    /// horizontal size class regardless of device, so any view inside the
-    /// column cannot tell "iPhone" from "iPad content column" on its own.
-    /// `isSplitLayout` is derived here once and passed down explicitly.
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    // Read at this level — *outside* the `NavigationSplitView` below — on
+    // purpose. The split view hands its sidebar column a compact
+    // horizontal size class regardless of device, so any view inside the
+    // column cannot tell "iPhone" from "iPad content column" on its own.
+    // `isSplitLayout` is derived here once and passed down explicitly.
+    #if os(macOS)
+        private let horizontalSizeClass: MediaSizeClass? = .regular
+    #else
+        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     @State private var selectedItemForPlayback: MediaItem?
     @State private var path = NavigationPath()
     /// Detail-column selection when the split view shows both columns
@@ -74,7 +78,7 @@ private struct LibraryContentView: View {
                 viewModel.serverChanged()
                 Task { await viewModel.refresh() }
             }
-            .fullScreenCover(item: $selectedItemForPlayback) { item in
+            .playerCover(item: $selectedItemForPlayback) { item in
                 VideoPlayerView(
                     item: item,
                     appState: appState,
@@ -164,8 +168,8 @@ private struct LibraryContentView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) { ServerSwitcherButton() }
-        ToolbarItem(placement: .topBarTrailing) { SettingsButton() }
+        ToolbarItem(placement: .navigation) { ServerSwitcherButton() }
+        ToolbarItem(placement: .primaryAction) { SettingsButton() }
     }
 
     private var contentView: some View {

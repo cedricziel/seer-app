@@ -41,13 +41,15 @@ struct PersonDetailView: View {
             .padding()
         }
         .navigationTitle(viewModel.displayName)
-        .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await viewModel.load()
-        }
-        .onDisappear {
-            viewModel.cancel()
-        }
+        #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+        #endif
+            .task {
+                await viewModel.load()
+            }
+            .onDisappear {
+                viewModel.cancel()
+            }
     }
 
     private var filmographyState: PersonFilmographyView.State {
@@ -78,7 +80,7 @@ struct PersonDetailHeader: View {
             headshot
                 .frame(width: 110, height: 110)
                 .clipShape(Circle())
-                .overlay(Circle().stroke(Color(.systemGray5), lineWidth: 1))
+                .overlay(Circle().stroke(Color.secondary.opacity(0.2), lineWidth: 1))
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(name)
@@ -122,7 +124,7 @@ struct PersonDetailHeader: View {
 
     private var headshotPlaceholder: some View {
         Circle()
-            .fill(Color(.systemGray5))
+            .fill(Color.secondary.opacity(0.2))
             .overlay {
                 Image(systemName: "person.fill")
                     .font(.largeTitle)
@@ -187,7 +189,11 @@ struct PersonFilmographyView: View {
     let imageURL: (MediaItem) -> URL?
     let roleLabel: (MediaItem) -> String?
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #if os(macOS)
+        private let horizontalSizeClass: MediaSizeClass? = .regular
+    #else
+        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
 
     init(
         state: State,

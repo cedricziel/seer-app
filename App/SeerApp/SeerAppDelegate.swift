@@ -1,11 +1,18 @@
-import BackgroundTasks
+#if os(iOS)
+    import BackgroundTasks
+#endif
+#if os(macOS)
+    import AppKit
+#else
+    import UIKit
+#endif
 import DownloadClient
 import NotificationClient
 import SeerCore
-import UIKit
 
 /// App delegate for handling background URL session callbacks and background tasks
-final class SeerAppDelegate: NSObject, UIApplicationDelegate {
+@MainActor
+final class SeerAppDelegate: NSObject {
     /// Reference to the download manager (set by SeerApp)
     weak var downloadManager: DownloadManager?
 
@@ -18,118 +25,119 @@ final class SeerAppDelegate: NSObject, UIApplicationDelegate {
     /// Background task identifier for request status polling
     static let requestPollTaskIdentifier = "com.cedricziel.seer.requestpoll"
 
-    func application(
-        _: UIApplication,
-        didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil
-    ) -> Bool {
-        // Initialize TelemetryService for OpenTelemetry-based performance and crash diagnostics
-        _ = TelemetryService.shared
+    #if os(iOS)
+        func application(
+            _: UIApplication,
+            didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil
+        ) -> Bool {
+            // Initialize TelemetryService for OpenTelemetry-based performance and crash diagnostics
+            _ = TelemetryService.shared
 
-        // Register background tasks
-        registerBackgroundTasks()
-        return true
-    }
-
-    // MARK: - Background URL Session Handling
-
-    func application(
-        _: UIApplication,
-        handleEventsForBackgroundURLSession identifier: String,
-        completionHandler: @escaping () -> Void
-    ) {
-        // Handle background URL session events for downloads
-        if identifier == BackgroundSessionManager.sessionIdentifier {
-            BackgroundSessionManager.shared.setBackgroundCompletionHandler(completionHandler)
-        }
-    }
-
-    // MARK: - Background Task Registration
-
-    private func registerBackgroundTasks() {
-        // Register auto-download background task
-        BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: AutoDownloadService.taskIdentifier,
-            using: nil
-        ) { [weak self] task in
-            guard let processingTask = task as? BGProcessingTask else { return }
-            self?.handleAutoDownloadTask(processingTask)
+            // Register background tasks
+            registerBackgroundTasks()
+            return true
         }
 
-        // Register request status polling background task
-        BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: Self.requestPollTaskIdentifier,
-            using: nil
-        ) { [weak self] task in
-            guard let processingTask = task as? BGProcessingTask else { return }
-            self?.handleRequestPollTask(processingTask)
-        }
-    }
+        // MARK: - Background URL Session Handling
 
-    private func handleAutoDownloadTask(_ task: BGProcessingTask) {
-        // Schedule the next occurrence
-        scheduleAutoDownloadTask()
-
-        // Create a task to process auto-downloads
-        let processingTask = Task {
-            // Auto-download processing would happen here
-            // For now, just complete the task
-            task.setTaskCompleted(success: true)
+        func application(
+            _: UIApplication,
+            handleEventsForBackgroundURLSession identifier: String,
+            completionHandler: @escaping () -> Void
+        ) {
+            // Handle background URL session events for downloads
+            if identifier == BackgroundSessionManager.sessionIdentifier {
+                BackgroundSessionManager.shared.setBackgroundCompletionHandler(completionHandler)
+            }
         }
 
-        // Handle task expiration
-        task.expirationHandler = {
-            processingTask.cancel()
-        }
-    }
+        // MARK: - Background Task Registration
 
-    private func handleRequestPollTask(_ task: BGProcessingTask) {
-        // Schedule the next occurrence
-        scheduleRequestPollTask()
-
-        // Create a task to poll for request status changes
-        let processingTask = Task { [weak self] in
-            guard let poller = self?.requestStatusPoller else {
-                task.setTaskCompleted(success: true)
-                return
+        private func registerBackgroundTasks() {
+            // Register auto-download background task
+            BGTaskScheduler.shared.register(
+                forTaskWithIdentifier: AutoDownloadService.taskIdentifier,
+                using: nil
+            ) { [weak self] task in
+                guard let processingTask = task as? BGProcessingTask else { return }
+                self?.handleAutoDownloadTask(processingTask)
             }
 
-            await poller.poll()
-            task.setTaskCompleted(success: true)
+            // Register request status polling background task
+            BGTaskScheduler.shared.register(
+                forTaskWithIdentifier: Self.requestPollTaskIdentifier,
+                using: nil
+            ) { [weak self] task in
+                guard let processingTask = task as? BGProcessingTask else { return }
+                self?.handleRequestPollTask(processingTask)
+            }
         }
 
-        // Handle task expiration
-        task.expirationHandler = {
-            processingTask.cancel()
+        private func handleAutoDownloadTask(_ task: BGProcessingTask) {
+            // Schedule the next occurrence
+            scheduleAutoDownloadTask()
+
+            // Create a task to process auto-downloads
+            let processingTask = Task {
+                // Auto-download processing would happen here
+                // For now, just complete the task
+                task.setTaskCompleted(success: true)
+            }
+
+            // Handle task expiration
+            task.expirationHandler = {
+                processingTask.cancel()
+            }
         }
-    }
 
-    /// Schedule the auto-download background task
-    func scheduleAutoDownloadTask() {
-        let request = BGProcessingTaskRequest(identifier: AutoDownloadService.taskIdentifier)
-        request.requiresNetworkConnectivity = true
-        request.requiresExternalPower = false
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 60 * 60) // 1 hour
+        private func handleRequestPollTask(_ task: BGProcessingTask) {
+            // Schedule the next occurrence
+            scheduleRequestPollTask()
 
-        do {
-            try BGTaskScheduler.shared.submit(request)
-        } catch {
-            print("Failed to schedule auto-download task: \(error)")
+            // Create a task to poll for request status changes
+            let processingTask = Task { [weak self] in
+                guard let poller = self?.requestStatusPoller else {
+                    task.setTaskCompleted(success: true)
+                    return
+                }
+
+                await poller.poll()
+                task.setTaskCompleted(success: true)
+            }
+
+            // Handle task expiration
+            task.expirationHandler = {
+                processingTask.cancel()
+            }
         }
-    }
 
-    /// Schedule the request status polling background task
-    func scheduleRequestPollTask() {
-        let request = BGProcessingTaskRequest(identifier: Self.requestPollTaskIdentifier)
-        request.requiresNetworkConnectivity = true
-        request.requiresExternalPower = false
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 minutes
+        /// Schedule the auto-download background task
+        func scheduleAutoDownloadTask() {
+            let request = BGProcessingTaskRequest(identifier: AutoDownloadService.taskIdentifier)
+            request.requiresNetworkConnectivity = true
+            request.requiresExternalPower = false
+            request.earliestBeginDate = Date(timeIntervalSinceNow: 60 * 60) // 1 hour
 
-        do {
-            try BGTaskScheduler.shared.submit(request)
-        } catch {
-            print("Failed to schedule request poll task: \(error)")
+            do {
+                try BGTaskScheduler.shared.submit(request)
+            } catch {
+                print("Failed to schedule auto-download task: \(error)")
+            }
         }
-    }
+
+        /// Schedule the request status polling background task
+        func scheduleRequestPollTask() {
+            let request = BGProcessingTaskRequest(identifier: Self.requestPollTaskIdentifier)
+            request.requiresNetworkConnectivity = true
+            request.requiresExternalPower = false
+            request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60) // 15 minutes
+
+            do {
+                try BGTaskScheduler.shared.submit(request)
+            } catch {
+                print("Failed to schedule request poll task: \(error)")
+            }
+        } #endif
 }
 
 // MARK: - NotificationActionDelegate
@@ -166,3 +174,23 @@ extension SeerAppDelegate: NotificationActionDelegate {
         }
     }
 }
+
+#if os(macOS)
+    extension SeerAppDelegate: NSApplicationDelegate {
+        func applicationDidFinishLaunching(_: Notification) {
+            _ = TelemetryService.shared
+        }
+    }
+#else
+    extension SeerAppDelegate: UIApplicationDelegate {
+        #if os(tvOS)
+            func application(
+                _: UIApplication,
+                didFinishLaunchingWithOptions _: [UIApplication.LaunchOptionsKey: Any]? = nil
+            ) -> Bool {
+                _ = TelemetryService.shared
+                return true
+            }
+        #endif
+    }
+#endif

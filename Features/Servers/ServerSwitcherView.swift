@@ -149,20 +149,22 @@ struct ServerSwitcherView: View {
                     }
                 }
                 .navigationTitle("Switch Server")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Done") {
-                            dismiss()
+                #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                #endif
+                    .toolbar {
+                        ToolbarItem(placement: .primaryAction) {
+                            Button("Done") {
+                                dismiss()
+                            }
                         }
                     }
-                }
-                .sheet(isPresented: $showingAddServer) {
-                    AddServerView()
-                }
-                .sheet(isPresented: $showingManageServers) {
-                    ServerManagementView()
-                }
+                    .sheet(isPresented: $showingAddServer) {
+                        AddServerView()
+                    }
+                    .sheet(isPresented: $showingManageServers) {
+                        ServerManagementView()
+                    }
             }
         }
     #endif

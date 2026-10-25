@@ -30,9 +30,11 @@ struct EpisodeDetailSheet: View {
         #else
             NavigationStack {
                 content
+                #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
+                #endif
                     .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
+                        ToolbarItem(placement: .primaryAction) {
                             Button("Done") {
                                 dismiss()
                             }

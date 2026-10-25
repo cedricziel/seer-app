@@ -96,21 +96,23 @@ struct ServerEditView: View {
                 }
             }
             .navigationTitle("Edit Server")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+            #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Save") {
+                            saveChanges()
+                        }
+                        .fontWeight(.semibold)
+                        .disabled(name.isEmpty)
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Save") {
-                        saveChanges()
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(name.isEmpty)
-                }
-            }
         }
     }
 
@@ -156,7 +158,9 @@ private struct ReauthenticateView: View {
                 TextField("Username", text: $username)
                     .textContentType(.username)
                     .autocorrectionDisabled()
+                #if os(iOS)
                     .textInputAutocapitalization(.never)
+                #endif
 
                 SecureField("Password", text: $password)
                     .textContentType(.password)
@@ -189,7 +193,9 @@ private struct ReauthenticateView: View {
             }
         }
         .navigationTitle("Re-authenticate")
-        .navigationBarTitleDisplayMode(.inline)
+        #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 
     private func reauthenticate() async {

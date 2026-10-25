@@ -1,10 +1,12 @@
 import AppIntents
-import CoreSpotlight
+#if !os(tvOS)
+    import CoreSpotlight
+#endif
 import Foundation
 
 /// AppEntity representing a Jellyseerr media request, sourced from the
 /// `CachedRequest` SwiftData store.
-public struct RequestEntity: AppEntity, IndexedEntity, Equatable {
+public struct RequestEntity: AppEntity, Equatable {
     public static let typeDisplayRepresentation = TypeDisplayRepresentation(
         name: "Media Request"
     )
@@ -48,12 +50,16 @@ public struct RequestEntity: AppEntity, IndexedEntity, Equatable {
         default: "Unknown"
         }
     }
-
-    public var attributeSet: CSSearchableItemAttributeSet {
-        let set = CSSearchableItemAttributeSet(contentType: .item)
-        set.title = title
-        set.contentDescription = statusName
-        set.identifier = id
-        return set
-    }
 }
+
+#if !os(tvOS)
+    extension RequestEntity: IndexedEntity {
+        public var attributeSet: CSSearchableItemAttributeSet {
+            let set = CSSearchableItemAttributeSet(contentType: .item)
+            set.title = title
+            set.contentDescription = statusName
+            set.identifier = id
+            return set
+        }
+    }
+#endif

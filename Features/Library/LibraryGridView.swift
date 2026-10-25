@@ -45,7 +45,11 @@ struct LibraryGridView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var networkMonitor: NetworkMonitor
     @StateObject private var viewModel: LibraryViewModel
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #if os(macOS)
+        private let horizontalSizeClass: MediaSizeClass? = .regular
+    #else
+        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
     @Environment(\.colorScheme) private var colorScheme
     @State private var selectedItemForPlayback: MediaItem?
 
@@ -74,14 +78,16 @@ struct LibraryGridView: View {
         }
         .navigationTitle(title)
         #if !os(tvOS)
-            .navigationBarTitleDisplayMode(.large)
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.large)
+            #endif
         #endif
             .task {
                 await viewModel.enterDestination(
                     destination, modelContext: modelContext, networkMonitor: networkMonitor
                 )
             }
-            .fullScreenCover(item: $selectedItemForPlayback) { item in
+            .playerCover(item: $selectedItemForPlayback) { item in
                 VideoPlayerView(
                     item: item,
                     appState: appState,
