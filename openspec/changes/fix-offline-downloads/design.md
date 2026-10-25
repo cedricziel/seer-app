@@ -16,6 +16,7 @@ Goals are the four reviewed fixes, regression coverage, and repairing tvOS compi
 - Keep the dependency direction features → clients → SeerCore. No new module relationship is required.
 - Keep Spotlight indexing and MetricKit subscription on iOS. tvOS retains AppEntity support, standard telemetry, and consent checks without referencing unavailable system types.
 - Adapt shared player entry points to TVPlayerView on tvOS. Keep swipe actions and navigation title display modes on iOS; use context menus for tvOS deletion. Show feedback submission instructions on tvOS because its system sharing controller is unavailable.
+- Use caches for media and pending transfers on tvOS, with matching playback paths. Apple documents that the documents directory fails at runtime on tvOS and cache files can be purged between launches. Handle missing downloads through the existing unavailable-file error. See [tvOS storage policies](https://developer.apple.com/videos/play/wwdc2023/10256/).
 
 ## HIG & Layout
 

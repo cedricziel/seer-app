@@ -1,5 +1,14 @@
 ## ADDED Requirements
 
+### Requirement: Download files use supported television storage
+
+The system SHALL store downloaded media and pending transfer files in the caches directory on tvOS. Playback SHALL resolve files using the same directory policy. It SHALL preserve the existing iOS directory policy.
+
+#### Scenario: Resolve Apple TV download paths
+- **WHEN** tvOS prepares a download or resolves a downloaded file for playback
+- **THEN** both paths SHALL use the caches directory
+- **AND** a missing file SHALL produce the existing unavailable-download error instead of streaming from a different server
+
 ### Requirement: System integrations use supported platform APIs
 
 The application SHALL compile for iOS and tvOS without referencing unavailable system APIs. Spotlight indexing and MetricKit subscription SHALL be included only on iOS. AppEntity support, standard telemetry, and diagnostics consent checks SHALL remain available on tvOS.

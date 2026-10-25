@@ -64,7 +64,7 @@ public final class Download {
 
     // MARK: - File Storage
 
-    /// Relative path to the downloaded file (from Documents/Downloads)
+    /// Relative path beneath the platform's Downloads directory
     public var relativePath: String?
 
     /// Quality setting used for download
@@ -113,8 +113,11 @@ public final class Download {
     /// Full file URL for playback
     public var fileURL: URL? {
         guard let relativePath, state == .completed else { return nil }
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-        return documentsPath?.appendingPathComponent("Downloads").appendingPathComponent(relativePath)
+        let baseDirectory = FileManager.default.urls(
+            for: DownloadStorage.defaultSearchPathDirectory,
+            in: .userDomainMask
+        ).first
+        return baseDirectory?.appendingPathComponent("Downloads").appendingPathComponent(relativePath)
     }
 
     /// Formatted file size

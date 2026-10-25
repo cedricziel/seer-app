@@ -313,12 +313,20 @@ extension BackgroundSessionManager: URLSessionDownloadDelegate {
 
     // MARK: - Pending (completed-but-unprocessed) files
 
+    static var pendingSearchPathDirectory: FileManager.SearchPathDirectory {
+        #if os(tvOS)
+            .cachesDirectory
+        #else
+            .applicationSupportDirectory
+        #endif
+    }
+
     /// Directory that holds files the URLSession has finished downloading but
     /// the `DownloadManager` has not yet moved into the downloads folder. Lives
-    /// in Application Support rather than `tmp` so it survives until the app
-    /// next has a chance to reconcile (e.g. after a background relaunch).
+    /// in Caches on tvOS and Application Support elsewhere so a background
+    /// relaunch can reconcile it before the next transfer starts.
     public static var pendingDirectory: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        let base = FileManager.default.urls(for: pendingSearchPathDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         return base.appendingPathComponent("PendingDownloads", isDirectory: true)
     }
