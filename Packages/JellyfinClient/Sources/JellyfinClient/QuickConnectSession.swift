@@ -1,4 +1,6 @@
+import Combine
 import Foundation
+import JellyfinAPI
 
 // MARK: - Transport abstraction
 
@@ -183,6 +185,7 @@ public final class QuickConnectSession: ObservableObject {
 
 public struct URLSessionQuickConnectTransport: QuickConnectTransport {
     private let session: URLSession
+    private let clients = QuickConnectSDKClients()
     private let clientName: String
     private let deviceID: String
     private let clientVersion: String
@@ -200,58 +203,42 @@ public struct URLSessionQuickConnectTransport: QuickConnectTransport {
     }
 
     public func isEnabled(serverURL: URL) async throws -> Bool {
-        let url = serverURL.appendingPathComponent("QuickConnect/Enabled")
-        let (data, response) = try await session.data(for: authorizedRequest(url: url))
-        guard let http = response as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
-            return false
-        }
+        let (data, response) = try await sdkClient(serverURL).data(for: Paths.getQuickConnectEnabled)
+        guard (200 ... 299).contains(response.statusCode) else { return false }
         let body = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return body == "true"
     }
 
     public func initiate(serverURL: URL) async throws -> QuickConnectInitiateResponse {
-        let url = serverURL.appendingPathComponent("QuickConnect/Initiate")
-        var request = authorizedRequest(url: url)
-        request.httpMethod = "POST"
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await sdkClient(serverURL).data(for: Paths.initiateQuickConnect)
         try Self.validate(response: response, data: data)
         let raw = try JSONDecoder().decode(InitiateRaw.self, from: data)
         return QuickConnectInitiateResponse(code: raw.code, secret: raw.secret)
     }
 
     public func pollState(serverURL: URL, secret: String) async throws -> QuickConnectStateResponse {
-        var components = URLComponents(
-            url: serverURL.appendingPathComponent("QuickConnect/Connect"),
-            resolvingAgainstBaseURL: false
-        )
-        components?.queryItems = [URLQueryItem(name: "secret", value: secret)]
-        guard let url = components?.url else {
-            throw QuickConnectSession.QuickConnectError.invalidResponse
-        }
-        let (data, response) = try await session.data(for: authorizedRequest(url: url))
+        let request = Paths.getQuickConnectState(secret: secret)
+        let (data, response) = try await sdkClient(serverURL).data(for: request)
         try Self.validate(response: response, data: data)
         let raw = try JSONDecoder().decode(StateRaw.self, from: data)
         return QuickConnectStateResponse(authenticated: raw.authenticated)
     }
 
     public func authenticate(serverURL: URL, secret: String) async throws -> AuthResponse {
-        let url = serverURL.appendingPathComponent("Users/AuthenticateWithQuickConnect")
-        var request = authorizedRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(["Secret": secret])
-        let (data, response) = try await session.data(for: request)
+        let request = Paths.authenticateWithQuickConnect(.init(secret: secret))
+        let (data, response) = try await sdkClient(serverURL).data(for: request)
         try Self.validate(response: response, data: data)
         return try JSONDecoder().decode(AuthResponse.self, from: data)
     }
 
-    private func authorizedRequest(url: URL) -> URLRequest {
-        var request = URLRequest(url: url)
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-        let header = "MediaBrowser Client=\"\(clientName)\", Device=\"iOS\", "
-            + "DeviceId=\"\(deviceID)\", Version=\"\(clientVersion)\""
-        request.addValue(header, forHTTPHeaderField: "Authorization")
-        return request
+    private func sdkClient(_ serverURL: URL) -> JellyfinSDKTransport {
+        clients.client(
+            serverURL: serverURL,
+            session: session,
+            clientName: clientName,
+            clientVersion: clientVersion,
+            deviceID: deviceID
+        )
     }
 
     private static func validate(response: URLResponse, data _: Data) throws {
@@ -276,6 +263,33 @@ public struct URLSessionQuickConnectTransport: QuickConnectTransport {
         let authenticated: Bool
         enum CodingKeys: String, CodingKey {
             case authenticated = "Authenticated"
+        }
+    }
+}
+
+private final class QuickConnectSDKClients: @unchecked Sendable {
+    private let lock = NSLock()
+    private var clients: [URL: JellyfinSDKTransport] = [:]
+
+    func client(
+        serverURL: URL,
+        session: URLSession,
+        clientName: String,
+        clientVersion: String,
+        deviceID: String
+    ) -> JellyfinSDKTransport {
+        lock.withLock {
+            if let client = clients[serverURL] { return client }
+            let client = JellyfinSDKTransport(
+                serverURL: serverURL,
+                deviceID: deviceID,
+                clientName: clientName,
+                clientVersion: clientVersion,
+                sessionConfiguration: session.configuration,
+                sessionDelegate: session.delegate
+            )
+            clients[serverURL] = client
+            return client
         }
     }
 }

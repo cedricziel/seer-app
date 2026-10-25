@@ -8,8 +8,9 @@ guarantees security patches only for its most recent stable release.
 
 The policy review on October 25, 2026 found server
 [12.3](https://github.com/jellyfin/jellyfin/releases/tag/v12.3) and Swift SDK
-[3.3.0](https://github.com/jellyfin/jellyfin-sdk-swift/releases/tag/3.3.0) current.
-The SDK was generated from the server 12.1 API. These versions record the review;
+[3.3.1](https://github.com/jellyfin/jellyfin-sdk-swift/releases/tag/3.3.1) current.
+The SDK was generated from the server 12.1 API. SDK 3.3.1 preserves the 3.3.0
+public API and fixes session-configuration/delegate handling. These versions record the review;
 they do not freeze the support policy to those releases.
 
 ## Confirmed legacy gap
@@ -28,7 +29,8 @@ It does not make those older branches supported or tested releases.
 The comparison uses the official controllers for
 [10.8.13](https://github.com/jellyfin/jellyfin/tree/v10.8.13/Jellyfin.Api/Controllers)
 and [10.9.0](https://github.com/jellyfin/jellyfin/tree/v10.9.0/Jellyfin.Api/Controllers).
-No 10.8-specific compatibility layer is maintained.
+No 10.8-specific compatibility layer is maintained. App Store requirements and
+release notes must reflect this policy; do not continue advertising 10.8+ support.
 
 ## SDK boundary
 
@@ -47,8 +49,12 @@ The following behavior remains app-owned:
 
 SDK request construction must preserve reverse-proxy base paths, stable device
 identity, restored tokens, existing timeout policies, pagination, error status and
-response bodies, and playback profile/report fields. Tests compare encoded request
-bodies where bridging through SDK DTOs could discard fields.
+response bodies, and playback profile/report fields. Playback requests use generated
+SDK endpoints with the app payload assigned through the supported request-body API.
+Decoding into SDK DTOs first can change omitted boolean fields into explicit false
+values. Tests compare the entire encoded JSON payload, including field omissions.
+Generated query values preserve literal plus signs as `%2B`; existing encoded base
+URL queries remain unchanged. Search and Quick Connect tests inspect the actual wire URL.
 
 ## Verification
 

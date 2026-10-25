@@ -230,8 +230,8 @@ private class SeriesSyncFixtureProtocol: URLProtocol, @unchecked Sendable {
             return
         }
         let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
-        let itemType = query.first { $0.name == "IncludeItemTypes" }?.value
-        let parentID = query.first { $0.name == "ParentId" }?.value
+        let itemType = query.first { $0.name.caseInsensitiveCompare("includeItemTypes") == .orderedSame }?.value
+        let parentID = query.first { $0.name.caseInsensitiveCompare("parentId") == .orderedSame }?.value
         guard (itemType == "Season" && parentID == "series") || (itemType == "Episode" && parentID == "season") else {
             client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
             return

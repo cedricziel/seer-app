@@ -21,7 +21,10 @@ configFiles:
 packages:
   JellyfinAPI:
     url: https://github.com/jellyfin/jellyfin-sdk-swift
-    from: "0.6.0"
+    from: "3.3.0"
+  Get:
+    url: https://github.com/kean/Get
+    from: "2.2.1"
   Kingfisher:
     url: https://github.com/onevcat/Kingfisher
     from: "8.0.0"
@@ -56,7 +59,6 @@ targets:
       - path: Features/Playback/PlayerControlsOverlay.swift
         destinationFilters: [iOS, macOS]
     dependencies:
-      - package: JellyfinAPI
       - package: Kingfisher
       - target: SeerCore
       - target: JellyfinClient
@@ -158,6 +160,8 @@ targets:
           - "**/.DS_Store"
     dependencies:
       - package: JellyfinAPI
+      - package: Get
+        product: Get
       - target: SeerCore
     settings:
       base:
@@ -318,6 +322,7 @@ targets:
       - path: Tests/PlaybackClientTests
         excludes:
           - "**/.DS_Store"
+      - path: Tests/JellyfinClientTests/SDKStubServer.swift
     dependencies:
       - target: PlaybackClient
       - target: JellyfinClient
@@ -354,6 +359,7 @@ targets:
           - "**/.DS_Store"
     dependencies:
       - target: JellyfinClient
+      - package: JellyfinAPI
       - target: SeerCore
     settings:
       base:

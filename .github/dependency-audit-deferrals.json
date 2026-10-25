@@ -1,8 +1,4 @@
 {
-  "jellyfin/jellyfin-sdk-swift": {
-    "version": "3.3.0",
-    "reason": "Adopt the SDK behind JellyfinService in a separate migration."
-  },
   "apple/swift-collections": {
     "version": "1.7.4",
     "reason": "Requires Swift 6.4; retain Swift 6.2 support."

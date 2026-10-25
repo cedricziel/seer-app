@@ -1,18 +1,18 @@
 import Foundation
+import Get
+import JellyfinAPI
 import SeerCore
 
-/// Service for interacting with the Jellyfin API
+/// Jellyfin operations exposed through app-owned media and authentication models.
 public actor JellyfinService {
-    private var serverURL: URL
+    private let serverURL: URL
     private var accessToken: String?
     private var userID: String?
-    private var deviceID: String
-
-    private let session: URLSession
+    private let deviceID: String
+    private let sessionConfiguration: URLSessionConfiguration
+    private let sessionDelegate: URLSessionDelegate?
+    private var transport: JellyfinSDKTransport
     private let decoder: JSONDecoder
-
-    private let clientName = "Seer"
-    private let clientVersion = "1.0.0"
 
     public enum JellyfinError: LocalizedError, Sendable {
         case invalidURL
@@ -49,21 +49,45 @@ public actor JellyfinService {
     }
 
     public init(
-        serverURL: URL, accessToken: String? = nil, userID: String? = nil,
-        deviceID: String? = nil, session: URLSession? = nil
+        serverURL: URL,
+        accessToken: String? = nil,
+        userID: String? = nil,
+        deviceID: String? = nil,
+        session: URLSession? = nil,
+        sessionConfiguration: URLSessionConfiguration? = nil
     ) {
         self.serverURL = serverURL
         self.accessToken = accessToken
         self.userID = userID
-        self.deviceID = deviceID ?? Self.generateDeviceID()
-
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
-        self.session = session ?? URLSession(configuration: config)
-
+        let resolvedDeviceID = deviceID ?? Self.generateDeviceID()
+        self.deviceID = resolvedDeviceID
+        let sourceConfiguration = sessionConfiguration ?? session?.configuration ?? .default
+        let configuration = sourceConfiguration.copy() as? URLSessionConfiguration ?? sourceConfiguration
+        if session == nil {
+            configuration.timeoutIntervalForRequest = 30
+            configuration.timeoutIntervalForResource = 60
+        }
+        self.sessionConfiguration = configuration
+        sessionDelegate = session?.delegate
+        transport = JellyfinSDKTransport(
+            serverURL: serverURL,
+            accessToken: accessToken,
+            deviceID: resolvedDeviceID,
+            sessionConfiguration: configuration,
+            sessionDelegate: session?.delegate
+        )
         decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            if let date = try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(value) {
+                return date
+            }
+            if let date = try? Date.ISO8601FormatStyle().parse(value) {
+                return date
+            }
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid Jellyfin date")
+        }
     }
 
     private static func generateDeviceID() -> String {
@@ -76,76 +100,45 @@ public actor JellyfinService {
     }
 }
 
-// MARK: - Authentication
-
 public extension JellyfinService {
-    /// Authenticate with username and password
+    /// Authenticates without an existing token and replaces credentials only after a successful response.
     func authenticate(username: String, password: String) async throws -> AuthResponse {
-        let url = serverURL.appendingPathComponent("Users/AuthenticateByName")
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue(authorizationHeader(includeToken: false), forHTTPHeaderField: "Authorization")
-
-        let body: [String: String] = [
-            "Username": username,
-            "Pw": password
-        ]
-        request.httpBody = try JSONEncoder().encode(body)
-
-        let (data, response) = try await performRequest(request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw JellyfinError.networkError(URLError(.badServerResponse))
-        }
-
-        if httpResponse.statusCode == 401 {
+        let request = Paths.authenticateUserByName(.init(pw: password, username: username))
+        let unauthenticated = JellyfinSDKTransport(
+            serverURL: serverURL,
+            deviceID: deviceID,
+            sessionConfiguration: sessionConfiguration,
+            sessionDelegate: sessionDelegate
+        )
+        let (data, response) = try await performRequest(request, using: unauthenticated)
+        if response.statusCode == 401 {
             throw JellyfinError.invalidCredentials
         }
-
-        guard httpResponse.statusCode == 200 else {
-            throw JellyfinError.serverError(httpResponse.statusCode, String(data: data, encoding: .utf8))
-        }
-
+        try validateResponse(response, data: data)
         let authResponse = try decoder.decode(AuthResponse.self, from: data)
-        accessToken = authResponse.accessToken
-        userID = authResponse.user.id
-
+        setCredentials(accessToken: authResponse.accessToken, userID: authResponse.user.id)
         return authResponse
     }
 
-    /// Set credentials without authenticating (for restoring session)
+    /// Restores credentials without authenticating or revoking an existing server session.
     func setCredentials(accessToken: String, userID: String) {
         self.accessToken = accessToken
         self.userID = userID
+        transport = JellyfinSDKTransport(
+            serverURL: serverURL,
+            accessToken: accessToken,
+            deviceID: deviceID,
+            sessionConfiguration: sessionConfiguration,
+            sessionDelegate: sessionDelegate
+        )
     }
-}
 
-// MARK: - Libraries
-
-public extension JellyfinService {
-    /// Get all user libraries
     func getLibraries() async throws -> [Library] {
-        guard let userID else {
-            throw JellyfinError.notAuthenticated
-        }
-
-        let url = serverURL.appendingPathComponent("Users/\(userID)/Views")
-        let request = try authenticatedRequest(url: url)
-
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
-
-        let librariesResponse = try decoder.decode(LibrariesResponse.self, from: data)
-        return librariesResponse.items
+        let userID = try authenticatedUserID()
+        let request = Paths.getUserViews(parameters: .init(userID: userID))
+        return try await decode(LibrariesResponse.self, from: request).items
     }
-}
 
-// MARK: - Items
-
-public extension JellyfinService {
-    /// Get items from a library or the entire collection
     func getItems(
         parentID: String? = nil,
         includeItemTypes: [MediaItem.MediaType]? = nil,
@@ -157,386 +150,123 @@ public extension JellyfinService {
         filters: [String]? = nil,
         searchTerm: String? = nil
     ) async throws -> ItemsResponse {
-        guard let userID else {
-            throw JellyfinError.notAuthenticated
-        }
-
-        var components = try serverURL
-            .appendingPathComponent("Users/\(userID)/Items")
-            .urlComponents()
-
-        var queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "SortBy", value: sortBy),
-            URLQueryItem(name: "SortOrder", value: sortOrder),
-            URLQueryItem(name: "Limit", value: String(limit)),
-            URLQueryItem(name: "StartIndex", value: String(startIndex)),
-            URLQueryItem(name: "Recursive", value: String(recursive)),
-            URLQueryItem(
-                name: "Fields",
-                value: "Overview,Genres,Studios,People,ProviderIds,CommunityRating,OfficialRating"
-            )
-        ]
-
-        if let searchTerm {
-            queryItems.append(URLQueryItem(name: "SearchTerm", value: searchTerm))
-        }
-
-        if let parentID {
-            queryItems.append(URLQueryItem(name: "ParentId", value: parentID))
-        }
-
-        if let types = includeItemTypes {
-            let typeStrings = types.map(\.rawValue)
-            queryItems.append(URLQueryItem(name: "IncludeItemTypes", value: typeStrings.joined(separator: ",")))
-        }
-
-        if let filters, !filters.isEmpty {
-            queryItems.append(URLQueryItem(name: "Filters", value: filters.joined(separator: ",")))
-        }
-
-        components.queryItems = queryItems
-
-        guard let url = components.url else {
-            throw JellyfinError.invalidURL
-        }
-
-        let request = try authenticatedRequest(url: url)
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
-
-        return try decoder.decode(ItemsResponse.self, from: data)
+        var parameters = try Paths.GetItemsParameters(userID: authenticatedUserID())
+        parameters.parentID = parentID
+        parameters.includeItemTypes = try includeItemTypes.map { try sdkValues($0.map(\.rawValue)) }
+        parameters.sortBy = try sdkValues(sortBy.split(separator: ",").map(String.init))
+        parameters.sortOrder = try sdkValues([sortOrder])
+        parameters.limit = limit
+        parameters.startIndex = startIndex
+        parameters.isRecursive = recursive
+        parameters.filters = try filters.map { try sdkValues($0) }
+        parameters.searchTerm = searchTerm
+        parameters.fields = [.overview, .genres, .studios, .people, .providerIDs]
+        return try await decode(ItemsResponse.self, from: Paths.getItems(parameters: parameters))
     }
 
-    /// Get a single item by ID
     func getItem(id: String) async throws -> MediaItem {
-        guard let userID else {
-            throw JellyfinError.notAuthenticated
-        }
-
-        var components = try serverURL
-            .appendingPathComponent("Users/\(userID)/Items/\(id)")
-            .urlComponents()
-
-        // Include MediaSources to get format information
-        components.queryItems = [
-            URLQueryItem(
-                name: "Fields",
-                value: "Overview,Genres,Studios,People,ProviderIds,CommunityRating,OfficialRating,MediaSources"
-            )
-        ]
-
-        guard let url = components.url else {
-            throw JellyfinError.invalidURL
-        }
-
-        let request = try authenticatedRequest(url: url)
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
-
-        return try decoder.decode(MediaItem.self, from: data)
+        try await decode(MediaItem.self, from: Paths.getItem(itemID: id, userID: authenticatedUserID()))
     }
 
-    /// Get continue watching items
     func getContinueWatching(limit: Int = 10) async throws -> [MediaItem] {
-        guard let userID else {
-            throw JellyfinError.notAuthenticated
-        }
-
-        var components = try serverURL
-            .appendingPathComponent("Users/\(userID)/Items/Resume")
-            .urlComponents()
-        components.queryItems = [
-            URLQueryItem(name: "Limit", value: String(limit)),
-            URLQueryItem(name: "Fields", value: "Overview"),
-            URLQueryItem(name: "MediaTypes", value: "Video")
-        ]
-
-        guard let url = components.url else {
-            throw JellyfinError.invalidURL
-        }
-
-        let request = try authenticatedRequest(url: url)
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
-
-        let itemsResponse = try decoder.decode(ItemsResponse.self, from: data)
-        return itemsResponse.items
+        let parameters = try Paths.GetResumeItemsParameters(
+            userID: authenticatedUserID(),
+            limit: limit,
+            fields: [.overview],
+            mediaTypes: [.video]
+        )
+        return try await decode(ItemsResponse.self, from: Paths.getResumeItems(parameters: parameters)).items
     }
 
-    /// Get latest added items
     func getLatestItems(
         parentID: String? = nil,
         includeItemTypes: [MediaItem.MediaType]? = nil,
         limit: Int = 20
     ) async throws -> [MediaItem] {
-        guard let userID else {
-            throw JellyfinError.notAuthenticated
-        }
-
-        var components = try serverURL
-            .appendingPathComponent("Users/\(userID)/Items/Latest")
-            .urlComponents()
-        var queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "Limit", value: String(limit)),
-            URLQueryItem(name: "Fields", value: "Overview,Genres")
-        ]
-
-        if let parentID {
-            queryItems.append(URLQueryItem(name: "ParentId", value: parentID))
-        }
-
-        if let types = includeItemTypes {
-            let typeStrings = types.map(\.rawValue)
-            queryItems.append(URLQueryItem(name: "IncludeItemTypes", value: typeStrings.joined(separator: ",")))
-        }
-
-        components.queryItems = queryItems
-
-        guard let url = components.url else {
-            throw JellyfinError.invalidURL
-        }
-
-        let request = try authenticatedRequest(url: url)
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
-
-        return try decoder.decode([MediaItem].self, from: data)
+        let parameters = try Paths.GetLatestMediaParameters(
+            userID: authenticatedUserID(),
+            parentID: parentID,
+            fields: [.overview, .genres],
+            includeItemTypes: includeItemTypes.map { try sdkValues($0.map(\.rawValue)) },
+            limit: limit
+        )
+        return try await decode([MediaItem].self, from: Paths.getLatestMedia(parameters: parameters))
     }
 
-    /// Get all seasons for a series
     func getSeasons(seriesId: String) async throws -> [MediaItem] {
-        let response = try await getItems(
+        try await getItems(
             parentID: seriesId,
             includeItemTypes: [.season],
             sortBy: "IndexNumber",
-            sortOrder: "Ascending",
             limit: 100,
             recursive: false
-        )
-        return response.items
+        ).items
     }
 
-    /// Get all episodes for a season
     func getEpisodes(seasonId: String) async throws -> [MediaItem] {
-        let response = try await getItems(
+        try await getItems(
             parentID: seasonId,
             includeItemTypes: [.episode],
             sortBy: "IndexNumber",
-            sortOrder: "Ascending",
             limit: 100,
             recursive: false
-        )
-        return response.items
+        ).items
     }
-}
 
-// MARK: - Persons
-
-public extension JellyfinService {
-    /// Fetch full details for a person (actor, director, etc.) by ID.
     func getPerson(id: String) async throws -> PersonDetail {
-        guard let userID else {
-            throw JellyfinError.notAuthenticated
-        }
-
-        var components = try serverURL
-            .appendingPathComponent("Users/\(userID)/Items/\(id)")
-            .urlComponents()
-        components.queryItems = [
-            URLQueryItem(name: "Fields", value: "Overview,ProductionLocations,PremiereDate,EndDate")
-        ]
-
-        guard let url = components.url else {
-            throw JellyfinError.invalidURL
-        }
-
-        let request = try authenticatedRequest(url: url)
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
-
-        return try decoder.decode(PersonDetail.self, from: data)
+        try await decode(PersonDetail.self, from: Paths.getItem(itemID: id, userID: authenticatedUserID()))
     }
 
-    /// Fetch movies and series in the user's library that feature the given person.
     func getItems(personId: String, limit: Int = 20) async throws -> [MediaItem] {
-        guard let userID else {
-            throw JellyfinError.notAuthenticated
-        }
-
-        var components = try serverURL
-            .appendingPathComponent("Users/\(userID)/Items")
-            .urlComponents()
-        components.queryItems = [
-            URLQueryItem(name: "PersonIds", value: personId),
-            URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series"),
-            URLQueryItem(name: "Recursive", value: "true"),
-            URLQueryItem(name: "SortBy", value: "PremiereDate,SortName"),
-            URLQueryItem(name: "SortOrder", value: "Descending"),
-            URLQueryItem(name: "Limit", value: String(limit)),
-            URLQueryItem(name: "Fields", value: "Overview,Genres,People")
-        ]
-
-        guard let url = components.url else {
-            throw JellyfinError.invalidURL
-        }
-
-        let request = try authenticatedRequest(url: url)
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
-
-        return try decoder.decode(ItemsResponse.self, from: data).items
+        var parameters = try Paths.GetItemsParameters(userID: authenticatedUserID())
+        parameters.personIDs = [personId]
+        parameters.includeItemTypes = [.movie, .series]
+        parameters.isRecursive = true
+        parameters.sortBy = [.premiereDate, .sortName]
+        parameters.sortOrder = [.descending]
+        parameters.limit = limit
+        parameters.fields = [.overview, .genres, .people]
+        return try await decode(ItemsResponse.self, from: Paths.getItems(parameters: parameters)).items
     }
 
-    /// Build a URL for a person's primary image. The optional `imageTag` is
-    /// used as a cache-busting query parameter so updated images are refetched.
     func getPersonImageURL(
         personId: String,
         imageTag: String? = nil,
         maxWidth: Int? = nil,
         maxHeight: Int? = nil
     ) -> URL {
-        guard var components = URLComponents(
-            url: serverURL.appendingPathComponent("Items/\(personId)/Images/Primary"),
-            resolvingAgainstBaseURL: false
-        ) else {
-            return serverURL
-        }
-
-        var queryItems: [URLQueryItem] = []
-        if let imageTag {
-            queryItems.append(URLQueryItem(name: "tag", value: imageTag))
-        }
-        if let maxWidth {
-            queryItems.append(URLQueryItem(name: "maxWidth", value: String(maxWidth)))
-        }
-        if let maxHeight {
-            queryItems.append(URLQueryItem(name: "maxHeight", value: String(maxHeight)))
-        }
-        if !queryItems.isEmpty {
-            components.queryItems = queryItems
-        }
-
-        return components.url ?? serverURL
+        let request = Paths.getItemImage(
+            itemID: personId,
+            imageType: ImageType.primary.rawValue,
+            parameters: .init(maxWidth: maxWidth, maxHeight: maxHeight, tag: imageTag)
+        )
+        return transport.url(for: request) ?? serverURL
     }
-}
 
-// MARK: - Search
-
-public extension JellyfinService {
-    /// Search for items
     func search(query: String, limit: Int = 20) async throws -> [MediaItem] {
-        guard let userID else {
-            throw JellyfinError.notAuthenticated
-        }
-
-        var components = try serverURL
-            .appendingPathComponent("Users/\(userID)/Items")
-            .urlComponents()
-        components.queryItems = [
-            URLQueryItem(name: "SearchTerm", value: query),
-            URLQueryItem(name: "Limit", value: String(limit)),
-            URLQueryItem(name: "Recursive", value: "true"),
-            URLQueryItem(name: "IncludeItemTypes", value: "Movie,Series"),
-            URLQueryItem(name: "Fields", value: "Overview,Genres")
-        ]
-
-        guard let url = components.url else {
-            throw JellyfinError.invalidURL
-        }
-
-        let request = try authenticatedRequest(url: url)
-        let (data, response) = try await performRequest(request)
-        try validateResponse(response, data: data)
-
-        let itemsResponse = try decoder.decode(ItemsResponse.self, from: data)
-        return itemsResponse.items
+        var parameters = try Paths.GetItemsParameters(userID: authenticatedUserID())
+        parameters.searchTerm = query
+        parameters.limit = limit
+        parameters.isRecursive = true
+        parameters.includeItemTypes = [.movie, .series]
+        parameters.fields = [.overview, .genres]
+        return try await decode(ItemsResponse.self, from: Paths.getItems(parameters: parameters)).items
     }
-}
 
-// MARK: - Images
-
-public extension JellyfinService {
-    /// Get the URL for an item's primary image
     func getImageURL(
         itemID: String,
         imageType: ImageType = .primary,
         maxWidth: Int? = nil,
         maxHeight: Int? = nil
     ) -> URL {
-        guard var components = URLComponents(
-            url: serverURL.appendingPathComponent("Items/\(itemID)/Images/\(imageType.rawValue)"),
-            resolvingAgainstBaseURL: false
-        ) else {
-            return serverURL
-        }
-
-        var queryItems: [URLQueryItem] = []
-        if let maxWidth {
-            queryItems.append(URLQueryItem(name: "maxWidth", value: String(maxWidth)))
-        }
-        if let maxHeight {
-            queryItems.append(URLQueryItem(name: "maxHeight", value: String(maxHeight)))
-        }
-        if !queryItems.isEmpty {
-            components.queryItems = queryItems
-        }
-
-        return components.url ?? serverURL
-    }
-}
-
-// MARK: - Private Helpers
-
-extension JellyfinService {
-    func authenticatedRequest(url: URL) throws -> URLRequest {
-        guard accessToken != nil else {
-            throw JellyfinError.notAuthenticated
-        }
-
-        var request = URLRequest(url: url)
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-        request.addValue(authorizationHeader(includeToken: true), forHTTPHeaderField: "Authorization")
-
-        return request
+        let request = Paths.getItemImage(
+            itemID: itemID,
+            imageType: imageType.rawValue,
+            parameters: .init(maxWidth: maxWidth, maxHeight: maxHeight)
+        )
+        return transport.url(for: request) ?? serverURL
     }
 
-    private func authorizationHeader(includeToken: Bool) -> String {
-        var params = [
-            "Client=\"\(clientName)\"",
-            "Device=\"iOS\"",
-            "DeviceId=\"\(deviceID)\"",
-            "Version=\"\(clientVersion)\""
-        ]
-
-        if includeToken, let token = accessToken {
-            params.append("Token=\"\(token)\"")
-        }
-
-        return "MediaBrowser \(params.joined(separator: ", "))"
-    }
-
-    private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        do {
-            return try await session.data(for: request)
-        } catch {
-            throw JellyfinError.networkError(error)
-        }
-    }
-
-    private func validateResponse(_ response: URLResponse, data: Data) throws {
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw JellyfinError.networkError(URLError(.badServerResponse))
-        }
-
-        guard (200 ... 299).contains(httpResponse.statusCode) else {
-            throw JellyfinError.serverError(httpResponse.statusCode, String(data: data, encoding: .utf8))
-        }
-    }
-}
-
-// MARK: - Public Accessors
-
-public extension JellyfinService {
     func getServerURL() -> URL {
         serverURL
     }
@@ -552,60 +282,90 @@ public extension JellyfinService {
     func getDeviceID() -> String {
         deviceID
     }
-}
 
-// MARK: - User Progress
-
-public extension JellyfinService {
     func reportPlaybackProgress(itemId: String, positionTicks: Int64, isPaused: Bool) async throws {
-        guard userID != nil else { throw JellyfinError.notAuthenticated }
-        // appendingPathComponent keeps any reverse-proxy base path (e.g. /jellyfin)
-        let url = serverURL.appendingPathComponent("Sessions/Playing/Progress")
-        var request = try authenticatedRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "ItemId": itemId, "PositionTicks": positionTicks, "IsPaused": isPaused, "PlaySessionId": UUID().uuidString
-        ] as [String: Any])
-        let (_, resp) = try await session.data(for: request)
-        guard let http = resp as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
-            throw JellyfinError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0, nil)
-        }
+        _ = try authenticatedUserID()
+        let body = OfflinePlaybackProgress(
+            itemID: itemId,
+            positionTicks: positionTicks,
+            isPaused: isPaused,
+            playSessionID: UUID().uuidString
+        )
+        var request = Paths.reportPlaybackProgress()
+        request.body = body
+        try await send(request)
     }
 
     func setFavorite(itemId: String, isFavorite: Bool) async throws {
-        guard let userID else { throw JellyfinError.notAuthenticated }
-        // appendingPathComponent keeps any reverse-proxy base path (e.g. /jellyfin)
-        let url = serverURL.appendingPathComponent("Users/\(userID)/FavoriteItems/\(itemId)")
-        var request = try authenticatedRequest(url: url)
-        request.httpMethod = isFavorite ? "POST" : "DELETE"
-        let (_, resp) = try await session.data(for: request)
-        guard let http = resp as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
-            throw JellyfinError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0, nil)
+        let userID = try authenticatedUserID()
+        if isFavorite {
+            try await send(Paths.markFavoriteItem(itemID: itemId, userID: userID))
+        } else {
+            try await send(Paths.unmarkFavoriteItem(itemID: itemId, userID: userID))
         }
     }
 
     func markAsPlayed(itemId: String) async throws {
-        guard let userID else { throw JellyfinError.notAuthenticated }
-        // appendingPathComponent keeps any reverse-proxy base path (e.g. /jellyfin)
-        let url = serverURL.appendingPathComponent("Users/\(userID)/PlayedItems/\(itemId)")
-        var request = try authenticatedRequest(url: url)
-        request.httpMethod = "POST"
-        let (_, resp) = try await session.data(for: request)
-        guard let http = resp as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
-            throw JellyfinError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0, nil)
-        }
+        try await send(Paths.markPlayedItem(itemID: itemId, userID: authenticatedUserID()))
     }
 
     func markAsUnplayed(itemId: String) async throws {
-        guard let userID else { throw JellyfinError.notAuthenticated }
-        // appendingPathComponent keeps any reverse-proxy base path (e.g. /jellyfin)
-        let url = serverURL.appendingPathComponent("Users/\(userID)/PlayedItems/\(itemId)")
-        var request = try authenticatedRequest(url: url)
-        request.httpMethod = "DELETE"
-        let (_, resp) = try await session.data(for: request)
-        guard let http = resp as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
-            throw JellyfinError.serverError((resp as? HTTPURLResponse)?.statusCode ?? 0, nil)
+        try await send(Paths.markUnplayedItem(itemID: itemId, userID: authenticatedUserID()))
+    }
+}
+
+private extension JellyfinService {
+    func authenticatedUserID() throws -> String {
+        guard let userID, accessToken != nil else { throw JellyfinError.notAuthenticated }
+        return userID
+    }
+
+    func sdkValues<T: RawRepresentable>(_ values: [String]) throws -> [T] where T.RawValue == String {
+        try values.map { value in
+            guard let result = T(rawValue: value) else { throw JellyfinError.invalidURL }
+            return result
         }
+    }
+
+    func performRequest(
+        _ request: Request<some Any>,
+        using client: JellyfinSDKTransport? = nil
+    ) async throws -> (Data, HTTPURLResponse) {
+        do {
+            return try await (client ?? transport).data(for: request)
+        } catch {
+            throw JellyfinError.networkError(error)
+        }
+    }
+
+    func validateResponse(_ response: HTTPURLResponse, data: Data) throws {
+        guard (200 ... 299).contains(response.statusCode) else {
+            throw JellyfinError.serverError(response.statusCode, String(data: data, encoding: .utf8))
+        }
+    }
+
+    func decode<T: Decodable>(_ type: T.Type, from request: Request<some Any>) async throws -> T {
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+        return try decoder.decode(type, from: data)
+    }
+
+    func send(_ request: Request<some Any>) async throws {
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+    }
+}
+
+private struct OfflinePlaybackProgress: Encodable {
+    let itemID: String
+    let positionTicks: Int64
+    let isPaused: Bool
+    let playSessionID: String
+
+    enum CodingKeys: String, CodingKey {
+        case itemID = "ItemId"
+        case positionTicks = "PositionTicks"
+        case isPaused = "IsPaused"
+        case playSessionID = "PlaySessionId"
     }
 }
