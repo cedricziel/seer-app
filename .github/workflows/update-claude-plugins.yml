@@ -4,13 +4,15 @@ on:
     - cron: "0 6 * * 1"
   workflow_dispatch:
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: cedricziel/claude-plugins/actions/update-plugin@main
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+      - uses: cedricziel/claude-plugins/actions/update-plugin@b30beb9324f808081ca8c6a36c2c3597d1143158
         with:
           plugins: oss
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
