@@ -77,6 +77,11 @@ extension DownloadManager: BackgroundSessionDelegate {
                 fileName: "\(download.itemID).mp4"
             )
 
+            let fileSize = try await storage.fileSize(relativePath: relativePath)
+            try await store.updateProgress(
+                downloadID: downloadID, progress: 1, bytesDownloaded: fileSize, totalBytes: fileSize
+            )
+
             // Update download record
             try await store.updateFilePath(downloadID: downloadID, relativePath: relativePath)
             try await store.updateState(downloadID: downloadID, state: .completed)

@@ -118,6 +118,21 @@ public final class DownloadManager {
         }
     }
 
+    init(
+        modelContainer: ModelContainer,
+        storage: DownloadStorage,
+        sessionManager: BackgroundSessionManager,
+        queue: DownloadQueue
+    ) {
+        self.modelContainer = modelContainer
+        store = DownloadStore(modelContainer: modelContainer)
+        self.storage = storage
+        self.sessionManager = sessionManager
+        self.queue = queue
+        wifiOnlyEnabled = false
+        sessionManager.delegate = self
+    }
+
     // MARK: - Configuration
 
     /// Configure with server credentials

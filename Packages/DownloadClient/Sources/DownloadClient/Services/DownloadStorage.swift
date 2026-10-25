@@ -43,6 +43,11 @@ public actor DownloadStorage {
         }
     }
 
+    init(downloadsDirectory: URL) throws {
+        self.downloadsDirectory = downloadsDirectory
+        try FileManager.default.createDirectory(at: downloadsDirectory, withIntermediateDirectories: true)
+    }
+
     // MARK: - Directory Management
 
     /// Get the directory for a specific server and media type
