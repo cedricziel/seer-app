@@ -36,6 +36,8 @@ or filter, and progress isolation between servers with matching media IDs.
 
 For onboarding persistence changes, run `AuthFeatureTests/OnboardingViewModelTests` on the dedicated simulator. Verify password and Quick Connect reauthentication preserve the saved UUID, settings, and server count while refreshing credentials. Manual and Bonjour onboarding must still create a new server. Keep SwiftData in memory and use test credentials.
 
+For offline library initialization changes, run the hosted `LibraryFeatureTests/LibraryOfflineInitializationTests` suite on a disposable simulator with `-parallel-testing-enabled NO`. It uses an in-memory SwiftData store, fixed offline connectivity, temporary server credentials, and a URL protocol trap that rejects fixture-server requests. It covers home, independent library/recently-added grids, movie metadata, and series seasons/episodes. Use an empty `Config/Secrets.xcconfig` in a temporary source snapshot. Do not copy production secrets.
+
 Check these journeys on an isolated simulator:
 
 - Search defaults to Library without Jellyseerr; a result opens existing media details and playback.

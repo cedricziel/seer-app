@@ -170,6 +170,27 @@ public final class LibraryViewModel: ObservableObject {
         hasMoreItems = true
     }
 
+    func loadHome(modelContext: ModelContext, networkMonitor: NetworkMonitor) async {
+        setupOfflineSync(modelContext: modelContext, networkMonitor: networkMonitor)
+        await loadInitialData()
+    }
+
+    func enterDestination(
+        _ destination: LibraryGridDestination, modelContext: ModelContext, networkMonitor: NetworkMonitor
+    ) async {
+        setupOfflineSync(modelContext: modelContext, networkMonitor: networkMonitor)
+        switch destination {
+        case let .library(library):
+            isRecentlyAddedFeed = false
+            selectedMediaType = .all
+            await selectLibrary(library)
+        case .recentlyAdded:
+            isRecentlyAddedFeed = true
+            watchStatusFilter = .all
+            await selectLibrary(nil)
+        }
+    }
+
     func loadInitialData() async {
         loadTask?.cancel()
         await loadCachedDataIfAvailable()
@@ -397,6 +418,14 @@ public final class LibraryViewModel: ObservableObject {
 
     /// Fetch full item details including format information (MediaSources)
     func getItemDetails(id: String) async -> MediaItem? {
+        if networkMonitor?.isConnected == false {
+            guard let serverConfigurationID, let modelContext else { return nil }
+            let descriptor = FetchDescriptor<CachedMediaItem>(predicate: #Predicate {
+                $0.id == id && $0.serverConfigurationID == serverConfigurationID
+            })
+            guard let cached = try? modelContext.fetch(descriptor).first else { return nil }
+            return dataConverter.convertToMediaItem(cached)
+        }
         guard let service = jellyfinService else { return nil }
         do {
             return try await service.getItem(id: id)

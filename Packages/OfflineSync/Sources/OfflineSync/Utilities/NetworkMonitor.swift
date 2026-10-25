@@ -24,6 +24,12 @@ public final class NetworkMonitor: ObservableObject {
         startMonitoring()
     }
 
+    /// Creates a fixed connectivity state for previews and isolated tests without monitoring the device.
+    public init(isConnected: Bool) {
+        monitor = NWPathMonitor()
+        self.isConnected = isConnected
+    }
+
     private func startMonitoring() {
         monitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
