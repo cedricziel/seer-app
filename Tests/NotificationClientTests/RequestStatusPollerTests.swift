@@ -21,6 +21,25 @@ final class RequestStatusPollerTests: XCTestCase {
         XCTAssertEqual(result.cached?.mediaStatus, 5)
     }
 
+    func testCompletedRequestStillAnnouncesMediaAvailability() async throws {
+        let result = try await run([
+            response(status: 2, media: 3),
+            response(status: 5, media: 5),
+            response(status: 5, media: 5)
+        ])
+        XCTAssertEqual(result.events, ["A:Media Available"])
+        XCTAssertEqual(result.cached?.status, 5)
+    }
+
+    func testCompleted4KRequestStillAnnounces4KAvailability() async throws {
+        let result = try await run([
+            response(status: 2, media: 5, media4k: 3, is4k: true),
+            response(status: 5, media: 5, media4k: 5, is4k: true)
+        ])
+        XCTAssertEqual(result.events, ["A:Media Available"])
+        XCTAssertEqual(result.cached?.status, 5)
+    }
+
     func testPartialAvailabilityWaitsForFullAvailability() async throws {
         let partial = try await run([response(media: 3), response(media: 4)])
         XCTAssertTrue(partial.events.isEmpty)

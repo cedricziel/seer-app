@@ -147,7 +147,8 @@ public actor RequestStatusPoller {
         }
 
         let mediaStatus = request.is4k ? request.media.status4k : request.media.status
-        if request.status == .approved,
+        if request.status != .pending,
+           request.status != .declined,
            let previous = cached.mediaStatus,
            previous != MediaRequest.MediaAvailabilityStatus.available.rawValue,
            mediaStatus == MediaRequest.MediaAvailabilityStatus.available.rawValue {
