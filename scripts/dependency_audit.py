@@ -40,6 +40,14 @@ def dependency_pins():
         if f'{name}_VERSION="{version}"' not in hook:
             raise ValueError(f'{name} versions differ between CI and the session hook')
 
+    source = 'Packages/JellyseerrAPI/README.md'
+    guide = (ROOT / source).read_text()
+    for repo, pattern in [
+        ('apple/swift-openapi-generator', r'`swift-openapi-generator` (\d+\.\d+\.\d+)'),
+        ('seerr-team/seerr', r'\[Seerr v(\d+\.\d+\.\d+)'),
+    ]:
+        yield repo, re.search(pattern, guide).group(1), source
+
 
 def audit():
     releases = {}
