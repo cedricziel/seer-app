@@ -22,7 +22,11 @@ make resolve        # Resolve Swift package dependencies
 make clean          # Remove build/, DerivedData/, and *.xcodeproj
 ```
 
-Run a single test (the SeerApp scheme includes `PlaybackClientTests` and `DownloadClientTests`):
+Run a single test. The SeerApp scheme runs `SeerCoreTests`, `PlaybackClientTests`,
+`DownloadClientTests`, `JellyfinClientTests`, `JellyseerrClientTests`,
+`OfflineSyncTests`, `NotificationClientTests`, `SeerUITests`, `AuthFeatureTests`
+and `LibraryFeatureTests`; `SeerUITestsTV` and `SeerAppUITests` have their own
+schemes and are not part of CI:
 ```bash
 xcodebuild test -scheme SeerApp \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
@@ -139,4 +143,4 @@ device unless the user opts in via `PrivacySettingsView` /
 
 - iOS 26.0+ / tvOS 26.0+
 - Swift 6.2
-- Xcode 16.0+
+- Xcode 26+ (iOS 26 SDK)

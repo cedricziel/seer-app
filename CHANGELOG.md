@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.7.1](https://github.com/cedricziel/seer-app/compare/v0.7.0...v0.7.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* **library:** keep one navigation container per platform and put the toolbar inside the stack ([#51](https://github.com/cedricziel/seer-app/issues/51)) ([d52db59](https://github.com/cedricziel/seer-app/commit/d52db59d82b659fcd1bb201f9d3c71cd4666b3d6))
+
+## [0.7.0](https://github.com/cedricziel/seer-app/compare/v0.6.2...v0.7.0) (2026-09-06)
+
+
+### Features
+
+* **library:** redesign Library home and detail screens across iPhone, iPad, Mac and tvOS ([#45](https://github.com/cedricziel/seer-app/issues/45)) ([47ad39d](https://github.com/cedricziel/seer-app/commit/47ad39d41affc58add9e4ea7dca236db3621c526))
+
+## [0.6.2](https://github.com/cedricziel/seer-app/compare/v0.6.1...v0.6.2) (2026-09-04)
+
+
+### Bug Fixes
+
+* recover background downloads, persist sync and notification state, harden playback teardown ([#42](https://github.com/cedricziel/seer-app/issues/42)) ([753b749](https://github.com/cedricziel/seer-app/commit/753b7492c1b13d09af092c006ae2d5a276daa9d0))
+
 ## [0.6.1](https://github.com/cedricziel/seer-app/compare/v0.6.0...v0.6.1) (2026-05-03)
 
 

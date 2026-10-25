@@ -44,6 +44,11 @@ public final class PiPPlaybackManager {
     /// This MUST be stored because AVPlayerViewController.delegate is weak
     private var pipDelegate: (any AVPlayerViewControllerDelegate)?
 
+    /// Invoked when the user closes the PiP window outside of a restoration
+    /// (the "X" button). Lets the owning view model stop playback and
+    /// progress reporting, since no view is around to do it.
+    private var onPiPClosed: (@MainActor () -> Void)?
+
     /// Image URL for the current item's artwork (used for Now Playing info)
     private var artworkURL: URL?
 
@@ -148,17 +153,20 @@ public final class PiPPlaybackManager {
     ///   - item: The media item being played
     ///   - controller: The AVPlayerViewController - MUST be preserved for restoration
     ///   - delegate: The AVPlayerViewControllerDelegate - MUST be stored to survive view deallocation
+    ///   - onClosed: Called if the PiP window is closed without restoring the UI
     public func pipDidStart(
         player: AVPlayer,
         item: MediaItem,
         controller: AVPlayerViewController,
-        delegate: any AVPlayerViewControllerDelegate
+        delegate: any AVPlayerViewControllerDelegate,
+        onClosed: (@MainActor () -> Void)? = nil
     ) {
         print("[PiPManager] pipDidStart - storing delegate to prevent deallocation")
         pipPlayer = player
         pipItem = item
         pipController = controller
         pipDelegate = delegate // CRITICAL: Keep delegate alive!
+        onPiPClosed = onClosed
         isPiPActive = true
         isRestoring = false
     }
@@ -173,12 +181,13 @@ public final class PiPPlaybackManager {
             return
         }
 
-        print("[PiPManager] pipDidStop - clearing player (not restoring)")
-        pipPlayer = nil
-        pipItem = nil
-        pipController = nil
-        isPiPActive = false
-        shouldRestorePlayer = false
+        print("[PiPManager] pipDidStop - closing (not restoring)")
+        // The user dismissed the PiP window. Nothing else owns the player any
+        // more, so stop it here and let the view model finish its reporting.
+        pipPlayer?.pause()
+        let closed = onPiPClosed
+        clearPlayer()
+        closed?()
     }
 
     /// Marks the start of a restoration flow without doing any UIKit presentation.
@@ -287,6 +296,7 @@ public final class PiPPlaybackManager {
         pipItem = nil
         pipController = nil
         pipDelegate = nil // Release delegate
+        onPiPClosed = nil
         artworkURL = nil
         isPiPActive = false
         isRestoring = false

@@ -98,51 +98,61 @@ struct ServerManagementView: View {
                 }
             }
             .navigationTitle("Manage Servers")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Done") {
-                        dismiss()
+            #if !os(tvOS)
+                .navigationBarTitleDisplayMode(.inline)
+            #endif
+                .toolbar {
+                    // `.cancellationAction` / `.primaryAction` (rather than
+                    // `.topBarLeading` / `.topBarTrailing`, neither of which
+                    // exists on tvOS) keep this screen reachable from
+                    // `ServerSwitcherView`'s tvOS branch while still rendering
+                    // in the same leading/trailing bar positions on iOS.
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Done") {
+                            dismiss()
+                        }
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            showingAddServer = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingAddServer = true
-                    } label: {
-                        Image(systemName: "plus")
+                .sheet(item: $serverToEdit) { config in
+                    ServerEditView(config: config)
+                }
+                .sheet(isPresented: $showingAddServer) {
+                    AddServerView()
+                }
+                .alert(
+                    "Delete Server?",
+                    isPresented: .init(
+                        get: { serverToDelete != nil },
+                        set: { if !$0 { serverToDelete = nil } }
+                    )
+                ) {
+                    Button("Cancel", role: .cancel) {
+                        serverToDelete = nil
                     }
-                }
-            }
-            .sheet(item: $serverToEdit) { config in
-                ServerEditView(config: config)
-            }
-            .sheet(isPresented: $showingAddServer) {
-                AddServerView()
-            }
-            .alert(
-                "Delete Server?",
-                isPresented: .init(
-                    get: { serverToDelete != nil },
-                    set: { if !$0 { serverToDelete = nil } }
-                )
-            ) {
-                Button("Cancel", role: .cancel) {
-                    serverToDelete = nil
-                }
-                Button("Delete", role: .destructive) {
+                    Button("Delete", role: .destructive) {
+                        if let server = serverToDelete {
+                            appState.deleteServer(server)
+                        }
+                        serverToDelete = nil
+                    }
+                } message: {
                     if let server = serverToDelete {
-                        appState.deleteServer(server)
+                        Text(
+                            "Are you sure you want to delete \"\(server.name)\"? "
+                                + "This will remove all stored credentials."
+                        )
                     }
-                    serverToDelete = nil
                 }
-            } message: {
-                if let server = serverToDelete {
-                    Text("Are you sure you want to delete \"\(server.name)\"? This will remove all stored credentials.")
+                .task {
+                    await cloudKitStatus.checkStatus()
                 }
-            }
-            .task {
-                await cloudKitStatus.checkStatus()
-            }
         }
     }
 

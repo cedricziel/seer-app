@@ -235,15 +235,21 @@ extension BackgroundSessionManager: URLSessionDownloadDelegate {
     ) {
         print("[Download] Complete: task \(downloadTask.taskIdentifier)")
 
-        guard let downloadID = downloadID(forTask: downloadTask.taskIdentifier) else {
-            print("[Download] Warning: No download ID found for task \(downloadTask.taskIdentifier)")
-            unregisterTask(downloadTask.taskIdentifier)
-            return
+        // The in-memory task map is empty when iOS relaunches the app in the
+        // background to deliver this event. The file must still be preserved
+        // SYNCHRONOUSLY (the system deletes `location` once this returns), so
+        // fall back to a task-identifier-keyed name that the download manager
+        // can reconcile against the persisted `Download.taskIdentifier`.
+        let downloadID = downloadID(forTask: downloadTask.taskIdentifier)
+        if downloadID == nil {
+            print("[Download] No in-memory download ID for task \(downloadTask.taskIdentifier); preserving by task")
         }
 
-        // Move file SYNCHRONOUSLY before callback returns
-        // The temp file will be deleted by the system after this method returns
-        let intermediateURL = moveToIntermediateLocation(tempURL: location, downloadID: downloadID)
+        let intermediateURL = moveToIntermediateLocation(
+            tempURL: location,
+            downloadID: downloadID,
+            taskIdentifier: downloadTask.taskIdentifier
+        )
 
         delegate?.downloadDidComplete(
             taskIdentifier: downloadTask.taskIdentifier,
@@ -253,14 +259,41 @@ extension BackgroundSessionManager: URLSessionDownloadDelegate {
         unregisterTask(downloadTask.taskIdentifier)
     }
 
+    // MARK: - Pending (completed-but-unprocessed) files
+
+    /// Directory that holds files the URLSession has finished downloading but
+    /// the `DownloadManager` has not yet moved into the downloads folder. Lives
+    /// in Application Support rather than `tmp` so it survives until the app
+    /// next has a chance to reconcile (e.g. after a background relaunch).
+    public static var pendingDirectory: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return base.appendingPathComponent("PendingDownloads", isDirectory: true)
+    }
+
+    /// Location a completed file is parked at when its download ID is known.
+    public static func pendingFileURL(forDownload downloadID: UUID) -> URL {
+        pendingDirectory.appendingPathComponent("download-\(downloadID.uuidString).tmp")
+    }
+
+    /// Location a completed file is parked at when only the URLSession task
+    /// identifier is known (background relaunch before the manager exists).
+    public static func pendingFileURL(forTask taskIdentifier: Int) -> URL {
+        pendingDirectory.appendingPathComponent("download-task-\(taskIdentifier).tmp")
+    }
+
     /// Move temp file to a safe intermediate location synchronously
     /// Returns the new URL if successful, nil if failed
-    private func moveToIntermediateLocation(tempURL: URL, downloadID: UUID) -> URL? {
+    private func moveToIntermediateLocation(tempURL: URL, downloadID: UUID?, taskIdentifier: Int) -> URL? {
         let fileManager = FileManager.default
-        let tempDir = fileManager.temporaryDirectory
-        let intermediateURL = tempDir.appendingPathComponent("download-\(downloadID.uuidString).tmp")
+        let intermediateURL = if let downloadID {
+            Self.pendingFileURL(forDownload: downloadID)
+        } else {
+            Self.pendingFileURL(forTask: taskIdentifier)
+        }
 
         do {
+            try fileManager.createDirectory(at: Self.pendingDirectory, withIntermediateDirectories: true)
             // Remove any existing file at intermediate location
             if fileManager.fileExists(atPath: intermediateURL.path) {
                 try fileManager.removeItem(at: intermediateURL)

@@ -9,84 +9,114 @@ extension DownloadManager: BackgroundSessionDelegate {
         bytesWritten: Int64,
         totalBytes: Int64
     ) {
-        guard let downloadID = sessionManager.downloadID(forTask: taskIdentifier) else { return }
-
         Task { @MainActor [weak self] in
-            try? await self?.store.updateProgress(
+            guard let self, let downloadID = await resolveDownloadID(forTask: taskIdentifier) else { return }
+            try? await store.updateProgress(
                 downloadID: downloadID,
                 progress: progress,
                 bytesDownloaded: bytesWritten,
                 totalBytes: totalBytes
             )
-            await self?.refresh()
+            await refresh()
         }
     }
 
     public nonisolated func downloadDidComplete(taskIdentifier: Int, tempFileURL: URL) {
-        guard let downloadID = sessionManager.downloadID(forTask: taskIdentifier) else { return }
-
         Task { @MainActor [weak self] in
-            guard let self,
-                  let download = try? await store.fetchDownload(id: downloadID)
-            else {
-                // Clean up intermediate file if we can't process the download
+            guard let self else { return }
+            guard let downloadID = await resolveDownloadID(forTask: taskIdentifier) else {
+                // Nothing in the store refers to this task; the file is orphaned.
                 try? FileManager.default.removeItem(at: tempFileURL)
                 return
             }
+            await finalizeDownload(downloadID: downloadID, tempFileURL: tempFileURL)
+        }
+    }
 
-            do {
-                // Move file from intermediate location to permanent location
-                let relativePath = try await storage.moveDownloadedFile(
-                    from: tempFileURL,
-                    serverID: download.serverID,
-                    mediaType: download.mediaType,
-                    itemID: download.itemID,
-                    fileName: "\(download.itemID).mp4"
-                )
+    /// Resolve a URLSession task to a download. Prefers the session manager's
+    /// in-memory map; falls back to the persisted `Download.taskIdentifier`,
+    /// which is the only source of truth after a background relaunch.
+    func resolveDownloadID(forTask taskIdentifier: Int) async -> UUID? {
+        if let downloadID = sessionManager.downloadID(forTask: taskIdentifier) {
+            return downloadID
+        }
+        guard let download = try? await store.fetchDownload(taskIdentifier: taskIdentifier) else {
+            return nil
+        }
+        sessionManager.registerTask(taskIdentifier, forDownload: download.id)
+        return download.id
+    }
 
-                // Update download record
-                try await store.updateFilePath(downloadID: downloadID, relativePath: relativePath)
-                try await store.updateState(downloadID: downloadID, state: .completed)
+    /// Move a fully downloaded file from its pending location into permanent
+    /// storage and mark the download completed. Shared by the live delegate
+    /// path and the launch-time reconciliation in `requeuePendingDownloads`.
+    func finalizeDownload(downloadID: UUID, tempFileURL: URL) async {
+        // Claim before the first suspension so a concurrent caller sees it
+        guard !finalizingDownloadIDs.contains(downloadID) else { return }
+        finalizingDownloadIDs.insert(downloadID)
+        defer { finalizingDownloadIDs.remove(downloadID) }
 
-                // Notify delegate for notifications
-                await notificationDelegate?.downloadDidComplete(
-                    downloadID: downloadID,
-                    title: download.displayTitle,
-                    serverID: download.serverID,
-                    isAutoDownload: false // Auto-download tracking to be added
-                )
+        guard let download = try? await store.fetchDownload(id: downloadID) else {
+            // Clean up intermediate file if we can't process the download
+            try? FileManager.default.removeItem(at: tempFileURL)
+            return
+        }
+        guard download.state != .completed else {
+            // Already finalized by another path; the parked file is a leftover
+            try? FileManager.default.removeItem(at: tempFileURL)
+            return
+        }
 
-                await queue.markCompleted(downloadID)
-                await refresh()
-            } catch {
-                // Clean up intermediate file on failure
-                try? FileManager.default.removeItem(at: tempFileURL)
+        do {
+            // Move file from intermediate location to permanent location
+            let relativePath = try await storage.moveDownloadedFile(
+                from: tempFileURL,
+                serverID: download.serverID,
+                mediaType: download.mediaType,
+                itemID: download.itemID,
+                fileName: "\(download.itemID).mp4"
+            )
 
-                try? await store.updateState(
-                    downloadID: downloadID,
-                    state: .failed,
-                    errorMessage: error.localizedDescription
-                )
+            // Update download record
+            try await store.updateFilePath(downloadID: downloadID, relativePath: relativePath)
+            try await store.updateState(downloadID: downloadID, state: .completed)
 
-                // Notify delegate about failure
-                await notificationDelegate?.downloadDidFail(
-                    downloadID: downloadID,
-                    title: download.displayTitle,
-                    errorMessage: error.localizedDescription,
-                    serverID: download.serverID
-                )
+            // Notify delegate for notifications
+            await notificationDelegate?.downloadDidComplete(
+                downloadID: downloadID,
+                title: download.displayTitle,
+                serverID: download.serverID,
+                isAutoDownload: false // Auto-download tracking to be added
+            )
 
-                await queue.markCompleted(downloadID)
-                await refresh()
-            }
+            await queue.markCompleted(downloadID)
+            await refresh()
+        } catch {
+            // Clean up intermediate file on failure
+            try? FileManager.default.removeItem(at: tempFileURL)
+
+            try? await store.updateState(
+                downloadID: downloadID,
+                state: .failed,
+                errorMessage: error.localizedDescription
+            )
+
+            // Notify delegate about failure
+            await notificationDelegate?.downloadDidFail(
+                downloadID: downloadID,
+                title: download.displayTitle,
+                errorMessage: error.localizedDescription,
+                serverID: download.serverID
+            )
+
+            await queue.markCompleted(downloadID)
+            await refresh()
         }
     }
 
     public nonisolated func downloadDidFail(taskIdentifier: Int, error: Error, resumeData: Data?) {
-        guard let downloadID = sessionManager.downloadID(forTask: taskIdentifier) else { return }
-
         Task { @MainActor [weak self] in
-            guard let self else { return }
+            guard let self, let downloadID = await resolveDownloadID(forTask: taskIdentifier) else { return }
 
             // Save resume data if available
             if let resumeData {

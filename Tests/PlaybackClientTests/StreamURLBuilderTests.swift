@@ -459,7 +459,12 @@ final class StreamURLBuilderTests: XCTestCase {
 
         XCTAssertNotNil(result)
         XCTAssertTrue(result?.isTranscoded ?? false)
-        XCTAssertTrue(result?.url.absoluteString.contains("master.m3u8") ?? false)
+        XCTAssertTrue(result?.url.absoluteString.contains("/Videos/test-media-source-id/stream.mp4") ?? false)
+        XCTAssertFalse(
+            result?.url.absoluteString.contains("master.m3u8") ?? true,
+            "Downloads must never target the HLS playlist endpoint"
+        )
+        XCTAssertTrue(result?.url.absoluteString.contains("container=mp4") ?? false)
         XCTAssertTrue(result?.url.absoluteString.contains("maxWidth=1920") ?? false)
     }
 
@@ -482,7 +487,7 @@ final class StreamURLBuilderTests: XCTestCase {
 
         XCTAssertNotNil(result)
         XCTAssertTrue(result?.isTranscoded ?? false)
-        XCTAssertTrue(result?.url.absoluteString.contains("master.m3u8") ?? false)
+        XCTAssertTrue(result?.url.absoluteString.contains("/Videos/test-media-source-id/stream.mp4") ?? false)
         XCTAssertTrue(result?.url.absoluteString.contains("videoCodec=h264") ?? false)
         XCTAssertTrue(result?.url.absoluteString.contains("audioCodec=aac") ?? false)
     }
