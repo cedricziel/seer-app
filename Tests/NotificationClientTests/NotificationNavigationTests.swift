@@ -5,40 +5,43 @@ import XCTest
 
 @MainActor
 final class NotificationNavigationTests: XCTestCase {
-    func testDefaultActionRoutesRequestToItsServer() throws {
-        let (manager, delegate) = try makeManager()
-        let server = UUID()
-        manager.handleAction(
-            UNNotificationDefaultActionIdentifier,
-            categoryID: NotificationCategory.requestStatusChanged.rawValue,
-            info: NotificationInfo(requestID: 7, serverID: server.uuidString)
-        )
-        XCTAssertEqual(delegate.navigation.pendingDestination, .request(serverID: server, requestID: 7))
-    }
+    #if !os(tvOS)
+        func testDefaultActionRoutesRequestToItsServer() throws {
+            let (manager, delegate) = try makeManager()
+            let server = UUID()
+            manager.handleAction(
+                UNNotificationDefaultActionIdentifier,
+                categoryID: NotificationCategory.requestStatusChanged.rawValue,
+                info: NotificationInfo(requestID: 7, serverID: server.uuidString)
+            )
+            XCTAssertEqual(delegate.navigation.pendingDestination, .request(serverID: server, requestID: 7))
+        }
 
-    func testViewActionRoutesDownloadToItsServer() throws {
-        let (manager, delegate) = try makeManager()
-        let server = UUID()
-        let download = UUID()
-        manager.handleAction(
-            NotificationAction.view.rawValue,
-            categoryID: NotificationCategory.downloadCompleted.rawValue,
-            info: NotificationInfo(downloadID: download, serverID: server.uuidString)
-        )
-        XCTAssertEqual(delegate.navigation.pendingDestination, .download(serverID: server, downloadID: download))
-    }
+        func testViewActionRoutesDownloadToItsServer() throws {
+            let (manager, delegate) = try makeManager()
+            let server = UUID()
+            let download = UUID()
+            manager.handleAction(
+                NotificationAction.view.rawValue,
+                categoryID: NotificationCategory.downloadCompleted.rawValue,
+                info: NotificationInfo(downloadID: download, serverID: server.uuidString)
+            )
+            XCTAssertEqual(delegate.navigation.pendingDestination, .download(serverID: server, downloadID: download))
+        }
 
-    private func makeManager() throws -> (NotificationManager, NavigationDelegate) {
-        let schema = Schema([NotificationPreferences.self, CachedRequestStatus.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: schema, configurations: [config])
-        let manager = NotificationManager(
-            modelContainer: container, notificationCenter: InMemoryNotificationCenter(status: .authorized)
-        )
-        let delegate = NavigationDelegate()
-        manager.actionDelegate = delegate
-        return (manager, delegate)
-    }
+        private func makeManager() throws -> (NotificationManager, NavigationDelegate) {
+            let schema = Schema([NotificationPreferences.self, CachedRequestStatus.self])
+            let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            let container = try ModelContainer(for: schema, configurations: [config])
+            let manager = NotificationManager(
+                modelContainer: container, notificationCenter: InMemoryNotificationCenter(status: .authorized)
+            )
+            let delegate = NavigationDelegate()
+            manager.actionDelegate = delegate
+            return (manager, delegate)
+        }
+
+    #endif
 
     func testColdLaunchRequestWaitsForAuthenticationOnItsServer() {
         let navigation = NotificationNavigation()
@@ -90,14 +93,16 @@ final class NotificationNavigationTests: XCTestCase {
     }
 }
 
-@MainActor
-private final class NavigationDelegate: NotificationActionDelegate {
-    let navigation = NotificationNavigation()
+#if !os(tvOS)
+    @MainActor
+    private final class NavigationDelegate: NotificationActionDelegate {
+        let navigation = NotificationNavigation()
 
-    func didTapNotification(category: NotificationCategory, info: NotificationInfo) {
-        navigation.receive(category: category, info: info)
+        func didTapNotification(category: NotificationCategory, info: NotificationInfo) {
+            navigation.receive(category: category, info: info)
+        }
+
+        func didTapRetryDownload(downloadID _: UUID) {}
+        func didTapCancelDownload(downloadID _: UUID) {}
     }
-
-    func didTapRetryDownload(downloadID _: UUID) {}
-    func didTapCancelDownload(downloadID _: UUID) {}
-}
+#endif

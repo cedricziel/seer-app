@@ -14,6 +14,8 @@ struct ContentView: View {
     @State private var resolvedServerURL: URL?
     @State private var showPiPRestorePlayer = false
     @State private var checkedAuthentication: Bool?
+    @State private var whatsNewPresentationActive = false
+    @State private var pipPresentationActive = false
 
     private var resolutionContext: ServerURLResolver.Context? {
         guard let server = appState.activeServer else { return nil }
@@ -27,7 +29,8 @@ struct ContentView: View {
                    resolvedContext.matchesConfiguration(of: currentContext) {
                     MainTabView(
                         notificationPresentationReady: checkedAuthentication == true
-                            && !onboardingManager.showWhatsNew && !showPiPRestorePlayer
+                            && !onboardingManager.showWhatsNew && !whatsNewPresentationActive
+                            && !showPiPRestorePlayer && !pipPresentationActive
                     )
                     .id(resolvedServerURL)
                     .environmentObject(onboardingManager)
@@ -60,7 +63,9 @@ struct ContentView: View {
             else { return }
             appState.switchServer(to: destination.serverID)
         }
-        .playerCover(isPresented: $showPiPRestorePlayer) {
+        .playerCover(isPresented: $showPiPRestorePlayer, onDismiss: {
+            pipPresentationActive = false
+        }, content: {
             let pipManager = PiPPlaybackManager.shared
             if let item = pipManager.pipItem,
                let player = pipManager.pipPlayer {
@@ -74,8 +79,10 @@ struct ContentView: View {
             } else {
                 Color.clear.onAppear { showPiPRestorePlayer = false }
             }
-        }
-        .sheet(isPresented: $onboardingManager.showWhatsNew) {
+        })
+        .sheet(isPresented: $onboardingManager.showWhatsNew, onDismiss: {
+            whatsNewPresentationActive = false
+        }, content: {
             WhatsNewView(
                 appName: "Flowmark",
                 features: WhatsNewData.features,
@@ -85,12 +92,16 @@ struct ContentView: View {
             )
             .interactiveDismissDisabled()
             .presentationDetents([.large])
-        }
+        })
         .onChange(of: PiPPlaybackManager.shared.shouldRestorePlayer) { _, shouldRestore in
             if shouldRestore {
+                pipPresentationActive = true
                 showPiPRestorePlayer = true
                 PiPPlaybackManager.shared.clearRestoreRequest()
             }
+        }
+        .onChange(of: onboardingManager.showWhatsNew) { _, presented in
+            if presented { whatsNewPresentationActive = true }
         }
         .onAppear {
             if appState.isAuthenticated {

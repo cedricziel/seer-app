@@ -176,30 +176,30 @@ public final class NotificationManager: NSObject {
                 serverID: serverID
             )
 
-        await handleAction(actionID, categoryID: categoryID, info: info)
-    }
+            await handleAction(actionID, categoryID: categoryID, info: info)
+        }
 
-    @MainActor
-    func handleAction(_ actionID: String, categoryID: String, info: NotificationInfo) {
-        guard let delegate = actionDelegate,
-              let category = NotificationCategory(rawValue: categoryID)
-        else { return }
-        switch actionID {
-        case UNNotificationDefaultActionIdentifier, NotificationAction.view.rawValue:
-            delegate.didTapNotification(category: category, info: info)
-        case NotificationAction.retry.rawValue:
-            if let downloadID = info.downloadID {
-                delegate.didTapRetryDownload(downloadID: downloadID)
+        @MainActor
+        func handleAction(_ actionID: String, categoryID: String, info: NotificationInfo) {
+            guard let delegate = actionDelegate,
+                  let category = NotificationCategory(rawValue: categoryID)
+            else { return }
+            switch actionID {
+            case UNNotificationDefaultActionIdentifier, NotificationAction.view.rawValue:
+                delegate.didTapNotification(category: category, info: info)
+            case NotificationAction.retry.rawValue:
+                if let downloadID = info.downloadID {
+                    delegate.didTapRetryDownload(downloadID: downloadID)
+                }
+            case NotificationAction.cancel.rawValue:
+                if let downloadID = info.downloadID {
+                    delegate.didTapCancelDownload(downloadID: downloadID)
+                }
+            default:
+                break
             }
-        case NotificationAction.cancel.rawValue:
-            if let downloadID = info.downloadID {
-                delegate.didTapCancelDownload(downloadID: downloadID)
-            }
-        default:
-            break
         }
     }
-}
 
 #endif
 
