@@ -97,10 +97,16 @@ private struct LibraryContentView: View {
     }
 
     private func resolveRoute(_ route: FlowmarkURLRouter.MediaRoute) async -> MediaItem? {
-        guard let serverID = route.serverID ?? appState.activeServerID,
-              appState.configuration(for: serverID) != nil else { return nil }
-        if appState.activeServerID != serverID {
-            appState.switchServer(to: serverID)
+        guard let targetServerID = route.serverID ?? appState.activeServerID,
+              appState.configuration(for: targetServerID) != nil else { return nil }
+        let serverID: UUID
+        switch router.prepareMedia(route, activeServerID: appState.activeServerID) {
+        case let .switchServer(target):
+            appState.switchServer(to: target)
+            return nil
+        case let .load(target):
+            serverID = target
+        case nil:
             return nil
         }
         guard let credentials = appState.jellyfinCredentials(for: serverID) else { return nil }

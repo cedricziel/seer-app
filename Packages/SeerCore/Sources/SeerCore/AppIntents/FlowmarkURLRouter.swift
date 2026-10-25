@@ -25,6 +25,13 @@ public final class FlowmarkURLRouter: ObservableObject {
         public let serverID: UUID?
     }
 
+    private var resolutionServer: (routeID: UUID, serverID: UUID)?
+
+    public enum MediaServerAction: Equatable {
+        case switchServer(UUID)
+        case load(UUID)
+    }
+
     public nonisolated static let scheme = "flowmark"
 
     public init() {}
@@ -90,6 +97,22 @@ public final class FlowmarkURLRouter: ObservableObject {
             Self.logger.info("Unknown flowmark route: \(url.absoluteString)")
         }
         return result
+    }
+
+    /// Binds a lookup to one server. A later user server change cancels the route.
+    public func prepareMedia(_ route: MediaRoute, activeServerID: UUID?) -> MediaServerAction? {
+        guard pendingMedia?.id == route.id else { return nil }
+        if resolutionServer?.routeID != route.id {
+            guard let serverID = route.serverID ?? activeServerID else { return nil }
+            resolutionServer = (route.id, serverID)
+            if serverID != activeServerID { return .switchServer(serverID) }
+        }
+        guard let serverID = resolutionServer?.serverID else { return nil }
+        guard serverID == activeServerID else {
+            pendingMedia = nil
+            return nil
+        }
+        return .load(serverID)
     }
 
     /// Opens the resolved item once. Superseded routes and cancelled lookups cannot navigate.

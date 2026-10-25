@@ -85,6 +85,40 @@ final class FlowmarkURLRouterTests: XCTestCase {
         XCTAssertNil(router.pendingMedia)
     }
 
+    func testQualifiedRouteSwitchesServerBeforeLoading() throws {
+        let router = FlowmarkURLRouter()
+        let serverID = UUID()
+        router.route(ResumeWatchingIntent.mediaURL(for: "shared", serverID: serverID))
+        let route = try XCTUnwrap(router.pendingMedia)
+
+        XCTAssertEqual(router.prepareMedia(route, activeServerID: UUID()), .switchServer(serverID))
+        XCTAssertEqual(router.prepareMedia(route, activeServerID: serverID), .load(serverID))
+    }
+
+    func testUserServerSwitchCancelsFailedQualifiedRoute() async throws {
+        let router = FlowmarkURLRouter()
+        let serverID = UUID()
+        router.route(ResumeWatchingIntent.mediaURL(for: "shared", serverID: serverID))
+        let route = try XCTUnwrap(router.pendingMedia)
+        _ = router.prepareMedia(route, activeServerID: serverID)
+        await router.consumePendingMedia { _ -> String? in nil } open: { _ in XCTFail("Missing item opened") }
+
+        let nextAction = router.prepareMedia(route, activeServerID: UUID())
+
+        XCTAssertNil(nextAction)
+        XCTAssertNil(router.pendingMedia)
+    }
+
+    func testUserServerSwitchCancelsLegacyRoute() throws {
+        let router = FlowmarkURLRouter()
+        router.route(ResumeWatchingIntent.mediaURL(for: "shared"))
+        let route = try XCTUnwrap(router.pendingMedia)
+        _ = router.prepareMedia(route, activeServerID: UUID())
+
+        XCTAssertNil(router.prepareMedia(route, activeServerID: UUID()))
+        XCTAssertNil(router.pendingMedia)
+    }
+
     /// Wrong-scheme URLs round-trip as `.unknown`.
     func testRejectsWrongScheme() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/media/abc"))
