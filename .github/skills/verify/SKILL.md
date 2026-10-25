@@ -5,6 +5,8 @@ description: Verify Seer changes with static checks and isolated builds, includi
 
 Run from the repository root:
 
+For PiP restoration changes, run `.claude/skills/verify/scripts/pip-tests.sh SIMULATOR_RUNTIME_IDENTIFIER`. The script creates and deletes its own simulator and test project. It compiles the real manager and covers paused, buffering, and playing restoration plus artwork callback isolation without launching the app or loading media URLs.
+
 1. Run `./scripts/swift-tools swiftlint lint --strict --no-cache`, `./scripts/swift-tools swiftformat --lint . --cache ignore`, `plutil -lint App/SeerApp/Info.plist`, and `git diff --check`. Separate pre-existing failures from changed-file failures.
 2. Generate the Xcode project with `xcodegen generate`. Never edit the generated project directly.
 3. For dependency maintenance, run `python3 -m unittest discover -s scripts -p 'test_*.py'` and `actionlint .github/workflows/dependency-audit.yml`. Run `python3 scripts/dependency_audit.py` with authenticated `gh`; exit 1 with a release table means unreviewed newer candidates exist, while an API or parsing error means the audit did not complete.

@@ -1,6 +1,7 @@
 import AVKit
 @testable import JellyfinClient
 @testable import PlaybackClient
+import Synchronization
 import XCTest
 
 /// Mock delegate for testing
@@ -91,6 +92,42 @@ final class PiPPlaybackManagerTests: XCTestCase {
         XCTAssertNotNil(sut.pipController)
         XCTAssertTrue(sut.isRestoring)
         XCTAssertFalse(sut.isPiPActive)
+    }
+
+    func testRestoringPausedPiPDoesNotResumePlayback() {
+        let player = RestorationPlayer(status: .paused)
+        sut.pipDidStart(
+            player: player, item: createTestMediaItem(),
+            controller: AVPlayerViewController(), delegate: mockDelegate
+        )
+
+        sut.requestRestoreUI { _ in }
+
+        XCTAssertEqual(player.playCalls, 0)
+    }
+
+    func testRestoringBufferingPiPDoesNotRestartPlayback() {
+        let player = RestorationPlayer(status: .waitingToPlayAtSpecifiedRate)
+        sut.pipDidStart(
+            player: player, item: createTestMediaItem(),
+            controller: AVPlayerViewController(), delegate: mockDelegate
+        )
+
+        sut.requestRestoreUI { _ in }
+
+        XCTAssertEqual(player.playCalls, 0)
+    }
+
+    func testRestoringPlayingPiPDoesNotRestartPlayback() {
+        let player = RestorationPlayer(status: .playing)
+        sut.pipDidStart(
+            player: player, item: createTestMediaItem(),
+            controller: AVPlayerViewController(), delegate: mockDelegate
+        )
+
+        sut.requestRestoreUI { _ in }
+
+        XCTAssertEqual(player.playCalls, 0)
     }
 
     // MARK: - Restore UI Flow Tests
@@ -188,5 +225,27 @@ final class PiPPlaybackManagerTests: XCTestCase {
             name: "Test Movie",
             type: .movie
         )
+    }
+}
+
+private final class RestorationPlayer: AVPlayer, @unchecked Sendable {
+    private let simulatedStatus: AVPlayer.TimeControlStatus
+    private let playCounter = Mutex(0)
+
+    var playCalls: Int {
+        playCounter.withLock { $0 }
+    }
+
+    init(status: AVPlayer.TimeControlStatus) {
+        simulatedStatus = status
+        super.init()
+    }
+
+    override var timeControlStatus: AVPlayer.TimeControlStatus {
+        simulatedStatus
+    }
+
+    override func play() {
+        playCounter.withLock { $0 += 1 }
     }
 }
