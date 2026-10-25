@@ -19,13 +19,21 @@ struct InstallationIDStore {
         self.add = add
     }
 
-    func installationID() -> String? {
-        let query: [String: Any] = [
+    private var query: [String: Any] {
+        [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: "com.cedricziel.seer.telemetry",
             kSecAttrAccount as String: "installation_id",
             kSecAttrSynchronizable as String: false
         ]
+    }
+
+    func existingID() -> String? {
+        let (status, data) = readItem(query)
+        return status == errSecSuccess ? decodeID(data) : nil
+    }
+
+    func installationID() -> String? {
         let (status, data) = readItem(query)
         if status == errSecSuccess {
             return decodeID(data)

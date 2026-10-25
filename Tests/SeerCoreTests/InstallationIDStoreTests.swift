@@ -4,6 +4,12 @@ import Security
 import XCTest
 
 final class InstallationIDStoreTests: XCTestCase {
+    func testReadingExistingIDDoesNotCreateOne() {
+        let keychain = InMemoryInstallationKeychain()
+        XCTAssertNil(keychain.store().existingID())
+        XCTAssertNil(keychain.savedItem)
+    }
+
     func testCreatesUUIDAndReusesItAcrossStoreInstances() throws {
         let keychain = InMemoryInstallationKeychain()
         let first = try XCTUnwrap(keychain.store().installationID())
