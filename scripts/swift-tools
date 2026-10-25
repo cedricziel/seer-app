@@ -10,7 +10,7 @@ if [ "$platform" = Linux ]; then
 fi
 
 ensure_tool() {
-    local tool="$1" version asset member checksum _platform destination stage actual repository
+    local tool="$1" version asset member checksum _platform destination actual repository
     read -r tool version _platform asset member checksum < <(awk -v tool="$tool" -v platform="$platform" '$1 == tool && $3 == platform {print}' "$root/scripts/swift-tools.lock")
     if [ -z "${checksum:-}" ]; then
         echo "Unsupported tool/platform: $1/$platform" >&2
