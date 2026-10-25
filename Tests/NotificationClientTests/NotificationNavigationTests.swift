@@ -55,6 +55,19 @@ final class NotificationNavigationTests: XCTestCase {
         XCTAssertNil(navigation.pendingDestination)
     }
 
+    func testLaunchSheetDefersDestinationUntilPresentationIsReady() {
+        let navigation = NotificationNavigation()
+        let server = UUID()
+        navigation.receive(
+            category: .requestStatusChanged, info: NotificationInfo(requestID: 7, serverID: server.uuidString)
+        )
+
+        XCTAssertNil(navigation.consume(if: false) { _ in true })
+        XCTAssertEqual(navigation.pendingDestination, .request(serverID: server, requestID: 7))
+        XCTAssertEqual(navigation.consume(if: true) { _ in true }, .request(serverID: server, requestID: 7))
+        XCTAssertNil(navigation.pendingDestination)
+    }
+
     func testDownloadRetainsServerAndDownloadIdentity() {
         let navigation = NotificationNavigation()
         let server = UUID()

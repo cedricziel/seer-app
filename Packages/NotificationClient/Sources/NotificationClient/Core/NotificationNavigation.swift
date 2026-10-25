@@ -39,9 +39,10 @@ public final class NotificationNavigation: ObservableObject {
         }
     }
 
-    /// Consumes only after the destination server is active and authenticated.
-    public func consume(activateServer: (UUID) -> Bool) -> Destination? {
-        guard let destination = pendingDestination, activateServer(destination.serverID) else { return nil }
+    /// Consumes only after presentation is ready and the destination server is authenticated.
+    public func consume(if presentationReady: Bool = true, activateServer: (UUID) -> Bool) -> Destination? {
+        guard presentationReady, let destination = pendingDestination,
+              activateServer(destination.serverID) else { return nil }
         pendingDestination = nil
         return destination
     }

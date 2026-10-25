@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var resolvedContext: ServerURLResolver.Context?
     @State private var resolvedServerURL: URL?
     @State private var showPiPRestorePlayer = false
+    @State private var checkedAuthentication: Bool?
 
     private var resolutionContext: ServerURLResolver.Context? {
         guard let server = appState.activeServer else { return nil }
@@ -24,9 +25,12 @@ struct ContentView: View {
             if appState.isAuthenticated {
                 if let resolvedContext, let currentContext = resolutionContext,
                    resolvedContext.matchesConfiguration(of: currentContext) {
-                    MainTabView()
-                        .id(resolvedServerURL)
-                        .environmentObject(onboardingManager)
+                    MainTabView(
+                        notificationPresentationReady: checkedAuthentication == true
+                            && !onboardingManager.showWhatsNew && !showPiPRestorePlayer
+                    )
+                    .id(resolvedServerURL)
+                    .environmentObject(onboardingManager)
                 } else {
                     ProgressView("Connecting to server...")
                 }
@@ -92,11 +96,18 @@ struct ContentView: View {
             if appState.isAuthenticated {
                 onboardingManager.checkAndShowWhatsNew()
             }
+            checkedAuthentication = appState.isAuthenticated
+        }
+        .onChange(of: appState.isAuthenticated) { _, authenticated in
+            checkedAuthentication = nil
+            if authenticated { onboardingManager.checkAndShowWhatsNew() }
+            checkedAuthentication = authenticated
         }
     }
 }
 
 struct MainTabView: View {
+    let notificationPresentationReady: Bool
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var flowmarkRouter: FlowmarkURLRouter
     @EnvironmentObject private var notificationNavigation: NotificationNavigation
@@ -125,7 +136,7 @@ struct MainTabView: View {
                 RequestsView()
             }
         }
-        .task(id: notificationNavigation.pendingDestination?.id) {
+        .task(id: notificationPresentationReady ? notificationNavigation.pendingDestination?.id : nil) {
             openNotificationDestination()
         }
         .sheet(item: $notificationDestination) { destination in
@@ -143,18 +154,21 @@ struct MainTabView: View {
     }
 
     private func openNotificationDestination() {
-        guard let pending = notificationNavigation.pendingDestination else { return }
+        guard notificationPresentationReady, let pending = notificationNavigation.pendingDestination else { return }
         guard appState.servers.contains(where: { $0.id == pending.serverID }) else {
             notificationNavigation.clear()
             showNotificationError = true
             return
         }
-        guard let destination = notificationNavigation.consume(activateServer: { serverID in
-            if appState.activeServerID != serverID {
-                appState.switchServer(to: serverID)
+        guard let destination = notificationNavigation.consume(
+            if: notificationPresentationReady,
+            activateServer: { serverID in
+                if appState.activeServerID != serverID {
+                    appState.switchServer(to: serverID)
+                }
+                return appState.activeServerID == serverID && appState.isAuthenticated
             }
-            return appState.activeServerID == serverID && appState.isAuthenticated
-        }) else { return }
+        ) else { return }
         switch destination {
         case .request: flowmarkRouter.selectedTab = .requests
         case .download: flowmarkRouter.selectedTab = .downloads
