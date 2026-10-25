@@ -109,7 +109,8 @@ private struct LibraryContentView: View {
         case nil:
             return nil
         }
-        guard let credentials = appState.jellyfinCredentials(for: serverID) else { return nil }
+        guard let credentials = await appState.resolvedJellyfinCredentials(for: serverID),
+              !Task.isCancelled, appState.activeServerID == serverID else { return nil }
         let service = JellyfinService(
             serverURL: credentials.serverURL,
             accessToken: credentials.accessToken,
