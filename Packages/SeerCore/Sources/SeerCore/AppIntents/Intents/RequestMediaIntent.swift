@@ -125,7 +125,9 @@ public struct RequestMediaIntent: AppIntent {
             predicate: #Predicate { $0.serverConfigurationID == serverID }
         )
         let rows = (try? context.fetch(descriptor)) ?? []
-        guard let match = rows.first(where: { $0.name.lowercased() == needle }) else {
+        guard let match = rows.first(where: {
+            $0.name.lowercased() == needle && (mediaType == nil || mediaType?.matchesLibraryType($0.mediaType) == true)
+        }) else {
             return nil
         }
         return MediaItemEntity(
@@ -141,6 +143,13 @@ public struct RequestMediaIntent: AppIntent {
 public enum RequestMediaType: String, AppEnum {
     case movie
     case show
+
+    func matchesLibraryType(_ type: String) -> Bool {
+        switch self {
+        case .movie: type.lowercased() == "movie"
+        case .show: ["series", "tv"].contains(type.lowercased())
+        }
+    }
 
     public static let typeDisplayRepresentation: TypeDisplayRepresentation = "Media Type"
 
