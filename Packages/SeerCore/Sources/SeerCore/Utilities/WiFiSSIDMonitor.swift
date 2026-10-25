@@ -15,6 +15,8 @@ public final class WiFiSSIDMonitor: ObservableObject, WiFiNetworkStatus {
     /// Whether location permission is granted (needed for SSID access)
     @Published public private(set) var hasLocationPermission: Bool = false
 
+    @Published public private(set) var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
+
     @Published public private(set) var networkRevision: UInt64 = 0
 
     private let pathMonitor = NWPathMonitor()
@@ -24,9 +26,10 @@ public final class WiFiSSIDMonitor: ObservableObject, WiFiNetworkStatus {
     public static let shared = WiFiSSIDMonitor()
 
     private init() {
-        locationDelegate = LocationDelegate { [weak self] authorized in
+        locationDelegate = LocationDelegate { [weak self] status in
             Task { @MainActor [weak self] in
-                self?.hasLocationPermission = authorized
+                self?.locationAuthorizationStatus = status
+                self?.hasLocationPermission = status == .authorizedWhenInUse || status == .authorizedAlways
                 self?.updateSSID()
             }
         }
@@ -105,15 +108,14 @@ public final class WiFiSSIDMonitor: ObservableObject, WiFiNetworkStatus {
 // MARK: - Location Delegate
 
 private final class LocationDelegate: NSObject, CLLocationManagerDelegate {
-    private let onAuthorizationChanged: (Bool) -> Void
+    private let onAuthorizationChanged: (CLAuthorizationStatus) -> Void
 
-    init(onAuthorizationChanged: @escaping (Bool) -> Void) {
+    init(onAuthorizationChanged: @escaping (CLAuthorizationStatus) -> Void) {
         self.onAuthorizationChanged = onAuthorizationChanged
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
-        let authorized = status == .authorizedWhenInUse || status == .authorizedAlways
-        onAuthorizationChanged(authorized)
+        onAuthorizationChanged(status)
     }
 }

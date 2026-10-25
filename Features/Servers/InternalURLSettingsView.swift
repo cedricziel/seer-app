@@ -1,10 +1,11 @@
+import CoreLocation
 import SeerCore
 import SwiftUI
 
-/// View for configuring internal URL settings for a server
 struct InternalURLSettingsView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
 
     let config: ServerConfiguration
 
@@ -12,7 +13,7 @@ struct InternalURLSettingsView: View {
     @State private var networkSSIDs: [String]
     @State private var newSSID: String = ""
     @State private var showingAddNetworkAlert = false
-    @State private var showingInvalidURLAlert = false
+    @State private var urlValidationError: String?
 
     @StateObject private var wifiMonitor = WiFiSSIDMonitor.shared
 
@@ -30,6 +31,18 @@ struct InternalURLSettingsView: View {
                     .keyboardType(.URL)
                     .autocapitalization(.none)
                     .autocorrectionDisabled()
+                    .onChange(of: internalURLString) {
+                        if urlValidationError != nil {
+                            validateInternalURL()
+                        }
+                    }
+
+                if let urlValidationError {
+                    Text(urlValidationError)
+                        .font(.callout)
+                        .foregroundStyle(.red)
+                        .accessibilityIdentifier("internalURLValidationError")
+                }
             } header: {
                 Text("Internal URL")
             } footer: {
@@ -84,16 +97,26 @@ struct InternalURLSettingsView: View {
 
             if !wifiMonitor.hasLocationPermission {
                 Section {
-                    Button {
-                        wifiMonitor.requestLocationPermission()
-                    } label: {
-                        HStack {
-                            Image(systemName: "location.fill")
-                            Text("Grant Location Permission")
+                    switch wifiMonitor.locationAuthorizationStatus {
+                    case .denied:
+                        Button("Open Settings", systemImage: "gear") {
+                            openLocationSettings()
                         }
+                    case .restricted:
+                        Text(
+                            "Location access is restricted. Check device restrictions to allow WiFi network detection."
+                        )
+                    case .notDetermined:
+                        Button("Grant Location Permission", systemImage: "location.fill") {
+                            wifiMonitor.requestLocationPermission()
+                        }
+                    default:
+                        EmptyView()
                     }
                 } footer: {
-                    Text("Location permission is needed to read your WiFi network name.")
+                    Text(
+                        "Location access enables WiFi detection. Manual URL and network entry remain available."
+                    )
                 }
             }
 
@@ -132,11 +155,19 @@ struct InternalURLSettingsView: View {
         } message: {
             Text("Enter the name (SSID) of your home WiFi network.")
         }
-        .alert("Invalid URL", isPresented: $showingInvalidURLAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Please enter a valid URL for the internal server address.")
-        }
+    }
+
+    private func openLocationSettings() {
+        #if canImport(UIKit)
+            if let url = URL(string: UIApplication.openSettingsURLString) {
+                openURL(url)
+            }
+        #elseif os(macOS)
+            if let url =
+                URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices") {
+                openURL(url)
+            }
+        #endif
     }
 
     private func deleteSSIDs(at offsets: IndexSet) {
@@ -164,24 +195,27 @@ struct InternalURLSettingsView: View {
         saveChanges()
     }
 
-    private func saveChanges() {
-        // Parse internal URL if provided
-        let internalURL: URL?
-        let trimmedURL = internalURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func validateInternalURL() {
+        do {
+            _ = try InternalServerURL.parse(internalURLString)
+            urlValidationError = nil
+        } catch {
+            urlValidationError = error.localizedDescription
+        }
+    }
 
-        if trimmedURL.isEmpty {
-            internalURL = nil
-        } else if let url = URL(string: trimmedURL), url.scheme != nil {
-            internalURL = url
-        } else {
-            showingInvalidURLAlert = true
+    private func saveChanges() {
+        let internalURL: URL?
+        do {
+            internalURL = try InternalServerURL.parse(internalURLString)
+            urlValidationError = nil
+        } catch {
+            urlValidationError = error.localizedDescription
             return
         }
 
-        // Update the configuration
         config.internalJellyfinURL = internalURL
         config.internalNetworkSSIDs = networkSSIDs
-
         appState.updateServer(config)
         dismiss()
     }

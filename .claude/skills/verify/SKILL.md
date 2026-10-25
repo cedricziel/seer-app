@@ -84,3 +84,5 @@ requests, replacement-code loading, late responses after cancellation, and retry
 against a saved server. Review expired, failed, and replacement-request snapshots;
 unusable codes and Copy code must be absent while Request New Code and password
 sign-in remain available on errors. Record baselines on the CI runtime.
+
+For internal URL settings, run `SeerCoreTests/InternalServerURLTests` through required CI or an isolated test scheme. Cover blank input clearing the setting, HTTP/HTTPS hosts, unsupported schemes, and hostless input. Run `.claude/skills/verify/scripts/internal-url-settings-tests.sh SIMULATOR_RUNTIME_IDENTIFIER /absolute/scratch/evidence` for the isolated form flow. It covers denied, restricted, and unrequested location access, manual network entry, invalid Save retaining input with inline advice, and a corrected URL saving successfully. Append `before` to capture current main for comparison. The harness substitutes in-memory server and permission fixtures and does not verify system Settings or live SSID detection.
