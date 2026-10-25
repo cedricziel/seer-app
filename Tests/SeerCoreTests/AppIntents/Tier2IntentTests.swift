@@ -78,7 +78,7 @@ final class Tier2IntentTests: XCTestCase {
             captured.set(submission)
         }
 
-        let entity = MediaItemEntity(id: "the-bear", title: "The Bear")
+        let entity = MediaItemEntity(id: "the-bear", title: "The Bear", serverID: serverID)
         let intent = MarkAsWatchedIntent(item: entity, watched: true)
         _ = try await intent.perform()
 
@@ -96,12 +96,54 @@ final class Tier2IntentTests: XCTestCase {
             captured.set(payload)
         }
 
-        let entity = MediaItemEntity(id: "dune", title: "Dune")
+        let entity = MediaItemEntity(id: "dune", title: "Dune", serverID: serverID)
         let intent = DownloadForOfflineIntent(item: entity)
         _ = try await intent.perform()
 
         XCTAssertEqual(captured.value?.itemID, "dune")
         XCTAssertEqual(captured.value?.title, "Dune")
+    }
+
+    func testSavedEntitiesKeepServerAfterActiveServerChanges() async throws {
+        insertActiveServer()
+        let originalServerID = UUID()
+        container.mainContext.insert(ServerConfiguration(
+            id: originalServerID,
+            name: "Original",
+            jellyfinURL: URL.test("https://original.example.com")
+        ))
+        try container.mainContext.save()
+        let entity = MediaItemEntity(id: "shared", title: "Original Movie", serverID: originalServerID)
+        let played = AtomicValue<MarkAsWatchedSubmission>()
+        let download = AtomicValue<DownloadEnqueuePayload>()
+        MarkAsWatchedIntent.updater = { played.set($0) }
+        DownloadForOfflineIntent.enqueuer = { download.set($0) }
+
+        _ = try await MarkAsWatchedIntent(item: entity).perform()
+        _ = try await DownloadForOfflineIntent(item: entity).perform()
+
+        XCTAssertEqual(played.value?.serverID, originalServerID)
+        XCTAssertEqual(played.value?.itemID, "shared")
+        XCTAssertEqual(download.value?.serverID, originalServerID)
+        XCTAssertEqual(download.value?.itemID, "shared")
+    }
+
+    func testUnboundEntitiesCannotMutateActiveServer() async throws {
+        insertActiveServer()
+        let entity = MediaItemEntity(id: "shared", title: "Unbound")
+        let called = AtomicFlag()
+        MarkAsWatchedIntent.updater = { _ in called.set(true) }
+        DownloadForOfflineIntent.enqueuer = { _ in called.set(true) }
+
+        do {
+            _ = try await MarkAsWatchedIntent(item: entity).perform()
+            XCTFail("Expected missing server identity to be rejected")
+        } catch IntentError.needsConfiguration {}
+        do {
+            _ = try await DownloadForOfflineIntent(item: entity).perform()
+            XCTFail("Expected missing server identity to be rejected")
+        } catch IntentError.needsConfiguration {}
+        XCTAssertFalse(called.value)
     }
 
     // MARK: - 4.12 / 4.12a — CheckRequestStatusIntent

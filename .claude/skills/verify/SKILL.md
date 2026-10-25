@@ -61,3 +61,9 @@ and `SeerCoreTests/Tier1IntentTests`. An explicit type must not fall back to the
 other type, and owning a same-name movie must not suppress a show request.
 
 For shared Swift tooling changes, run `python3 -m unittest scripts/test_swift_tools.py`.
+
+For App Intents server identity changes, run `SeerCoreTests/AppEntityQueryTests`,
+`SeerCoreTests/Tier1IntentTests`, and `SeerCoreTests/Tier2IntentTests` in the isolated
+hosted test app. Cover duplicate item IDs across servers, saved entities targeting
+an inactive server, and rejection of unbound entities. Legacy unqualified entity
+IDs must require reselection instead of resolving against the active server.

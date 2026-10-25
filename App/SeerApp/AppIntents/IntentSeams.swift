@@ -111,8 +111,7 @@ enum IntentSeams {
     private static func installMarkAsWatchedUpdater(appState: AppState) {
         MarkAsWatchedIntent.updater = { submission in
             let creds = await Task { @MainActor in
-                guard let serverID = appState.activeServerID else { return nil as AppState.JellyfinCredentials? }
-                return await appState.resolvedJellyfinCredentials(for: serverID)
+                await appState.resolvedJellyfinCredentials(for: submission.serverID)
             }.value
             guard let creds else {
                 throw IntentError.needsConfiguration

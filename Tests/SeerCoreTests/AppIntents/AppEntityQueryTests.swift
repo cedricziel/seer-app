@@ -69,8 +69,31 @@ final class AppEntityQueryTests: XCTestCase {
         let results = try await query.entities(matching: "dune")
 
         XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(results.first?.id, "dune-1")
+        XCTAssertEqual(results.first?.itemID, "dune-1")
         XCTAssertEqual(results.first?.title, "Dune")
+    }
+
+    func testSavedIdentifierResolvesOnlyOriginalServer() async throws {
+        let otherServerID = UUID()
+        let context = container.mainContext
+        context.insert(CachedMediaItem(
+            id: "shared", serverConfigurationID: serverID, name: "Original", mediaType: "Movie"
+        ))
+        context.insert(CachedMediaItem(
+            id: "shared", serverConfigurationID: otherServerID, name: "Other", mediaType: "Movie"
+        ))
+        try context.save()
+        let query = MediaItemEntityQuery()
+        let entities = try await query.entities(matching: "")
+        let original = try XCTUnwrap(entities.first { $0.title == "Original" })
+
+        let resolved = try await query.entities(for: [original.id])
+        let legacy = try await query.entities(for: ["shared"])
+
+        XCTAssertEqual(Set(entities.map(\.id)).count, 2)
+        XCTAssertEqual(resolved.map(\.title), ["Original"])
+        XCTAssertEqual(resolved.first?.serverID, serverID)
+        XCTAssertTrue(legacy.isEmpty)
     }
 
     /// 2.2 — empty cache returns an empty array, never throws.
@@ -120,9 +143,9 @@ final class AppEntityQueryTests: XCTestCase {
         // First three results MUST be the played items, ordered by
         // lastPlayedDate descending.
         XCTAssertGreaterThanOrEqual(results.count, 3)
-        XCTAssertEqual(results[0].id, "p-0")
-        XCTAssertEqual(results[1].id, "p-1")
-        XCTAssertEqual(results[2].id, "p-2")
+        XCTAssertEqual(results[0].itemID, "p-0")
+        XCTAssertEqual(results[1].itemID, "p-1")
+        XCTAssertEqual(results[2].itemID, "p-2")
     }
 
     // MARK: - RequestEntityQuery (2.4)

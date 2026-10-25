@@ -246,7 +246,7 @@ final class Tier1IntentTests: XCTestCase {
         let result = try await SearchMediaIntent(query: "dune").perform()
         XCTAssertEqual(result.value?.count, 3)
         // Local entry must come first.
-        XCTAssertEqual(result.value?.first?.id, "dune-1")
+        XCTAssertEqual(result.value?.first?.itemID, "dune-1")
     }
 
     /// 4.7 — Local + supplement entries with the same id deduplicate
@@ -254,8 +254,9 @@ final class Tier1IntentTests: XCTestCase {
     func testDeduplicatesByTmdbId() async throws {
         insertItem(id: "shared-id", name: "Local Title")
 
+        let sourceServerID = serverID
         SearchMediaIntent.discoverSupplement = { _ in
-            [MediaItemEntity(id: "shared-id", title: "Discover Title", year: 2024)]
+            [MediaItemEntity(id: "shared-id", title: "Discover Title", year: 2024, serverID: sourceServerID)]
         }
 
         let result = try await SearchMediaIntent(query: "title").perform()
