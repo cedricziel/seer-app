@@ -103,23 +103,25 @@ public final class NotificationManager: NSObject {
         userInfo: [String: Any] = [:],
         identifier: String = UUID().uuidString
     ) async throws {
-        await refreshAuthorization()
-        guard isAuthorized else { return }
+        #if !os(tvOS)
+            await refreshAuthorization()
+            guard isAuthorized else { return }
 
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = .default
-        content.categoryIdentifier = category.rawValue
-        content.userInfo = userInfo
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            content.categoryIdentifier = category.rawValue
+            content.userInfo = userInfo
 
-        let request = UNNotificationRequest(
-            identifier: identifier,
-            content: content,
-            trigger: nil // Deliver immediately
-        )
+            let request = UNNotificationRequest(
+                identifier: identifier,
+                content: content,
+                trigger: nil // Deliver immediately
+            )
 
-        try await notificationCenter.add(request)
+            try await notificationCenter.add(request)
+        #endif
     }
 
     /// Remove pending notifications
