@@ -3,12 +3,64 @@ import SeerCore
 import SeerUI
 import SwiftUI
 
-/// View for searching TMDB and requesting media via Jellyseerr
 struct SearchView: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        SearchContentView(appState: appState)
+        SearchScopeView(appState: appState)
+            .id(LibrarySearchSession(appState: appState))
+    }
+}
+
+private struct LibrarySearchSession: Hashable {
+    let serverID: UUID?
+    let serverURL: URL?
+    let userID: String?
+    let accessToken: String?
+    let deviceID: String?
+
+    @MainActor
+    init(appState: AppState) {
+        serverID = appState.activeServerID
+        serverURL = appState.jellyfinServerURL
+        userID = appState.jellyfinUserID
+        accessToken = appState.jellyfinAccessToken
+        deviceID = appState.jellyfinDeviceID
+    }
+}
+
+private struct SearchScopeView: View {
+    @ObservedObject var appState: AppState
+    @State private var scope: Scope = .library
+    @State private var query = ""
+
+    private enum Scope: String, CaseIterable {
+        case library = "Library"
+        case catalog = "Catalog"
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                Picker("Search scope", selection: $scope) {
+                    ForEach(Scope.allCases, id: \.self) { scope in
+                        Text(scope.rawValue).tag(scope)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding()
+
+                switch scope {
+                case .library: LibrarySearchView(appState: appState, query: $query)
+                case .catalog: SearchContentView(appState: appState, query: $query)
+                }
+            }
+            .navigationTitle("Search")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { ServerSwitcherButton() }
+                ToolbarItem(placement: .topBarTrailing) { SettingsButton() }
+            }
+        }
     }
 }
 
@@ -17,6 +69,7 @@ private struct SearchContentView: View {
     @ObservedObject var appState: AppState
     @StateObject private var viewModel: SearchViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Binding var query: String
 
     @State private var selectedResult: SearchResult?
     @State private var isRequestingMedia: Bool = false
@@ -31,92 +84,88 @@ private struct SearchContentView: View {
     @State private var pendingRequestAfterConnect: SearchResult?
     @State private var showJellyseerrConnectSheet: Bool = false
 
-    init(appState: AppState) {
+    init(appState: AppState, query: Binding<String>) {
         self.appState = appState
+        _query = query
         _viewModel = StateObject(wrappedValue: SearchViewModel(appState: appState))
     }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if !viewModel.isJellyseerrConfigured {
-                    notConfiguredView
-                } else {
-                    searchContentView
+        Group {
+            if !viewModel.isJellyseerrConfigured {
+                notConfiguredView
+            } else {
+                searchContentView
+            }
+        }
+        .searchable(text: $query, prompt: "Search catalog to request")
+        .task(id: query) {
+            viewModel.searchQuery = query
+            await viewModel.search()
+        }
+        .alert("Request Submitted", isPresented: $showRequestSuccess) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your request has been submitted successfully.")
+        }
+        .alert("Request Failed", isPresented: .init(
+            get: { requestError != nil },
+            set: {
+                if !$0 {
+                    requestError = nil
                 }
             }
-            .navigationTitle("Search")
-            .searchable(text: $viewModel.searchQuery, prompt: "Search movies and TV shows")
-            .onChange(of: viewModel.searchQuery) {
-                Task {
-                    await viewModel.search()
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    ServerSwitcherButton()
-                }
-            }
-            .alert("Request Submitted", isPresented: $showRequestSuccess) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text("Your request has been submitted successfully.")
-            }
-            .alert("Request Failed", isPresented: .init(
-                get: { requestError != nil },
-                set: { if !$0 { requestError = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(requestError ?? "An error occurred")
-            }
-            .sheet(item: $selectedResult) { result in
-                SearchResultDetailSheet(
-                    result: result,
-                    canRequest4K: viewModel.canRequest4K,
-                    onRequest: {
-                        handleRequestAction(result)
-                    },
-                    isRequesting: isRequestingMedia
-                )
-                .presentationDetents([.medium, .large])
-            }
-            .sheet(isPresented: $showJellyseerrConnectSheet) {
-                JellyseerrConnectSheet(
-                    connector: connectJellyseerr,
-                    onSuccess: {
-                        showJellyseerrConnectSheet = false
-                        // Resume the originating Request tap once Jellyseerr
-                        // is configured. Defer to the next runloop so the
-                        // sheet's dismiss animation completes first.
-                        if let pending = pendingRequestAfterConnect {
-                            pendingRequestAfterConnect = nil
-                            Task { @MainActor in
-                                try? await Task.sleep(for: .milliseconds(50))
-                                handleRequestAction(pending)
-                            }
-                        }
-                    },
-                    onCancel: {
-                        showJellyseerrConnectSheet = false
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(requestError ?? "An error occurred")
+        }
+        .sheet(item: $selectedResult) { result in
+            SearchResultDetailSheet(
+                result: result,
+                canRequest4K: viewModel.canRequest4K,
+                onRequest: {
+                    handleRequestAction(result)
+                },
+                isRequesting: isRequestingMedia
+            )
+            .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showJellyseerrConnectSheet) {
+            JellyseerrConnectSheet(
+                connector: connectJellyseerr,
+                onSuccess: {
+                    showJellyseerrConnectSheet = false
+                    // Resume the originating Request tap once Jellyseerr
+                    // is configured. Defer to the next runloop so the
+                    // sheet's dismiss animation completes first.
+                    if let pending = pendingRequestAfterConnect {
                         pendingRequestAfterConnect = nil
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(50))
+                            handleRequestAction(pending)
+                        }
+                    }
+                },
+                onCancel: {
+                    showJellyseerrConnectSheet = false
+                    pendingRequestAfterConnect = nil
+                }
+            )
+        }
+        .sheet(isPresented: $showRequestOptions) {
+            if let result = requestOptionsResult {
+                RequestOptionsSheet(
+                    result: result,
+                    viewModel: viewModel,
+                    canRequest4K: viewModel.canRequest4K,
+                    onSubmit: { seasons, is4k in
+                        Task {
+                            await requestMediaWithOptions(result, seasons: seasons, is4k: is4k)
+                        }
                     }
                 )
-            }
-            .sheet(isPresented: $showRequestOptions) {
-                if let result = requestOptionsResult {
-                    RequestOptionsSheet(
-                        result: result,
-                        viewModel: viewModel,
-                        canRequest4K: viewModel.canRequest4K,
-                        onSubmit: { seasons, is4k in
-                            Task {
-                                await requestMediaWithOptions(result, seasons: seasons, is4k: is4k)
-                            }
-                        }
-                    )
-                    .presentationDetents([.medium, .large])
-                }
+                .presentationDetents([.medium, .large])
             }
         }
         .onChange(of: appState.activeServerID) {
@@ -131,6 +180,8 @@ private struct SearchContentView: View {
             title: "Search Movies & Shows",
             description: "Connect Jellyseerr to search and request new titles.",
             onSuccess: {
+                viewModel.serverChanged()
+                viewModel.searchQuery = query
                 Task { await viewModel.search() }
             }
         )
@@ -173,7 +224,7 @@ private struct SearchContentView: View {
     private var searchEmptyState: some View {
         if viewModel.recentQueries.isEmpty {
             EmptyContentView(
-                title: "Search TMDB",
+                title: "Search Catalog",
                 systemImage: "magnifyingglass",
                 description: "Search for movies and TV shows to request"
             )
@@ -187,7 +238,7 @@ private struct SearchContentView: View {
             Section {
                 ForEach(viewModel.recentQueries, id: \.self) { query in
                     Button {
-                        Task { await viewModel.runRecentQuery(query) }
+                        self.query = query
                     } label: {
                         HStack {
                             Image(systemName: "clock.arrow.circlepath")

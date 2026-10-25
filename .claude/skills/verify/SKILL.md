@@ -1,21 +1,33 @@
 ---
 name: verify
-description: Verify Seer changes with native builds, isolated hosted unit tests, and OpenAPI regeneration before a PR.
+description: Verify Seer changes with isolated search-model tests, native builds, hosted unit tests, and OpenAPI regeneration before a PR.
 ---
 
 # Verify Seer
 
-1. Check `git status --short` and preserve unrelated changes and peer worktrees.
-2. Use the SwiftLint and SwiftFormat versions pinned in `.github/workflows/ci.yml`. Run `swiftlint lint --strict --no-cache` and `swiftformat --lint . --cache ignore`. Compare failures with the baseline and format only changed files.
-3. Regenerate the project with `xcodegen generate`. Build with `xcodebuild`, temporary derived-data and cloned-package directories, and `CODE_SIGNING_ALLOWED=NO`.
-4. Run hosted unit tests on a dedicated disposable simulator with test credentials. Delete the simulator in a cleanup trap. Never use an existing user simulator or device.
-5. For dependency maintenance, run `python3 -m unittest discover -s scripts -p 'test_*.py'` and `actionlint .github/workflows/dependency-audit.yml`. Run `python3 scripts/dependency_audit.py` with authenticated `gh`; exit 1 with a release table means unreviewed newer candidates exist, while an API or parsing error means the audit did not complete.
+1. Check `git status --short`. Preserve unrelated changes and peer worktrees.
+2. Run [scripts/search-tests.sh](scripts/search-tests.sh) for library-search changes. It compiles the real search model, Jellyfin media types, and regression tests in a disposable macOS Swift package. It does not launch the app or access credentials, preferences, or CloudKit. Requires macOS and the Xcode Swift toolchain. This checks model behavior, not SwiftUI integration.
+3. Use the SwiftLint and SwiftFormat versions pinned in `.github/workflows/ci.yml`. Run `swiftlint lint --strict --no-cache` and `swiftformat --lint . --cache ignore`. Compare failures with the baseline. Format only changed files.
+4. Run `openspec validate library-search-settings --strict` when changing that spec. For other changes, validate their change name.
+5. Regenerate the project with `xcodegen generate`. Build iOS and tvOS with `xcodebuild`, a temporary derived-data directory, temporary cloned-package directory, and `CODE_SIGNING_ALLOWED=NO`. Use `-destination 'generic/platform=iOS Simulator'` or `-destination 'generic/platform=tvOS Simulator'`. These builds require SDK services and package downloads; do not mistake sandbox failures for source errors.
+6. For runtime checks, create a dedicated simulator, use test servers and credentials, and delete the simulator in a cleanup trap. Never launch on a user's existing simulator or device. If isolation is unavailable, report runtime checks as unverified.
+7. For dependency maintenance, run `python3 -m unittest discover -s scripts -p 'test_*.py'` and `actionlint .github/workflows/dependency-audit.yml`. Run `python3 scripts/dependency_audit.py` with authenticated `gh`; exit 1 with a release table means unreviewed newer candidates exist, while an API or parsing error means the audit did not complete.
 
-Debug hosted unit tests enter `HostedUnitTestApp` through `SeerAppEntryPoint` when XCTest is injected. This bypasses `SeerApp.init`, its CloudKit stores, telemetry, and background services. Ordinary and Release launches retain `SeerApp.main()`. UI tests run XCTest in a separate runner and retain production startup.
+Debug hosted unit tests enter `HostedUnitTestApp` through `SeerAppEntryPoint` when XCTest is injected. This bypasses `SeerApp.init` and its CloudKit stores, telemetry, and background services. UI tests still enter the production app because XCTest runs in a separate runner process. An unsigned host was verified with all 11 LibrarySearchModelTests on an isolated iOS simulator. Do not launch an unsigned production app to run hosted unit tests: CloudKit requires entitlements and can trap before the test suite starts. The SDK invalidDigitCount warning can appear during successful runs; inspect the crash report before diagnosing a startup timeout.
 
-The unsigned host was verified with 11 native library-search tests on an isolated simulator. An ad-hoc binary without iCloud entitlements can trap if it enters production CloudKit startup. The SDK `invalidDigitCount` warning also appeared during the successful run; inspect crash reports before diagnosing a launch timeout.
+Check these journeys on an isolated simulator:
 
-Native builds and visual checks can be blocked by existing source errors or unavailable simulator services. Record exact blockers and leave unavailable checks incomplete.
+- Search defaults to Library without Jellyseerr; a result opens existing media details and playback.
+- Query text survives Library/Catalog switches; server or Jellyfin credential changes clear prior search state.
+- Blank queries, errors/retry, stale responses, task cancellation, and pagination behave correctly.
+- Returning from details preserves loaded search pages.
+- Every tab opens Settings; Servers, Downloads, Privacy & Diagnostics, and Send Feedback are reachable and dismiss back correctly.
+- Library and Requests retain Refresh in their menus.
+- Check iPhone portrait/landscape, iPad regular and split-view 1/3, 1/2, 2/3, tvOS focus, VoiceOver, AX5, and Reduce Motion.
+
+Record feature snapshots on the same iOS runtime as CI, currently iOS 26.5. iOS 27 renders navigation controls and text differently even at the same snapshot dimensions. Review reference, failure, and difference attachments before replacing a baseline; keep comparison thresholds unchanged. If the standalone snapshot artifact is absent, export the suite's attachments from the xcresult bundle without `--only-failures`, which can omit the PNG attachments.
+
+Native builds and visual checks can be blocked by existing source errors or unavailable simulator services. Record the exact blocker and leave those checks incomplete.
 
 ## OpenAPI changes
 

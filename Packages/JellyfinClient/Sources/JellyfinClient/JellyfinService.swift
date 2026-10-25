@@ -151,7 +151,8 @@ public extension JellyfinService {
         limit: Int = 50,
         startIndex: Int = 0,
         recursive: Bool = true,
-        filters: [String]? = nil
+        filters: [String]? = nil,
+        searchTerm: String? = nil
     ) async throws -> ItemsResponse {
         guard let userID else {
             throw JellyfinError.notAuthenticated
@@ -172,6 +173,10 @@ public extension JellyfinService {
                 value: "Overview,Genres,Studios,People,ProviderIds,CommunityRating,OfficialRating"
             )
         ]
+
+        if let searchTerm {
+            queryItems.append(URLQueryItem(name: "SearchTerm", value: searchTerm))
+        }
 
         if let parentID {
             queryItems.append(URLQueryItem(name: "ParentId", value: parentID))
