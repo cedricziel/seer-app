@@ -227,7 +227,14 @@ private class SeriesSyncFixtureProtocol: URLProtocol, @unchecked Sendable {
             client?.urlProtocol(self, didFailWithError: URLError(.badURL))
             return
         }
-        let body = url.path.contains("/Seasons")
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let itemType = query.first { $0.name == "IncludeItemTypes" }?.value
+        let parentID = query.first { $0.name == "ParentId" }?.value
+        guard (itemType == "Season" && parentID == "series") || (itemType == "Episode" && parentID == "season") else {
+            client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
+            return
+        }
+        let body = itemType == "Season"
             ? #"{"Items":[{"Id":"season","Name":"Season","Type":"Season","SeriesId":"series"}],"TotalRecordCount":1}"#
             : #"{"Items":[{"Id":"episode","Name":"E","Type":"Episode","SeriesId":"series"}],"TotalRecordCount":1}"#
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
