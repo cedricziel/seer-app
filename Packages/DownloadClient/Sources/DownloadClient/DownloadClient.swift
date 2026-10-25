@@ -27,7 +27,8 @@ import SwiftData
 public func createDownloadModelContainer() throws -> ModelContainer {
     let schema = Schema([
         Download.self,
-        AutoDownloadRule.self
+        AutoDownloadRule.self,
+        PendingDownloadProgress.self
     ])
 
     let configuration = ModelConfiguration(

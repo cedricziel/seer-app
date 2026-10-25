@@ -10,18 +10,20 @@ public extension DownloadManager {
 
     /// Set WiFi-only downloads setting
     func setWiFiOnlyEnabled(_ enabled: Bool) async {
+        guard wifiOnlyEnabled != enabled else { return }
+        let wasPaused = await queue.queuePaused
+        await queue.pauseQueue()
         wifiOnlyEnabled = enabled
         await queue.setWiFiOnlyEnabled(enabled)
 
-        if enabled {
-            // If enabling WiFi-only and not on WiFi, pause active downloads
-            let isOnWiFi = await queue.isWiFiConnected
-            if !isOnWiFi {
-                await pauseDownloadsForWiFi()
-            }
-        } else {
-            // If disabling WiFi-only, resume waiting downloads
+        // Existing background requests retain their original cellular policy.
+        await pauseDownloadsForWiFi()
+        let isOnWiFi = await queue.isWiFiConnected
+        if !enabled || isOnWiFi {
             await resumeWiFiWaitingDownloads()
+        }
+        if !wasPaused {
+            await queue.resumeQueue()
         }
     }
 
@@ -37,17 +39,19 @@ public extension DownloadManager {
 
     /// Pause active downloads and mark them as waiting for WiFi
     internal func pauseDownloadsForWiFi() async {
+        startClaims.invalidateAll()
+        let downloads = await (try? store.fetchAllDownloads()) ?? []
         for download in downloads where download.state == .downloading || download.state == .pending {
-            // Cancel active task if any
-            if let taskIdentifier = download.taskIdentifier {
+            startClaims.invalidate(download.id)
+            let taskIdentifier = download.taskIdentifier
+            try? await store.updateState(downloadID: download.id, state: .waitingForWiFi)
+            if let taskIdentifier {
+                sessionManager.unregisterTask(taskIdentifier)
                 let resumeData = await sessionManager.cancelDownload(taskIdentifier: taskIdentifier)
                 if let resumeData {
                     try? await store.updateResumeData(downloadID: download.id, resumeData: resumeData)
                 }
             }
-
-            // Update state to waiting for WiFi
-            try? await store.updateState(downloadID: download.id, state: .waitingForWiFi)
             await queue.dequeue(download.id)
         }
 

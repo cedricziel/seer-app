@@ -3,7 +3,8 @@ import SwiftData
 
 /// Actor for managing SwiftData operations for downloads
 public actor DownloadStore {
-    private let modelContainer: ModelContainer
+    let modelContainer: ModelContainer
+    var syncingPlaybackServers: Set<String> = []
 
     public init(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
@@ -171,6 +172,15 @@ public actor DownloadStore {
         try context.save()
     }
 
+    func clearTaskIdentifier(downloadID: UUID, matching taskIdentifier: Int) throws {
+        let context = ModelContext(modelContainer)
+        let descriptor = FetchDescriptor<Download>(predicate: #Predicate { $0.id == downloadID })
+        guard let download = try context.fetch(descriptor).first,
+              download.taskIdentifier == taskIdentifier else { return }
+        download.taskIdentifier = nil
+        try context.save()
+    }
+
     /// Update playback position
     public func updatePlaybackPosition(downloadID: UUID, positionTicks: Int64, isWatched: Bool) throws {
         let context = ModelContext(modelContainer)
@@ -182,6 +192,7 @@ public actor DownloadStore {
         download.playbackPositionTicks = positionTicks
         download.isWatched = isWatched
         download.lastPlayedDate = Date()
+        try queuePlaybackProgress(download: download, context: context)
 
         try context.save()
     }

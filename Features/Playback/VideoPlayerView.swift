@@ -29,6 +29,7 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
             item: MediaItem,
             appState: AppState,
             startPositionTicks: Int64 = 0,
+            downloadServerID: String? = nil,
             existingPlayer: AVPlayer? = nil,
             onPiPStart: (() -> Void)? = nil
         ) {
@@ -41,7 +42,8 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
                 item: item,
                 appState: appState,
                 startPositionTicks: startPositionTicks,
-                existingPlayer: existingPlayer
+                existingPlayer: existingPlayer,
+                downloadServerID: downloadServerID
             ))
         }
 

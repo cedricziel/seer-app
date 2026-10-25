@@ -49,6 +49,7 @@ public final class DownloadManager {
     let storage: DownloadStorage
     let queue: DownloadQueue
     let sessionManager: BackgroundSessionManager
+    var startClaims = DownloadStartClaims()
     private let modelContainer: ModelContainer
 
     // Server credentials (set when authenticated)
@@ -197,9 +198,17 @@ public final class DownloadManager {
             } else if download.state == .downloading {
                 // Check if this download's task is still running in the background
                 if let taskID = download.taskIdentifier, activeTasks.contains(taskID) {
-                    // Task is still running, re-register mapping and mark as active
-                    sessionManager.registerTask(taskID, forDownload: download.id)
-                    await queue.markActive(download.id)
+                    if await sessionManager.matchesNetworkPolicy(taskIdentifier: taskID, wifiOnly: wifiOnlyEnabled) {
+                        sessionManager.registerTask(taskID, forDownload: download.id)
+                        await queue.markActive(download.id)
+                    } else {
+                        // Older app versions started tasks without a daemon-enforced WiFi policy.
+                        try? await store.updateState(downloadID: download.id, state: .pending)
+                        sessionManager.unregisterTask(taskID)
+                        let resumeData = await sessionManager.cancelDownload(taskIdentifier: taskID)
+                        try? await store.updateResumeData(downloadID: download.id, resumeData: resumeData)
+                        await queue.enqueue(download.id)
+                    }
                 } else if let pendingFile = pendingFileURL(for: download) {
                     // The session finished this task while we were not around
                     // (background relaunch, crash). Finish it instead of
@@ -298,22 +307,19 @@ public final class DownloadManager {
 
     /// Pause a download
     public func pauseDownload(_ downloadID: UUID) async throws {
+        startClaims.invalidate(downloadID)
         guard let download = try await store.fetchDownload(id: downloadID),
-              download.state == .downloading,
-              let taskIdentifier = download.taskIdentifier
-        else {
-            return
-        }
-
-        // Cancel with resume data
-        let resumeData = await sessionManager.cancelDownload(taskIdentifier: taskIdentifier)
-
-        // Update state
+              download.state == .downloading || download.state == .pending else { return }
+        startClaims.invalidate(downloadID)
+        let taskIdentifier = download.taskIdentifier
         try await store.updateState(downloadID: downloadID, state: .paused)
-        if let resumeData {
-            try await store.updateResumeData(downloadID: downloadID, resumeData: resumeData)
+        if let taskIdentifier {
+            sessionManager.unregisterTask(taskIdentifier)
+            let resumeData = await sessionManager.cancelDownload(taskIdentifier: taskIdentifier)
+            if let resumeData {
+                try await store.updateResumeData(downloadID: downloadID, resumeData: resumeData)
+            }
         }
-
         await queue.dequeue(downloadID)
         await refresh()
     }
@@ -334,10 +340,17 @@ public final class DownloadManager {
 
     /// Cancel and remove a download
     public func cancelDownload(_ downloadID: UUID) async throws {
+        startClaims.invalidate(downloadID)
         guard let download = try await store.fetchDownload(id: downloadID) else { return }
+        startClaims.invalidate(downloadID)
+        let taskIdentifier = download.taskIdentifier
+        if download.state == .pending || download.state == .downloading {
+            try await store.updateState(downloadID: downloadID, state: .paused)
+        }
 
         // Cancel active task if any
-        if let taskIdentifier = download.taskIdentifier {
+        if let taskIdentifier {
+            sessionManager.unregisterTask(taskIdentifier)
             _ = await sessionManager.cancelDownload(taskIdentifier: taskIdentifier, saveResumeData: false)
         }
 
@@ -421,25 +434,25 @@ public final class DownloadManager {
     // MARK: - Private Download Logic
 
     private func startDownloadTask(downloadID: UUID) async {
+        let token = startClaims.begin(downloadID)
+        defer { startClaims.finish(token, for: downloadID) }
         guard let serverURL, let accessToken, let deviceID else {
             try? await store.updateState(downloadID: downloadID, state: .failed, errorMessage: "Not configured")
             return
         }
-        guard let download = try? await store.fetchDownload(id: downloadID) else { return }
+        guard let download = try? await store.fetchDownload(id: downloadID),
+              startClaims.isCurrent(token, for: downloadID),
+              download.state == .pending || download.state == .downloading else { return }
         if let serverID, download.serverID != serverID {
             // Belongs to another server; leave it pending until that server is active
             await queue.markCompleted(downloadID)
             return
         }
         try? await store.updateState(downloadID: downloadID, state: .downloading)
+        guard startClaims.isCurrent(token, for: downloadID) else { return }
 
-        // A paused or interrupted download carries resume data; continue it
-        // instead of starting over from byte zero.
-        if let resumeData = download.resumeData {
-            let task = sessionManager.resumeDownload(resumeData: resumeData, downloadID: downloadID)
-            try? await store.updateResumeData(downloadID: downloadID, resumeData: nil)
-            try? await store.updateTaskIdentifier(downloadID: downloadID, taskIdentifier: task.taskIdentifier)
-            await refresh()
+        if let resumeData = download.resumeData,
+           await resumeDownloadTaskIfPossible(resumeData: resumeData, downloadID: downloadID, token: token) {
             return
         }
 
@@ -450,6 +463,7 @@ public final class DownloadManager {
 
             // Get full playback info to check format compatibility
             let playbackInfo = try await playbackService.getPlaybackInfo(itemId: download.itemID)
+            guard startClaims.isCurrent(token, for: downloadID) else { return }
 
             guard let mediaSource = playbackInfo.mediaSources.first else {
                 throw DownloadError.downloadFailed("No media source available")
@@ -474,13 +488,56 @@ public final class DownloadManager {
             print("[Download] Transcoded: \(isTranscoded)")
 
             let headers = StreamURLBuilder.buildAuthHeaders(accessToken: accessToken, deviceID: deviceID)
-            let task = sessionManager.startDownload(url: downloadURL, downloadID: downloadID, headers: headers)
-            try await store.updateTaskIdentifier(downloadID: downloadID, taskIdentifier: task.taskIdentifier)
-            await refresh()
+            let task = sessionManager.startDownload(
+                url: downloadURL, downloadID: downloadID, headers: headers,
+                wifiOnly: wifiOnlyEnabled, startImmediately: false
+            )
+            await installDownloadTask(task, downloadID: downloadID, token: token)
         } catch {
+            guard startClaims.isCurrent(token, for: downloadID) else { return }
             let msg = error.localizedDescription
             print("[Download] Failed to start: \(msg)")
             try? await store.updateState(downloadID: downloadID, state: .failed, errorMessage: msg)
+            await queue.markCompleted(downloadID)
+            await refresh()
+        }
+    }
+
+    private func resumeDownloadTaskIfPossible(resumeData: Data, downloadID: UUID, token: UUID) async -> Bool {
+        try? await store.updateResumeData(downloadID: downloadID, resumeData: nil)
+        guard startClaims.isCurrent(token, for: downloadID) else { return true }
+        guard let task = sessionManager.resumeDownload(
+            resumeData: resumeData, downloadID: downloadID, wifiOnly: wifiOnlyEnabled, startImmediately: false
+        ) else { return false }
+        await installDownloadTask(task, downloadID: downloadID, token: token)
+        return true
+    }
+
+    private func installDownloadTask(_ task: URLSessionDownloadTask, downloadID: UUID, token: UUID) async {
+        guard startClaims.isCurrent(token, for: downloadID) else {
+            sessionManager.unregisterTask(task.taskIdentifier)
+            task.cancel()
+            return
+        }
+        do {
+            try await store.updateTaskIdentifier(downloadID: downloadID, taskIdentifier: task.taskIdentifier)
+            guard startClaims.isCurrent(token, for: downloadID) else {
+                sessionManager.unregisterTask(task.taskIdentifier)
+                task.cancel()
+                try? await store.clearTaskIdentifier(downloadID: downloadID, matching: task.taskIdentifier)
+                return
+            }
+            task.resume()
+            await refresh()
+        } catch {
+            sessionManager.unregisterTask(task.taskIdentifier)
+            task.cancel()
+            guard startClaims.isCurrent(token, for: downloadID) else { return }
+            try? await store.updateState(
+                downloadID: downloadID,
+                state: .failed,
+                errorMessage: error.localizedDescription
+            )
             await queue.markCompleted(downloadID)
             await refresh()
         }

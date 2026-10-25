@@ -15,6 +15,7 @@
             item: MediaItem,
             appState: AppState,
             startPositionTicks: Int64 = 0,
+            downloadServerID: String? = nil,
             existingPlayer: AVPlayer? = nil,
             onPiPStart _: (() -> Void)? = nil
         ) {
@@ -23,7 +24,8 @@
                 item: item,
                 appState: appState,
                 startPositionTicks: startPositionTicks,
-                existingPlayer: existingPlayer
+                existingPlayer: existingPlayer,
+                downloadServerID: downloadServerID
             ))
         }
 
@@ -87,23 +89,30 @@
         private let item: MediaItem
         private let appState: AppState
         private let startPositionTicks: Int64
+        private let downloadServerID: String?
 
         public init(
             item: MediaItem,
             appState: AppState,
             startPositionTicks: Int64 = 0,
+            downloadServerID: String? = nil,
             existingPlayer _: AVPlayer? = nil,
             onPiPStart _: (() -> Void)? = nil
         ) {
             self.item = item
             self.appState = appState
             self.startPositionTicks = startPositionTicks
+            self.downloadServerID = downloadServerID
         }
 
         public var body: some View {
-            TVPlayerView(item: item, appState: appState, startPositionTicks: startPositionTicks) {
-                dismiss()
-            }
+            TVPlayerView(
+                item: item,
+                appState: appState,
+                startPositionTicks: startPositionTicks,
+                downloadServerID: downloadServerID,
+                onDismiss: { dismiss() }
+            )
         }
     }
 #endif

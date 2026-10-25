@@ -37,9 +37,14 @@ public final class VideoPlayerViewModel {
     private var streamInfo: StreamInfo?
     private var playbackState: PlaybackState?
     private var isPlayingOffline: Bool = false
+    private let playbackServerID: String?
+    private let requiresDownloadedFile: Bool
+    private var offlineDownloadID: UUID?
+    private var offlineIsWatched = false
+    private(set) var localProgressSaveTask: Task<Void, Never>?
     /// Injected by the hosting view from the SwiftUI environment before
     /// loading, so downloaded media plays from disk instead of streaming.
-    var downloadManager: DownloadManager?
+    var downloadManager: (any DownloadPlaybackManaging)?
 
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
@@ -70,11 +75,14 @@ public final class VideoPlayerViewModel {
         appState: AppState,
         startPositionTicks _: Int64 = 0,
         existingPlayer: AVPlayer? = nil,
-        downloadManager: DownloadManager? = nil
+        downloadManager: (any DownloadPlaybackManaging)? = nil,
+        downloadServerID: String? = nil
     ) {
         self.item = item
         self.appState = appState
         self.downloadManager = downloadManager
+        playbackServerID = downloadServerID ?? appState.activeServerKey
+        requiresDownloadedFile = downloadServerID != nil
 
         // If we have an existing player (restoration from PiP), use it
         if let existingPlayer {
@@ -99,7 +107,8 @@ public final class VideoPlayerViewModel {
         }
 
         // Initialize playback service if we have credentials
-        if let serverURL = appState.jellyfinServerURL,
+        if downloadServerID == nil,
+           let serverURL = appState.jellyfinServerURL,
            let accessToken = appState.jellyfinAccessToken,
            let userID = appState.jellyfinUserID,
            let deviceID = appState.jellyfinDeviceID {
@@ -140,13 +149,27 @@ public final class VideoPlayerViewModel {
         setupAudioSession()
         isBuffering = true
         errorMessage = nil
+        isReady = false
+        hasReportedStart = false
+        isPlayingOffline = false
+        offlineDownloadID = nil
         teardownPlayer()
 
         // Check for local downloaded file first
-        let localURL = await getLocalFileURL()
+        let download = await getLocalDownload()
         guard isCurrentLoad(generation) else { return }
-        if let localURL {
-            await loadFromLocalFile(url: localURL, startPositionTicks: startPositionTicks, generation: generation)
+        if let download {
+            offlineDownloadID = download.record.id
+            offlineIsWatched = download.record.isWatched
+            let resumeTicks = download.record.lastPlayedDate == nil
+                ? startPositionTicks
+                : (download.record.isWatched ? 0 : download.record.playbackPositionTicks)
+            await loadFromLocalFile(url: download.url, startPositionTicks: resumeTicks, generation: generation)
+            return
+        }
+        if requiresDownloadedFile {
+            errorMessage = "The downloaded file is unavailable. Download this item again."
+            isBuffering = false
             return
         }
 
@@ -222,12 +245,14 @@ public final class VideoPlayerViewModel {
     }
 
     /// Check for local downloaded file
-    private func getLocalFileURL() async -> URL? {
-        guard let manager = downloadManager,
-              let serverID = appState.activeServerKey
+    private func getLocalDownload() async -> (record: Download, url: URL)? {
+        guard let manager = downloadManager, let playbackServerID,
+              let download = await manager.download(forItemID: item.id, serverID: playbackServerID),
+              download.state == .completed,
+              let url = await manager.localFileURL(forItemID: item.id, serverID: playbackServerID),
+              FileManager.default.fileExists(atPath: url.path)
         else { return nil }
-
-        return await manager.localFileURL(forItemID: item.id, serverID: serverID)
+        return (download, url)
     }
 
     /// Load media from local file
@@ -266,6 +291,7 @@ public final class VideoPlayerViewModel {
             )
         }
 
+        currentTime = Double(startPositionTicks) / 10_000_000
         // Initialize playback state for offline
         playbackState = PlaybackState(
             itemId: item.id,
@@ -297,6 +323,7 @@ public final class VideoPlayerViewModel {
     func pause() {
         player?.pause()
         isPlaying = false
+        reportProgress()
         stopProgressReporting()
     }
 
@@ -430,7 +457,11 @@ public final class VideoPlayerViewModel {
 
     /// Updates Now Playing info for lock screen / control center
     private func updateNowPlayingInfo(player: AVPlayer) {
-        let imageURL = appState.jellyfinServerURL?.appendingPathComponent("Items/\(item.id)/Images/Primary")
+        let imageURL: URL? = if playbackServerID == appState.activeServerKey {
+            appState.jellyfinServerURL?.appendingPathComponent("Items/\(item.id)/Images/Primary")
+        } else {
+            nil
+        }
         let playerDuration = player.currentItem?.duration
         let durationSeconds: Double? = if let playerDuration, playerDuration.isNumeric {
             CMTimeGetSeconds(playerDuration)
@@ -469,6 +500,11 @@ public final class VideoPlayerViewModel {
             }
             .store(in: &cancellables)
 
+        NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime, object: player.currentItem)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.handlePlaybackEnded() }
+            .store(in: &cancellables)
+
         // Observe current item status
         player.currentItem?.publisher(for: \.status)
             .receive(on: DispatchQueue.main)
@@ -495,7 +531,15 @@ public final class VideoPlayerViewModel {
     private func handleTimeControlStatus(_ status: AVPlayer.TimeControlStatus) {
         switch status {
         case .playing: isPlaying = true; isBuffering = false
-        case .paused: isPlaying = false
+        case .paused:
+            let wasPlaying = isPlaying
+            isPlaying = false
+            if wasPlaying, isPlayingOffline {
+                if let time = player?.currentTime(), time.seconds.isFinite {
+                    handleTimeUpdate(time)
+                }
+                saveLocalProgress()
+            }
         case .waitingToPlayAtSpecifiedRate: isBuffering = true
         @unknown default: break
         }
@@ -567,7 +611,42 @@ public final class VideoPlayerViewModel {
         progressReportTask = nil
     }
 
+    private func handlePlaybackEnded() {
+        isPlaying = false
+        if isPlayingOffline {
+            offlineIsWatched = true
+            if duration > 0 {
+                playbackState = playbackState?.withPosition(ticks: PlaybackState.positionTicks(from: duration))
+            }
+            saveLocalProgress()
+        }
+        stopProgressReporting()
+    }
+
+    private func saveLocalProgress() {
+        if !offlineIsWatched, let time = player?.currentTime(), time.seconds.isFinite {
+            handleTimeUpdate(time)
+        }
+        guard let manager = downloadManager, let offlineDownloadID, let state = playbackState else { return }
+        let previousSave = localProgressSaveTask
+        let isWatched = offlineIsWatched
+        localProgressSaveTask = Task {
+            // Preserve update order when a seek or stop races a periodic save.
+            await previousSave?.value
+            do {
+                try await manager.updatePlaybackPosition(
+                    downloadID: offlineDownloadID,
+                    positionTicks: state.positionTicks,
+                    isWatched: isWatched
+                )
+            } catch {
+                logger.error("Failed to save offline progress: \(error.localizedDescription)")
+            }
+        }
+    }
+
     private func reportPlaybackStart() {
+        guard !isPlayingOffline else { return }
         guard let state = playbackState, let service = playbackService else { return }
         Task {
             try? await service.reportPlaybackStart(state: state)
@@ -575,6 +654,10 @@ public final class VideoPlayerViewModel {
     }
 
     private func reportProgress() {
+        if isPlayingOffline {
+            saveLocalProgress()
+            return
+        }
         guard let state = playbackState, let service = playbackService else { return }
         let updatedState = state.withPaused(!isPlaying)
         Task {
@@ -583,6 +666,10 @@ public final class VideoPlayerViewModel {
     }
 
     private func reportPlaybackStopped() {
+        if isPlayingOffline {
+            saveLocalProgress()
+            return
+        }
         guard let state = playbackState, let service = playbackService else { return }
         Task {
             try? await service.reportPlaybackStopped(state: state)

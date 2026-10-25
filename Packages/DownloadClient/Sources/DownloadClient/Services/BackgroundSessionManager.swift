@@ -19,6 +19,8 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
     /// The background URLSession
     public private(set) var session: URLSession
 
+    private let pendingDirectoryOverride: URL?
+
     /// Delegate for download events (thread-safe access via lock)
     private weak var _delegate: BackgroundSessionDelegate?
     private let delegateLock = NSLock()
@@ -73,6 +75,7 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
     override private init() {
         // Use a temporary shared session for the stored property requirement before super.init()
         session = URLSession.shared
+        pendingDirectoryOverride = nil
 
         super.init()
 
@@ -94,6 +97,12 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
         session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
     }
 
+    init(session: URLSession, pendingDirectory: URL) {
+        self.session = session
+        pendingDirectoryOverride = pendingDirectory
+        super.init()
+    }
+
     /// Create a properly configured background session
     public static func createSession(delegate: URLSessionDelegate?) -> URLSession {
         let config = URLSessionConfiguration.background(withIdentifier: sessionIdentifier)
@@ -109,32 +118,45 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
 
     // MARK: - Task Management
 
-    /// Start a download task
+    /// Creates a download task; `startImmediately: false` lets the caller persist its identifier before resuming.
     public func startDownload(
         url: URL,
         downloadID: UUID,
-        headers: [String: String] = [:]
+        headers: [String: String] = [:],
+        wifiOnly: Bool = true,
+        startImmediately: Bool = true
     ) -> URLSessionDownloadTask {
         var request = URLRequest(url: url)
+        request.allowsCellularAccess = !wifiOnly
         for (key, value) in headers {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
         let task = session.downloadTask(with: request)
         taskMap[task.taskIdentifier] = downloadID
-        task.resume()
+        if startImmediately {
+            task.resume()
+        }
 
         return task
     }
 
-    /// Resume a download with saved data
+    /// Resumes only when the saved request matches the current network policy; otherwise the caller restarts it.
     public func resumeDownload(
         resumeData: Data,
-        downloadID: UUID
-    ) -> URLSessionDownloadTask {
+        downloadID: UUID,
+        wifiOnly: Bool = true,
+        startImmediately: Bool = true
+    ) -> URLSessionDownloadTask? {
         let task = session.downloadTask(withResumeData: resumeData)
+        guard let request = task.originalRequest, request.allowsCellularAccess == !wifiOnly else {
+            task.cancel()
+            return nil
+        }
         taskMap[task.taskIdentifier] = downloadID
-        task.resume()
+        if startImmediately {
+            task.resume()
+        }
 
         return task
     }
@@ -153,6 +175,13 @@ public final class BackgroundSessionManager: NSObject, @unchecked Sendable {
             task.cancel()
             return nil
         }
+    }
+
+    func matchesNetworkPolicy(taskIdentifier: Int, wifiOnly: Bool) async -> Bool {
+        guard let task = await findTask(identifier: taskIdentifier), let request = task.originalRequest else {
+            return false
+        }
+        return request.allowsCellularAccess == !wifiOnly
     }
 
     /// Find a task by identifier
@@ -239,6 +268,18 @@ extension BackgroundSessionManager: URLSessionDownloadDelegate {
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
+        guard let response = downloadTask.response as? HTTPURLResponse,
+              (200 ... 299).contains(response.statusCode)
+        else {
+            try? FileManager.default.removeItem(at: location)
+            delegate?.downloadDidFail(
+                taskIdentifier: downloadTask.taskIdentifier,
+                error: DownloadResponseError(statusCode: (downloadTask.response as? HTTPURLResponse)?.statusCode),
+                resumeData: nil
+            )
+            unregisterTask(downloadTask.taskIdentifier)
+            return
+        }
         print("[Download] Complete: task \(downloadTask.taskIdentifier)")
 
         // The in-memory task map is empty when iOS relaunches the app in the
@@ -257,10 +298,15 @@ extension BackgroundSessionManager: URLSessionDownloadDelegate {
             taskIdentifier: downloadTask.taskIdentifier
         )
 
-        delegate?.downloadDidComplete(
-            taskIdentifier: downloadTask.taskIdentifier,
-            tempFileURL: intermediateURL ?? location // Pass intermediate URL if move succeeded
-        )
+        if let intermediateURL {
+            delegate?.downloadDidComplete(taskIdentifier: downloadTask.taskIdentifier, tempFileURL: intermediateURL)
+        } else {
+            delegate?.downloadDidFail(
+                taskIdentifier: downloadTask.taskIdentifier,
+                error: CocoaError(.fileWriteUnknown),
+                resumeData: nil
+            )
+        }
 
         unregisterTask(downloadTask.taskIdentifier)
     }
@@ -292,14 +338,13 @@ extension BackgroundSessionManager: URLSessionDownloadDelegate {
     /// Returns the new URL if successful, nil if failed
     private func moveToIntermediateLocation(tempURL: URL, downloadID: UUID?, taskIdentifier: Int) -> URL? {
         let fileManager = FileManager.default
-        let intermediateURL = if let downloadID {
-            Self.pendingFileURL(forDownload: downloadID)
-        } else {
-            Self.pendingFileURL(forTask: taskIdentifier)
-        }
+        let directory = pendingDirectoryOverride ?? Self.pendingDirectory
+        let fileName = downloadID.map { "download-\($0.uuidString).tmp" }
+            ?? "download-task-\(taskIdentifier).tmp"
+        let intermediateURL = directory.appendingPathComponent(fileName)
 
         do {
-            try fileManager.createDirectory(at: Self.pendingDirectory, withIntermediateDirectories: true)
+            try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
             // Remove any existing file at intermediate location
             if fileManager.fileExists(atPath: intermediateURL.path) {
                 try fileManager.removeItem(at: intermediateURL)
@@ -351,5 +396,16 @@ extension BackgroundSessionManager: URLSessionDelegate {
         if let error {
             print("Background session invalidated: \(error.localizedDescription)")
         }
+    }
+}
+
+private struct DownloadResponseError: LocalizedError {
+    let statusCode: Int?
+
+    var errorDescription: String? {
+        if let statusCode {
+            return "Download server returned HTTP \(statusCode)."
+        }
+        return "Download server returned an invalid response."
     }
 }
