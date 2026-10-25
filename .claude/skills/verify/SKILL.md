@@ -8,7 +8,7 @@ description: Verify Seer changes with isolated search-model tests, native builds
 1. Check `git status --short`. Preserve unrelated changes and peer worktrees.
 2. Run [scripts/search-tests.sh](scripts/search-tests.sh) for library-search changes. It compiles the real search model, Jellyfin media types, and regression tests in a disposable macOS Swift package. It does not launch the app or access credentials, preferences, or CloudKit. Requires macOS and the Xcode Swift toolchain. This checks model behavior, not SwiftUI integration.
 3. Run [scripts/request-tests.sh](scripts/request-tests.sh) for request-loading changes. It compiles the real request view model, API models, scheduler, and SwiftData cache model in a disposable macOS package. The [AppState fixture](fixtures/RequestDependencies.swift) and [API fixture](fixtures/RequestService.swift) prevent credentials, preferences, CloudKit, and network access. Continuation-controlled tests cover stale server/filter/sort responses, refresh/pagination ownership, and actions on obsolete rows.
-4. Use the SwiftLint and SwiftFormat versions pinned in `.github/workflows/ci.yml`. Run `swiftlint lint --strict --no-cache` and `swiftformat --lint . --cache ignore`. Compare failures with the baseline. Format only changed files.
+4. Use the versions and checksums in `scripts/swift-tools.lock`. Run `./scripts/swift-tools swiftlint lint --strict --no-cache` and `./scripts/swift-tools swiftformat --lint . --cache ignore`. Compare failures with the baseline. Format only changed files.
 5. Run `openspec validate library-search-settings --strict` when changing that spec. For other changes, validate their change name.
 6. Regenerate the project with `xcodegen generate`. Build iOS and tvOS with `xcodebuild`, a temporary derived-data directory, temporary cloned-package directory, and `CODE_SIGNING_ALLOWED=NO`. Use `-destination 'generic/platform=iOS Simulator'` or `-destination 'generic/platform=tvOS Simulator'`. These builds require SDK services and package downloads; do not mistake sandbox failures for source errors.
 7. For runtime checks, create a dedicated simulator, use test servers and credentials, and delete the simulator in a cleanup trap. Never launch on a user's existing simulator or device. If isolation is unavailable, report runtime checks as unverified.
@@ -51,3 +51,5 @@ values without accessing user credentials. Verify that `app.installation.id` is
 added to the shared resource only when diagnostics are enabled. Run
 `DiagnosticsPreferencesTests` and `DiagnosticsExporterTests` for default-on
 preferences, legacy opt-out preservation, and export-time category gates.
+
+For shared Swift tooling changes, run `python3 -m unittest scripts/test_swift_tools.py`.
