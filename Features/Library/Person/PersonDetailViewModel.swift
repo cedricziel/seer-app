@@ -115,4 +115,35 @@ final class PersonDetailViewModel: ObservableObject {
     func imageURL(for item: MediaItem) -> URL? {
         serverURL?.appendingPathComponent("Items/\(item.id)/Images/Primary")
     }
+
+    // MARK: - Filmography role/year label
+
+    /// This person's role or type on the given filmography item (e.g.
+    /// "Director" or a character name), recovered by matching `personId`
+    /// against the item's `people` array.
+    private func roleText(for item: MediaItem) -> String? {
+        guard let match = item.people?.first(where: { $0.id == personId }) else { return nil }
+        if let role = match.role, !role.isEmpty {
+            return role
+        }
+        if let type = match.type, !type.isEmpty {
+            return type
+        }
+        return nil
+    }
+
+    /// "Role · Year" when a role or type string can be recovered for this
+    /// person on the item, else just the year, matching prior behavior.
+    func roleLabel(for item: MediaItem) -> String? {
+        switch (roleText(for: item), item.year) {
+        case let (role?, year?):
+            "\(role) · \(year)"
+        case let (role?, nil):
+            role
+        case let (nil, year?):
+            String(year)
+        case (nil, nil):
+            nil
+        }
+    }
 }

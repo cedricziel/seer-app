@@ -1,3 +1,4 @@
+import DownloadClient
 import JellyfinClient
 import PlaybackClient
 import SeerCore
@@ -19,7 +20,28 @@ private struct LibraryContentView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var onboardingManager: OnboardingManager
     @StateObject private var viewModel: LibraryViewModel
+    @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
+    /// Read at this level — *outside* the `NavigationSplitView` below — on
+    /// purpose. The split view hands its sidebar column a compact
+    /// horizontal size class regardless of device, so any view inside the
+    /// column cannot tell "iPhone" from "iPad content column" on its own.
+    /// `isSplitLayout` is derived here once and passed down explicitly.
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedItemForPlayback: MediaItem?
+    @State private var path = NavigationPath()
+    /// Detail-column selection when the split view shows both columns
+    /// (iPad / Mac Designed for iPad). On compact width the split view is
+    /// collapsed and navigation pushes `MediaDetailView` onto `path`
+    /// instead, so this stays `nil` there. Cleared whenever a grid screen
+    /// is pushed so the detail pane never shows an item from a previous
+    /// library.
+    @State private var selectedItem: MediaItem?
+
+    #if os(tvOS)
+        private let recentlyAddedCardWidth: CGFloat = 196
+    #else
+        private let recentlyAddedCardWidth: CGFloat = 140
+    #endif
 
     init(appState: AppState, onboardingManager: OnboardingManager) {
         self.appState = appState
@@ -27,73 +49,118 @@ private struct LibraryContentView: View {
         _viewModel = StateObject(wrappedValue: LibraryViewModel(appState: appState))
     }
 
+    /// Whether the split view currently shows its detail column alongside
+    /// the home content, so item taps should *select* into that column
+    /// rather than push. Always `false` on tvOS, which uses a plain stack.
+    private var isSplitLayout: Bool {
+        #if os(tvOS)
+            return false
+        #else
+            return horizontalSizeClass == .regular
+        #endif
+    }
+
     var body: some View {
-        NavigationStack {
-            Group {
-                if viewModel.isLoading, viewModel.mediaItems.isEmpty, viewModel.continueWatching.isEmpty {
-                    LoadingView(message: "Loading library...")
-                } else if let error = viewModel.errorMessage, viewModel.mediaItems.isEmpty {
-                    ErrorView(error: error) {
-                        Task { await viewModel.refresh() }
-                    }
-                } else {
-                    contentView
+        rootContainer
+            .task { await viewModel.loadInitialData() }
+            .onDisappear { viewModel.cancelAllTasks() }
+            .onChange(of: appState.activeServerID) {
+                path = NavigationPath()
+                selectedItem = nil
+                viewModel.serverChanged()
+                Task { await viewModel.refresh() }
+            }
+            .fullScreenCover(item: $selectedItemForPlayback) { item in
+                VideoPlayerView(
+                    item: item,
+                    appState: appState,
+                    startPositionTicks: item.userData?.playbackPositionTicks ?? 0,
+                    onPiPStart: { selectedItemForPlayback = nil }
+                )
+            }
+    }
+
+    // MARK: - Navigation containers
+
+    /// One container per platform, kept stable across size-class changes:
+    ///
+    /// - tvOS: a plain `NavigationStack`.
+    /// - iOS / iPadOS / Mac (Designed for iPad): a two-column
+    ///   `NavigationSplitView`. On regular width the home content (with its
+    ///   own `NavigationStack` for the grid and detail pushes) sits in the
+    ///   leading column and `LibraryDetailColumn` in the trailing one; on
+    ///   compact width the split view collapses to that leading stack by
+    ///   itself, so iPhone and iPad Split View / Slide Over never swap
+    ///   containers mid-session.
+    @ViewBuilder
+    private var rootContainer: some View {
+        #if os(tvOS)
+            homeStack
+        #else
+            NavigationSplitView(columnVisibility: .constant(.all)) {
+                homeStack
+                    // Keep the content column within a sidebar-style width
+                    // range so the detail column always has room, including
+                    // on the narrowest current iPad (mini, 744pt portrait).
+                    .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 600)
+                    // The home content is the primary surface, not a
+                    // collapsible sidebar; the tab sidebar already provides
+                    // that role on iPad.
+                    .toolbar(removing: .sidebarToggle)
+            } detail: {
+                LibraryDetailColumn(selectedItem: selectedItem, viewModel: viewModel)
+            }
+            .navigationSplitViewStyle(.balanced)
+        #endif
+    }
+
+    private var homeStack: some View {
+        NavigationStack(path: $path) {
+            homeRoot
+        }
+    }
+
+    /// Root screen of the home stack: loading/error switch, the toolbar,
+    /// and the push destinations. Everything here is *inside* the
+    /// `NavigationStack` so the toolbar items land in its navigation bar.
+    private var homeRoot: some View {
+        Group {
+            if viewModel.isLoading, viewModel.libraries.isEmpty, viewModel.continueWatching.isEmpty {
+                LoadingView(message: "Loading library...")
+            } else if let error = hostAwareErrorMessage, viewModel.libraries.isEmpty {
+                ErrorView(error: error) {
+                    Task { await viewModel.refresh() }
                 }
+            } else {
+                contentView
             }
-            .navigationTitle("Library")
-            .navigationDestination(for: MediaItem.self) { item in
-                MediaDetailView(item: item, source: .library, viewModel: viewModel)
-            }
-            .navigationDestination(for: MediaItem.Person.self) { person in
-                PersonDetailView(person: person, appState: appState)
-            }
-            .toolbar { toolbarContent }
         }
-        .task { await viewModel.loadInitialData() }
-        .onDisappear { viewModel.cancelAllTasks() }
-        .onChange(of: appState.activeServerID) {
-            viewModel.cancelAllTasks()
-            Task { await viewModel.refresh() }
+        .navigationTitle("Library")
+        .toolbar { toolbarContent }
+        .navigationDestination(for: MediaItem.self) { item in
+            MediaDetailView(item: item, source: .library, viewModel: viewModel)
         }
-        .fullScreenCover(item: $selectedItemForPlayback) { item in
-            VideoPlayerView(
-                item: item,
+        .navigationDestination(for: MediaItem.Person.self) { person in
+            PersonDetailView(person: person, appState: appState)
+        }
+        .navigationDestination(for: LibraryGridDestination.self) { destination in
+            LibraryGridView(
+                destination: destination,
                 appState: appState,
-                startPositionTicks: item.userData?.playbackPositionTicks ?? 0,
-                onPiPStart: { selectedItemForPlayback = nil }
+                selectedItem: isSplitLayout ? $selectedItem : nil
             )
         }
+    }
+
+    private var hostAwareErrorMessage: String? {
+        guard let error = viewModel.errorMessage else { return nil }
+        guard let host = appState.activeServer?.jellyfinHost else { return error }
+        return "\(error) (\(host))"
     }
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) { ServerSwitcherButton() }
-        ToolbarItem(placement: .topBarTrailing) { filterMenu }
-        ToolbarItem(placement: .topBarTrailing) { refreshButton }
-    }
-
-    private var filterMenu: some View {
-        Menu {
-            ForEach(LibraryViewModel.MediaTypeFilter.allCases, id: \.self) { filter in
-                Button {
-                    viewModel.selectedMediaType = filter
-                    Task { await viewModel.filterChanged() }
-                } label: {
-                    HStack {
-                        Text(filter.rawValue)
-                        if viewModel.selectedMediaType == filter { Image(systemName: "checkmark") }
-                    }
-                }
-            }
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-        }
-    }
-
-    private var refreshButton: some View {
-        Button { Task { await viewModel.refresh() } } label: {
-            Image(systemName: "arrow.clockwise")
-        }
     }
 
     private var contentView: some View {
@@ -110,22 +177,9 @@ private struct LibraryContentView: View {
                 if onboardingManager.isFirstLaunchAfterSetup {
                     firstTimeTipSection
                 }
-                if viewModel.isLoadingContinueWatching {
-                    SkeletonCardRow(title: "Continue Watching", cardCount: 4, cardWidth: 140)
-                } else if !viewModel.continueWatching.isEmpty {
-                    continueWatchingSection
-                }
-                if viewModel.isLoadingLatestItems {
-                    SkeletonCardRow(title: "Recently Added", cardCount: 5, cardWidth: 140)
-                } else if !viewModel.latestItems.isEmpty {
-                    latestItemsSection
-                } else if viewModel.hasLoadedLatestItems {
-                    recentlyAddedEmptySection
-                }
-                if !viewModel.libraries.isEmpty { librariesSection }
-                if viewModel.selectedLibrary != nil || viewModel.selectedMediaType != .all {
-                    mediaGridSection
-                }
+                chipRow
+                continueWatchingBlock
+                recentlyAddedBlock
             }
             .padding(.vertical)
         }
@@ -150,70 +204,217 @@ private struct LibraryContentView: View {
         }
     }
 
-    private var continueWatchingSection: some View {
-        MediaCardRow(title: "Continue Watching") {
-            ForEach(viewModel.continueWatching) { item in
-                continueWatchingCard(for: item)
-            }
-        }
-    }
-
-    private func continueWatchingCard(for item: MediaItem) -> some View {
-        Button { selectedItemForPlayback = item } label: {
-            MediaCard(
-                title: item.name,
-                subtitle: item.seriesName ?? item.formattedRuntime,
-                imageURL: viewModel.imageURL(for: item)
-            )
-            .frame(width: 140)
-            .overlay(alignment: .bottomTrailing) { playOverlay }
-            .overlay(alignment: .bottom) { progressOverlay(for: item) }
-        }
-        .buttonStyle(.plain)
-        .mediaContextMenu(
-            config: contextMenuConfig(for: item, canPlay: true, showDetails: true),
-            actions: contextMenuActions(for: item, canPlay: true)
-        )
-    }
-
-    private var playOverlay: some View {
-        Image(systemName: "play.circle.fill").font(.title)
-            .foregroundStyle(.white).shadow(radius: 2).padding(8)
+    /// Pushes a grid screen and drops any detail-column selection, so the
+    /// detail pane doesn't keep showing an item from the previous context.
+    private func openGrid(_ destination: LibraryGridDestination) {
+        selectedItem = nil
+        path.append(destination)
     }
 
     @ViewBuilder
-    private func progressOverlay(for item: MediaItem) -> some View {
-        if let percentage = item.playedPercentage ?? progressPercentage(for: item) {
-            GeometryReader { geometry in
-                Rectangle().fill(Color.accentColor)
-                    .frame(width: geometry.size.width * (percentage / 100.0), height: 3)
-            }.frame(height: 3)
+    private var chipRow: some View {
+        if !viewModel.libraries.isEmpty {
+            LibraryChipRow(libraries: viewModel.libraries) { library in
+                openGrid(.library(library))
+            }
         }
     }
 
-    private func progressPercentage(for item: MediaItem) -> Double? {
+    // MARK: - Continue Watching
+
+    @ViewBuilder
+    private var continueWatchingBlock: some View {
+        if viewModel.isLoadingContinueWatching {
+            continueWatchingSkeleton
+        } else if !viewModel.continueWatching.isEmpty {
+            continueWatchingSection
+        }
+    }
+
+    private var continueWatchingSkeleton: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Continue Watching").font(.title2).fontWeight(.bold).padding(.horizontal)
+            #if !os(tvOS)
+                SkeletonHeroRow().padding(.horizontal)
+            #endif
+            SkeletonLandscapeRow()
+        }
+    }
+
+    private var continueWatchingSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Continue Watching").font(.title2).fontWeight(.bold).padding(.horizontal)
+            #if os(tvOS)
+                landscapeRow(items: Array(viewModel.continueWatching.prefix(4)))
+            #else
+                if let hero = viewModel.continueWatching.first {
+                    heroCard(for: hero).padding(.horizontal)
+                }
+                let rest = Array(viewModel.continueWatching.dropFirst())
+                if !rest.isEmpty { landscapeRow(items: rest) }
+            #endif
+        }
+    }
+
+    private func landscapeRow(items: [MediaItem]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 12) {
+                ForEach(items) { item in landscapeCard(for: item) }
+            }
+            .padding(.horizontal)
+        }
+    }
+
+    private func heroCard(for item: MediaItem) -> some View {
+        ContinueWatchingHeroCard(
+            caption: episodeCaption(for: item),
+            title: item.name,
+            subtitle: heroSubtitle(for: item),
+            imageURL: continueWatchingImageURL(for: item),
+            progress: progressFraction(for: item),
+            isDownloaded: offlineDimmingEnabled ? isItemDownloaded(item) : false,
+            showOfflineDimming: offlineDimmingEnabled,
+            onResume: { selectedItemForPlayback = item },
+            contextMenuConfig: contextMenuConfig(for: item, canPlay: true, showDetails: true),
+            contextMenuActions: contextMenuActions(for: item, canPlay: true)
+        )
+    }
+
+    private func landscapeCard(for item: MediaItem) -> some View {
+        Button { selectedItemForPlayback = item } label: {
+            ContinueWatchingLandscapeCard(
+                title: item.name,
+                subtitle: landscapeSubtitle(for: item),
+                imageURL: continueWatchingImageURL(for: item),
+                progress: progressFraction(for: item),
+                isDownloaded: offlineDimmingEnabled ? isItemDownloaded(item) : false,
+                showOfflineDimming: offlineDimmingEnabled,
+                contextMenuConfig: contextMenuConfig(for: item, canPlay: true, showDetails: true),
+                contextMenuActions: contextMenuActions(for: item, canPlay: true)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(offlineDimmingEnabled && !isItemDownloaded(item))
+    }
+
+    private func continueWatchingImageURL(for item: MediaItem) -> URL? {
+        if let backdropTags = item.backdropImageTags, !backdropTags.isEmpty {
+            return viewModel.imageURL(for: item, type: .backdrop)
+        }
+        return viewModel.imageURL(for: item, type: .primary)
+    }
+
+    private func progressFraction(for item: MediaItem) -> Double? {
+        if let percentage = item.playedPercentage { return percentage / 100.0 }
         guard let positionTicks = item.userData?.playbackPositionTicks,
               let durationTicks = item.runTimeTicks, durationTicks > 0 else { return nil }
-        return Double(positionTicks) / Double(durationTicks) * 100.0
+        return Double(positionTicks) / Double(durationTicks)
+    }
+
+    private func episodeCaption(for item: MediaItem) -> String? {
+        guard item.type == .episode else { return nil }
+        var parts: [String] = []
+        if let seriesName = item.seriesName { parts.append(seriesName) }
+        if let season = item.parentIndexNumber { parts.append("S\(season)") }
+        if let episode = item.indexNumber { parts.append("E\(episode)") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func heroSubtitle(for item: MediaItem) -> String? {
+        item.remainingTimeText ?? item.seriesName ?? item.formattedRuntime
+    }
+
+    private func landscapeSubtitle(for item: MediaItem) -> String? {
+        guard let remaining = item.remainingTimeText else {
+            return item.seriesName ?? item.formattedRuntime
+        }
+        if let caption = episodeCaption(for: item) {
+            return "\(caption) · \(remaining)"
+        }
+        return remaining
+    }
+
+    // MARK: - Recently Added
+
+    @ViewBuilder
+    private var recentlyAddedBlock: some View {
+        if viewModel.isLoadingLatestItems {
+            SkeletonCardRow(title: "Recently Added", cardCount: 5, cardWidth: recentlyAddedCardWidth)
+        } else if !viewModel.latestItems.isEmpty {
+            latestItemsSection
+        } else if viewModel.hasLoadedLatestItems {
+            recentlyAddedEmptySection
+        }
     }
 
     private var latestItemsSection: some View {
-        MediaCardRow(title: "Recently Added") {
-            ForEach(viewModel.latestItems) { item in
-                NavigationLink(value: item) {
-                    MediaCard(
-                        title: item.name,
-                        subtitle: item.year.map { String($0) },
-                        imageURL: viewModel.imageURL(for: item)
-                    ).frame(width: 140)
+        VStack(alignment: .leading, spacing: 12) {
+            latestItemsHeader
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 12) {
+                    ForEach(viewModel.latestItems) { item in
+                        latestItemCard(for: item)
+                    }
                 }
-                .buttonStyle(.plain)
-                .mediaContextMenu(
-                    config: contextMenuConfig(for: item, canPlay: item.isPlayable, showDetails: false),
-                    actions: contextMenuActions(for: item, canPlay: item.isPlayable)
-                )
+                .padding(.horizontal)
             }
         }
+    }
+
+    private var latestItemsHeader: some View {
+        HStack {
+            Text("Recently Added").font(.title2).fontWeight(.bold)
+            Spacer()
+            Button {
+                openGrid(.recentlyAdded)
+            } label: {
+                Text("See All ›").font(.subheadline).foregroundStyle(Color.accentColor)
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private func latestItemCard(for item: MediaItem) -> some View {
+        let downloaded = offlineDimmingEnabled ? isItemDownloaded(item) : false
+        let card = ZStack(alignment: .topTrailing) {
+            MediaCard(
+                title: item.name,
+                subtitle: latestItemSubtitle(for: item, downloaded: downloaded),
+                imageURL: viewModel.imageURL(for: item)
+            )
+            .frame(width: recentlyAddedCardWidth)
+            .opacity(offlineDimmingEnabled && !downloaded ? 0.5 : 1)
+            if offlineDimmingEnabled, downloaded {
+                downloadedBadge
+            }
+        }
+        return Group {
+            if isSplitLayout {
+                // Split layout shows the detail in the trailing column
+                // instead of pushing onto `path`.
+                Button { selectedItem = item } label: { card }
+            } else {
+                NavigationLink(value: item) { card }
+            }
+        }
+        .buttonStyle(.plain)
+        .mediaContextMenu(
+            config: contextMenuConfig(for: item, canPlay: item.isPlayable, showDetails: false),
+            actions: contextMenuActions(for: item, canPlay: item.isPlayable)
+        )
+    }
+
+    private func latestItemSubtitle(for item: MediaItem, downloaded: Bool) -> String? {
+        if offlineDimmingEnabled, !downloaded { return "Not downloaded" }
+        return item.year.map { String($0) }
+    }
+
+    private var downloadedBadge: some View {
+        Image(systemName: "arrow.down.circle.fill")
+            .font(.caption)
+            .symbolRenderingMode(.palette)
+            .foregroundStyle(.white, .green)
+            .padding(6)
     }
 
     private var recentlyAddedEmptySection: some View {
@@ -223,78 +424,18 @@ private struct LibraryContentView: View {
         }
     }
 
-    private var librariesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Libraries").font(.title2).fontWeight(.bold).padding(.horizontal)
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(viewModel.libraries) { library in
-                        Button { Task { await viewModel.selectLibrary(library) } } label: {
-                            libraryCard(library)
-                        }.buttonStyle(.plain)
-                    }
-                }.padding(.horizontal)
-            }
-        }
+    // MARK: - Download / Offline Helpers
+
+    private var offlineDimmingEnabled: Bool {
+        downloadManager != nil && viewModel.isShowingCachedData
     }
 
-    private func libraryCard(_ library: Library) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray5))
-                .frame(width: 160, height: 90)
-                .overlay {
-                    Image(systemName: libraryIcon(for: library.collectionType)).font(.title)
-                        .foregroundStyle(.secondary)
-                }
-            Text(library.name).font(.subheadline).fontWeight(.medium).lineLimit(1)
-        }
-    }
-
-    private func libraryIcon(for type: Library.CollectionType?) -> String {
-        switch type {
-        case .movies: "film"
-        case .tvshows: "tv"
-        case .music: "music.note"
-        case .books: "book"
-        default: "folder"
-        }
-    }
-
-    private var mediaGridSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            mediaGridHeader
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16)], spacing: 16) {
-                ForEach(viewModel.mediaItems) { item in
-                    NavigationLink(value: item) {
-                        MediaCard(
-                            title: item.name,
-                            subtitle: item.year.map { String($0) },
-                            imageURL: viewModel.imageURL(for: item),
-                            contextMenuConfig: contextMenuConfig(
-                                for: item,
-                                canPlay: item.isPlayable,
-                                showDetails: false
-                            ),
-                            contextMenuActions: contextMenuActions(for: item, canPlay: item.isPlayable)
-                        ).onAppear { Task { await viewModel.loadMoreItemsIfNeeded(currentItem: item) } }
-                    }.buttonStyle(.plain)
-                }
-            }.padding(.horizontal)
-            if viewModel.isLoadingMore {
-                HStack { Spacer(); ProgressView(); Spacer() }.padding()
-            }
-        }
-    }
-
-    private var mediaGridHeader: some View {
-        HStack {
-            Text(viewModel.selectedLibrary?.name ?? viewModel.selectedMediaType.rawValue)
-                .font(.title2).fontWeight(.bold)
-            Spacer()
-            if viewModel.selectedLibrary != nil {
-                Button("Clear") { Task { await viewModel.selectLibrary(nil) } }.font(.subheadline)
-            }
-        }.padding(.horizontal)
+    private func isItemDownloaded(_ item: MediaItem) -> Bool {
+        guard let downloadManager else { return false }
+        return downloadManager.downloadSync(
+            forItemID: item.id,
+            serverID: appState.activeServerKey ?? "default"
+        )?.state == .completed
     }
 
     // MARK: - Context Menu Helpers
@@ -312,8 +453,20 @@ private struct LibraryContentView: View {
     private func contextMenuActions(for item: MediaItem, canPlay: Bool) -> MediaContextMenuActions {
         MediaContextMenuActions(
             onPlay: canPlay ? { selectedItemForPlayback = item } : nil,
-            onToggleWatched: { watched in Task { try? await viewModel.markAsWatched(item, watched: watched) } }
+            onToggleWatched: { watched in Task { try? await viewModel.markAsWatched(item, watched: watched) } },
+            onShowDetails: { showDetails(for: item) }
         )
+    }
+
+    /// Opens `MediaDetailView` for an item whose primary tap does something
+    /// else (Continue Watching cards resume playback): into the detail
+    /// column when the split view shows one, otherwise pushed onto `path`.
+    private func showDetails(for item: MediaItem) {
+        if isSplitLayout {
+            selectedItem = item
+        } else {
+            path.append(item)
+        }
     }
 }
 

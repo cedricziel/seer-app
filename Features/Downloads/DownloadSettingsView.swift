@@ -6,8 +6,8 @@ struct DownloadSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
 
-    @AppStorage("downloadQuality") private var downloadQuality: String = DownloadQuality.high.rawValue
-    @AppStorage("wifiOnlyDownloads") private var wifiOnlyDownloads: Bool = true
+    @AppStorage(DownloadQuality.userDefaultsKey) private var downloadQuality: String = DownloadQuality.high.rawValue
+    @AppStorage(DownloadManager.wifiOnlyUserDefaultsKey) private var wifiOnlyDownloads: Bool = true
     @AppStorage("deleteWhenWatched") private var deleteWhenWatched: Bool = false
     @AppStorage("maxStorageGB") private var maxStorageGB: Double = 0 // 0 = unlimited
 

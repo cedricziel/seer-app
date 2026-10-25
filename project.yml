@@ -75,7 +75,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer
-        MARKETING_VERSION: "0.6.1" # x-release-please-version
+        MARKETING_VERSION: "0.7.1" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         INFOPLIST_FILE: App/SeerApp/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -139,7 +139,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.core
-        MARKETING_VERSION: "0.6.1" # x-release-please-version
+        MARKETING_VERSION: "0.7.1" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -159,7 +159,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.jellyfinclient
-        MARKETING_VERSION: "0.6.1" # x-release-please-version
+        MARKETING_VERSION: "0.7.1" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -179,7 +179,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.jellyseerrclient
-        MARKETING_VERSION: "0.6.1" # x-release-please-version
+        MARKETING_VERSION: "0.7.1" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -198,7 +198,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.ui
-        MARKETING_VERSION: "0.6.1" # x-release-please-version
+        MARKETING_VERSION: "0.7.1" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -218,7 +218,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.playbackclient
-        MARKETING_VERSION: "0.6.1" # x-release-please-version
+        MARKETING_VERSION: "0.7.1" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -239,7 +239,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.offlinesync
-        MARKETING_VERSION: "0.6.1" # x-release-please-version
+        MARKETING_VERSION: "0.7.1" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -260,7 +260,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.downloadclient
-        MARKETING_VERSION: "0.6.1" # x-release-please-version
+        MARKETING_VERSION: "0.7.1" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -281,7 +281,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.notificationclient
-        MARKETING_VERSION: "0.6.1" # x-release-please-version
+        MARKETING_VERSION: "0.7.1" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         SKIP_INSTALL: true
         BUILD_LIBRARY_FOR_DISTRIBUTION: false
@@ -368,6 +368,25 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.jellyseerrclienttests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
+  NotificationClientTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, tvOS]
+    sources:
+      - path: Tests/NotificationClientTests
+        excludes:
+          - "**/.DS_Store"
+    dependencies:
+      - target: NotificationClient
+      - target: JellyseerrClient
+      - target: DownloadClient
+      - target: SeerCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.notificationclienttests
         GENERATE_INFOPLIST_FILE: true
         TEST_HOST: ""
         BUNDLE_LOADER: ""
@@ -507,6 +526,7 @@ schemes:
         JellyfinClientTests: [test]
         JellyseerrClientTests: [test]
         OfflineSyncTests: [test]
+        NotificationClientTests: [test]
         SeerUITests: [test]
         AuthFeatureTests: [test]
         LibraryFeatureTests: [test]
@@ -528,6 +548,7 @@ schemes:
         - JellyfinClientTests
         - JellyseerrClientTests
         - OfflineSyncTests
+        - NotificationClientTests
         - SeerUITests
         - AuthFeatureTests
         - LibraryFeatureTests

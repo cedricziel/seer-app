@@ -4,8 +4,9 @@ import SwiftData
 /// Tracks the last known status of a media request for detecting changes
 @Model
 public final class CachedRequestStatus {
-    /// Unique identifier for the request
-    @Attribute(.unique)
+    /// Identifier of the request on its Jellyseerr server. Request IDs are
+    /// per-server integers, so uniqueness is on `(serverID, requestID)`, not
+    /// on `requestID` alone.
     public var requestID: Int
 
     /// Current status value (maps to RequestStatus from JellyseerrClient)
@@ -39,9 +40,6 @@ public final class CachedRequestStatus {
         lastChecked = Date()
     }
 }
-
-/// SwiftData @Model classes need explicit Sendable conformance for cross-actor use
-extension CachedRequestStatus: @unchecked Sendable {}
 
 /// Status changes that warrant notifications
 public enum RequestStatusChange: Sendable {

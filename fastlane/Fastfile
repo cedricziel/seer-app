@@ -40,7 +40,10 @@ lane :test do
     scheme: SCHEME,
     devices: [ENV["SIMULATOR"] || "iPhone 17"],
     clean: false,
-    output_directory: "fastlane/test_output"
+    output_directory: "fastlane/test_output",
+    # Fail a test that stalls instead of holding the runner until the job
+    # limit. 120s is far above the slowest legitimate test in this suite.
+    xcargs: "-test-timeouts-enabled YES -default-test-execution-time-allowance 120"
   )
 end
 
@@ -285,7 +288,7 @@ def load_app_store_connect_api_key
         ASC_ISSUER_ID      (UUID from appstoreconnect.apple.com -> Users and Access -> Keys)
         ASC_KEY_PATH       (path to .p8 file)  OR  ASC_KEY_CONTENT (raw or base64)
 
-      Locally: copy fastlane/.env.default to fastlane/.env and fill in.
+      Locally: copy fastlane/.env.example to fastlane/.env and fill in.
       In CI:   configure these as GitHub Actions secrets (see docs/fastlane.md).
     MSG
   end

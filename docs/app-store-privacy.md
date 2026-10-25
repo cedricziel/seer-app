@@ -94,7 +94,7 @@ When submitting to the App Store, answer the privacy questionnaire as follows:
 
 ## Privacy Policy Requirements
 
-Your privacy policy (<https://seer.app/privacy>) should include:
+Your privacy policy (<https://cedricziel.github.io/seer-app/privacy-policy.html>) should include:
 
 1. **What data is collected**: Crash reports, performance metrics, device info
 2. **Why it's collected**: To fix bugs and improve app performance

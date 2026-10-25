@@ -33,6 +33,7 @@ struct GenreBrowseView: View {
 private struct GenreBrowseContentView: View {
     @ObservedObject var viewModel: GenreBrowseViewModel
     @ObservedObject var appState: AppState
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @State private var selectedResult: SearchResult?
     @State private var isRequestingMedia: Bool = false
@@ -111,9 +112,7 @@ private struct GenreBrowseContentView: View {
 
     private var resultsGrid: some View {
         ScrollView {
-            LazyVGrid(columns: [
-                GridItem(.adaptive(minimum: 140), spacing: 16)
-            ], spacing: 16) {
+            LazyVGrid(columns: mediaGridColumns(horizontalSizeClass: horizontalSizeClass), spacing: 16) {
                 ForEach(viewModel.results) { result in
                     SearchResultCard(
                         result: result,
