@@ -31,15 +31,15 @@ struct EpisodeDetailSheet: View {
             NavigationStack {
                 content
                 #if os(iOS)
-                    .navigationBarTitleDisplayMode(.inline)
+                .navigationBarTitleDisplayMode(.inline)
                 #endif
-                    .toolbar {
-                        ToolbarItem(placement: .primaryAction) {
-                            Button("Done") {
-                                dismiss()
-                            }
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Done") {
+                            dismiss()
                         }
                     }
+                }
             }
         #endif
     }

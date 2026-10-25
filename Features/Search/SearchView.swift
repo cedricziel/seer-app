@@ -268,12 +268,12 @@ private struct SearchContentView: View {
                         }
                     #else
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                viewModel.removeRecentQuery(query)
-                            } label: {
-                                Label("Remove", systemImage: "trash")
+                                Button(role: .destructive) {
+                                    viewModel.removeRecentQuery(query)
+                                } label: {
+                                    Label("Remove", systemImage: "trash")
+                                }
                             }
-                        }
                     #endif
                 }
             } header: {

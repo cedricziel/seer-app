@@ -132,8 +132,8 @@ struct MediaDetailView: View {
             }
         #else
             .sheet(isPresented: $showEpisodeDetail) {
-                episodeDetailDestination
-            }
+                    episodeDetailDestination
+                }
         #endif
     }
 
