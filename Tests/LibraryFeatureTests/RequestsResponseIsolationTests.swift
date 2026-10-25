@@ -198,6 +198,22 @@ final class RequestsResponseIsolationTests: XCTestCase {
         XCTAssertTrue(api.actions.isEmpty)
     }
 
+    func testUnchangedRequestRemainsActionableAfterSilentRefresh() async throws {
+        let (model, api) = await loadedModel()
+        let request = try XCTUnwrap(model.requests.first)
+        let identity = model.requestIdentity
+        let silent = Task { await model.silentRefresh() }
+        await api.waitForCalls(2)
+        api.succeed(1, ids: [1])
+        await silent.value
+        do {
+            try await model.cancelRequest(request, identity: identity)
+        } catch {
+            XCTAssertEqual((error as? URLError)?.code, .unsupportedURL)
+        }
+        XCTAssertEqual(api.actions, [1])
+    }
+
     func testCancelledLoadDoesNotPublishRowsOrLeaveLoading() async {
         let api = DelayedRequestService()
         let serverID = UUID()

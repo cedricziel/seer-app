@@ -28,4 +28,4 @@ let package = Package(name: "RequestVerification", platforms: [.macOS(.v14)], ta
 SWIFT
 CLANG_MODULE_CACHE_PATH="$verify_dir/clang-cache" SWIFT_MODULECACHE_PATH="$verify_dir/swift-cache" \
 xcrun swift test --package-path "$verify_dir" --disable-sandbox \
-    --cache-path "$verify_dir/cache" --manifest-cache local --disable-swift-testing --jobs 4
+    --cache-path "$verify_dir/cache" --manifest-cache local --disable-swift-testing --jobs 2

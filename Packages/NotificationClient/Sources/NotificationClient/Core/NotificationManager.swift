@@ -16,7 +16,7 @@ public final class NotificationManager: NSObject {
     // MARK: - Dependencies
 
     private let store: NotificationStore
-    private let notificationCenter: UNUserNotificationCenter
+    private let notificationCenter: any NotificationCenterClient
 
     // MARK: - Delegates
 
@@ -25,28 +25,30 @@ public final class NotificationManager: NSObject {
 
     // MARK: - Initialization
 
-    public init(modelContainer: ModelContainer) {
-        store = NotificationStore(modelContainer: modelContainer)
-        notificationCenter = UNUserNotificationCenter.current()
-        super.init()
+    public convenience init(modelContainer: ModelContainer) {
+        self.init(modelContainer: modelContainer, notificationCenter: SystemNotificationCenter())
 
-        // Load initial state
         Task { @MainActor [weak self] in
             await self?.refresh()
         }
+    }
+
+    init(modelContainer: ModelContainer, notificationCenter: any NotificationCenterClient) {
+        store = NotificationStore(modelContainer: modelContainer)
+        self.notificationCenter = notificationCenter
+        super.init()
     }
 
     // MARK: - Setup
 
     /// Register notification categories and set delegate
     public func setup() {
-        notificationCenter.setNotificationCategories(NotificationCategory.allCategories)
-        notificationCenter.delegate = self
+        notificationCenter.setup(delegate: self)
     }
 
     /// Refresh state from store and notification center
     public func refresh() async {
-        isAuthorized = await NotificationPermissions.isAuthorized()
+        await refreshAuthorization()
         preferences = try? await store.fetchPreferences()
     }
 
@@ -57,25 +59,26 @@ public final class NotificationManager: NSObject {
     /// - Returns: Whether permission was granted
     @discardableResult
     public func requestPermissionIfNeeded(context _: String? = nil) async -> Bool {
-        // Check if already authorized
-        if await NotificationPermissions.isAuthorized() {
-            return true
-        }
-
-        // Check if already asked
-        if await NotificationPermissions.hasBeenRequested() {
-            return false
-        }
+        let status = await refreshAuthorization()
+        guard status == .notDetermined else { return isAuthorized }
 
         // Request permission
         do {
-            let granted = try await NotificationPermissions.requestAuthorization()
+            let granted = try await notificationCenter.requestAuthorization()
             await refresh()
             return granted
         } catch {
+            await refreshAuthorization()
             print("[NotificationManager] Failed to request permission: \(error)")
             return false
         }
+    }
+
+    @discardableResult
+    private func refreshAuthorization() async -> UNAuthorizationStatus {
+        let status = await notificationCenter.authorizationStatus()
+        isAuthorized = status == .authorized || status == .provisional
+        return status
     }
 
     // MARK: - Preferences
@@ -98,6 +101,7 @@ public final class NotificationManager: NSObject {
         userInfo: [String: Any] = [:],
         identifier: String = UUID().uuidString
     ) async throws {
+        await refreshAuthorization()
         guard isAuthorized else { return }
 
         let content = UNMutableNotificationContent()

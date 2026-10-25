@@ -102,11 +102,8 @@ targets:
         runOnlyWhenInstalling: false
         shell: /bin/sh
         script: |
-          if which swiftlint > /dev/null; then
-            swiftlint lint --quiet
-          else
-            echo "warning: SwiftLint not installed"
-          fi
+          cd "$SRCROOT"
+          "$SRCROOT/scripts/swift-tools" swiftlint lint --quiet --no-cache
 
   SeerCore:
     type: framework

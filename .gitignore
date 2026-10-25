@@ -119,3 +119,5 @@ credentials/
 .playwright-mcp/
 
 __pycache__/
+
+.cache/

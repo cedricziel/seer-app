@@ -51,8 +51,20 @@ public final class PiPPlaybackManager {
 
     /// Image URL for the current item's artwork (used for Now Playing info)
     private var artworkURL: URL?
+    private var artworkGeneration = UUID()
+
+    private let artworkLoader: @Sendable (URL) async throws -> Data
+    private(set) var artworkTask: Task<Void, Never>?
+
+    init(artworkLoader: @escaping @Sendable (URL) async throws -> Data) {
+        self.artworkLoader = artworkLoader
+    }
 
     private init() {
+        artworkLoader = { url in
+            let (data, _) = try await URLSession.shared.data(from: url)
+            return data
+        }
         setupLifecycleObservers()
         setupRemoteCommandCenter()
     }
@@ -367,6 +379,9 @@ public final class PiPPlaybackManager {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nowPlayingInfo
 
         // Store artwork URL and fetch it asynchronously
+        artworkTask?.cancel()
+        artworkTask = nil
+        artworkGeneration = UUID()
         artworkURL = imageURL
         if let url = imageURL {
             loadArtwork(from: url)
@@ -389,6 +404,10 @@ public final class PiPPlaybackManager {
     /// Clears Now Playing info
     private func clearNowPlayingInfo() {
         print("[PiPManager] Clearing Now Playing info")
+        artworkTask?.cancel()
+        artworkTask = nil
+        artworkGeneration = UUID()
+        artworkURL = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
@@ -404,18 +423,22 @@ public final class PiPPlaybackManager {
     /// artwork off-main. Build it via the helper below so the
     /// closure is created in a nonisolated context.
     private func loadArtwork(from url: URL) {
-        Task.detached {
+        let generation = artworkGeneration
+        artworkTask = Task { [weak self, artworkLoader] in
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                let data = try await artworkLoader(url)
+                guard let self,
+                      artworkGeneration == generation,
+                      artworkURL == url,
+                      !Task.isCancelled,
+                      var info = MPNowPlayingInfoCenter.default().nowPlayingInfo
+                else { return }
                 #if canImport(UIKit)
                     guard let image = UIImage(data: data) else { return }
                     let artwork = Self.makeArtwork(from: image)
-                    await MainActor.run {
-                        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
-                        info[MPMediaItemPropertyArtwork] = artwork
-                        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-                        print("[PiPManager] Artwork loaded and set")
-                    }
+                    info[MPMediaItemPropertyArtwork] = artwork
+                    MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+                    print("[PiPManager] Artwork loaded and set")
                 #endif
             } catch {
                 print("[PiPManager] Failed to load artwork: \(error)")
