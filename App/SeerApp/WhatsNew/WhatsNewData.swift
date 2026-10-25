@@ -6,6 +6,13 @@ enum WhatsNewData {
     /// Current features to display in What's New modal
     static let features: [WhatsNewFeature] = [
         WhatsNewFeature(
+            icon: "hand.raised",
+            iconColor: .blue,
+            title: "Diagnostics Preferences",
+            description: "Diagnostics are now on by default to improve reliability. "
+                + "Existing opt-outs stay off. Manage crash and performance reports in Privacy settings."
+        ),
+        WhatsNewFeature(
             icon: "sparkles",
             iconColor: .purple,
             title: "Discover New Content",

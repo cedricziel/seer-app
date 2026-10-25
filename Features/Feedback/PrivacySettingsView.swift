@@ -77,7 +77,11 @@ struct PrivacySettingsView: View {
         } header: {
             Text("Diagnostics")
         } footer: {
-            Text("Diagnostic data is anonymized and never sold to third parties. It helps us identify and fix issues.")
+            Text(
+                "Diagnostics are on by default to fix bugs and improve reliability. "
+                    + "You can turn off either category here. Reports include a random installation ID "
+                    + "and are retained for 30 days."
+            )
         }
     }
 
@@ -102,7 +106,7 @@ struct PrivacySettingsView: View {
                     icon: "iphone",
                     iconColor: .gray,
                     title: "Device Info",
-                    description: "Model identifier, iOS version, locale"
+                    description: "Model, OS version, app version, installation ID"
                 )
             }
             .padding(.vertical, 4)
@@ -110,7 +114,7 @@ struct PrivacySettingsView: View {
             Text("What We Collect")
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
-                Label("Not linked to your identity", systemImage: "person.slash")
+                Label("Not linked to your account", systemImage: "person.slash")
                 Label("Not used for tracking", systemImage: "hand.raised.slash")
                 Label("Not shared with advertisers", systemImage: "megaphone.slash")
             }
@@ -122,6 +126,16 @@ struct PrivacySettingsView: View {
 
     private var privacyLinksSection: some View {
         Section {
+            if let installationID = TelemetryService.shared.installationID {
+                LabeledContent("Diagnostics ID") {
+                    Text(installationID)
+                        .font(.caption.monospaced())
+                    #if !os(tvOS)
+                        .textSelection(.enabled)
+                    #endif
+                }
+            }
+
             Link(destination: URL(string: "https://cedricziel.github.io/seer-app/privacy-policy.html")!) {
                 Label("Privacy Policy", systemImage: "doc.text")
             }

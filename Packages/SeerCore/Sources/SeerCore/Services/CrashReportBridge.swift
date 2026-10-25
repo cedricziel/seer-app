@@ -24,6 +24,7 @@ public final class CrashReportBridge: @unchecked Sendable {
     /// - Parameter logger: OpenTelemetry logger instance for emitting crash report events
     public func initialize(logger: OpenTelemetryApi.Logger) {
         otelLogger = logger
+        guard crashReporter == nil else { return }
 
         // Configure PLCrashReporter
         let config = PLCrashReporterConfig(
@@ -47,6 +48,16 @@ public final class CrashReportBridge: @unchecked Sendable {
         // Enable crash reporter for this session
         reporter.enable()
         Self.logger.info("PLCrashReporter enabled successfully")
+    }
+
+    /// Stops forwarding reports and discards any pending crash report.
+    public func disable() {
+        otelLogger = nil
+        let reporter = crashReporter ?? PLCrashReporter(configuration: PLCrashReporterConfig(
+            signalHandlerType: .BSD,
+            symbolicationStrategy: .all
+        ))
+        reporter?.purgePendingCrashReport()
     }
 
     /// Process any pending crash report from a previous session

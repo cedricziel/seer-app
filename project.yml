@@ -297,6 +297,8 @@ targets:
           - "**/.DS_Store"
     dependencies:
       - target: SeerCore
+      - package: OpenTelemetrySwift
+        product: OpenTelemetrySdk
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer.coretests

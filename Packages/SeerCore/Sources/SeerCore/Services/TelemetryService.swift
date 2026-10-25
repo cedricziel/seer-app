@@ -1,23 +1,22 @@
 import Foundation
-import Logging
 import MetricKit
 import OpenTelemetryApi
 import OpenTelemetryProtocolExporterCommon
 import OpenTelemetryProtocolExporterHttp
 import OpenTelemetrySdk
 import OSLog
-import OTelSwiftLog
-import PersistenceExporter
 import ResourceExtension
 import SignPostIntegration
 
 /// OpenTelemetry-based telemetry service that collects and reports performance metrics and crash data.
-/// This service replaces the previous Errata SDK implementation while preserving the same consent model.
-///
-/// **Privacy**: This service respects user consent via `DiagnosticsConsent`.
-/// Data is only processed/sent when the user has explicitly opted in.
+/// Diagnostics preferences gate collection and export; users can opt out in Settings.
 @MainActor
 public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unchecked Sendable {
+    /// Reads an existing diagnostics ID without creating one when reporting is disabled.
+    public var installationID: String? {
+        InstallationIDStore().existingID()
+    }
+
     /// Shared instance of the telemetry service
     public static let shared = TelemetryService()
 
@@ -55,18 +54,11 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
     /// OpenTelemetry logger for crash reports
     private var otelLogger: (any OpenTelemetryApi.Logger)?
 
-    /// Storage URL for persisting telemetry data when offline
-    private static var persistenceStorageURL: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("otel_telemetry", isDirectory: true)
-    }
-
     override private init() {
         super.init()
         MXMetricManager.shared.add(self)
         Self.logger.info("TelemetryService initialized and subscribed to MetricKit")
 
-        // Initialize OTEL if consent is already granted
         initializeIfConsented()
     }
 
@@ -76,13 +68,16 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
 
     // MARK: - OTEL Initialization
 
-    /// Initialize OpenTelemetry SDK if user has consented to diagnostics
+    /// Initializes OpenTelemetry when at least one diagnostics category is enabled.
     public func initializeIfConsented() {
         guard !isInitialized else { return }
 
         let consent = DiagnosticsConsent.shared
+        if !consent.crashReportsEnabled {
+            CrashReportBridge.shared.disable()
+        }
         guard consent.crashReportsEnabled || consent.performanceMetricsEnabled else {
-            Self.logger.debug("OTEL not initialized - no consent granted")
+            Self.logger.debug("OTEL not initialized - no diagnostics enabled")
             return
         }
 
@@ -93,13 +88,12 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
 
         setupOTEL(endpoint: endpoint)
 
-        // Initialize crash reporting if consented
         if consent.crashReportsEnabled, let otelLogger {
             CrashReportBridge.shared.initialize(logger: otelLogger)
         }
 
         isInitialized = true
-        Self.logger.info("OpenTelemetry SDK initialized with consent")
+        Self.logger.info("OpenTelemetry SDK initialized with diagnostics enabled")
     }
 
     private func setupOTEL(endpoint: String) {
@@ -123,7 +117,7 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
     }
 
     private func buildResource() -> Resource {
-        DefaultResources().get().merging(
+        var resource = DefaultResources().get().merging(
             other: Resource(
                 attributes: [
                     ResourceAttributes.serviceName.rawValue: AttributeValue.string("seer-ios"),
@@ -133,6 +127,11 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
                 ]
             )
         )
+        resource.attributes.removeValue(forKey: ResourceAttributes.deviceId.rawValue)
+        if let installationID = InstallationIDStore().installationID() {
+            resource.merge(other: Resource(attributes: ["app.installation.id": .string(installationID)]))
+        }
+        return resource
     }
 
     private func buildOtlpConfig() -> OtlpConfiguration {
@@ -163,18 +162,8 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
         }
         let httpExporter = OtlpHttpTraceExporter(endpoint: tracesURL, config: config)
 
-        // Wrap with persistence for offline buffering
-        let spanExporter: SpanExporter
-        do {
-            let storageURL = Self.persistenceStorageURL.appendingPathComponent("spans", isDirectory: true)
-            spanExporter = try PersistenceSpanExporterDecorator(
-                spanExporter: httpExporter,
-                storageURL: storageURL
-            )
-            Self.logger.debug("Persistence span exporter enabled at \(storageURL.path)")
-        } catch {
-            Self.logger.warning("Failed to create persistence span exporter: \(error). Using non-persistent exporter.")
-            spanExporter = httpExporter
+        let spanExporter = DiagnosticsSpanExporter(exporter: httpExporter) {
+            DiagnosticsPreferences.shared.performanceMetricsEnabled
         }
 
         var providerBuilder = TracerProviderBuilder()
@@ -201,8 +190,10 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
             Self.logger.error("Invalid OTLP metrics endpoint URL")
             return nil
         }
-        let exporter = StableOtlpHTTPMetricExporter(endpoint: metricsURL, config: config)
-        // Note: PersistenceMetricExporterDecorator doesn't support StableMetricExporter yet
+        let exporter = DiagnosticsMetricExporter(
+            exporter: StableOtlpHTTPMetricExporter(endpoint: metricsURL, config: config),
+            isEnabled: { DiagnosticsPreferences.shared.performanceMetricsEnabled }
+        )
         let reader = StablePeriodicMetricReaderBuilder(exporter: exporter)
             .setInterval(timeInterval: 60.0)
             .build()
@@ -223,21 +214,18 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
             Self.logger.error("Invalid OTLP logs endpoint URL")
             return nil
         }
-        let exporter = OtlpHttpLogExporter(endpoint: logsURL, config: config)
+        let exporter = DiagnosticsLogExporter(
+            exporter: OtlpHttpLogExporter(endpoint: logsURL, config: config),
+            isEnabled: { DiagnosticsPreferences.shared.crashReportsEnabled }
+        )
         let processor = BatchLogRecordProcessor(logRecordExporter: exporter)
         let provider = LoggerProviderBuilder().with(resource: resource).with(processors: [processor]).build()
         OpenTelemetry.registerLoggerProvider(loggerProvider: provider)
 
-        // Bootstrap Swift Logging to route logs through OpenTelemetry
-        LoggingSystem.bootstrap { _ in
-            OTelLogHandler(loggerProvider: provider)
-        }
-        Self.logger.debug("Swift Logging bootstrapped with OpenTelemetry log handler")
-
         return provider
     }
 
-    /// Call this when consent changes to initialize or update OTEL
+    /// Applies changed diagnostics preferences without restarting the app.
     public func onConsentChanged() {
         let consent = DiagnosticsConsent.shared
 
@@ -246,7 +234,11 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
                 initializeIfConsented()
             }
         }
-        // Note: OTEL doesn't easily support runtime disable, so we just stop sending new events
+        if consent.crashReportsEnabled, let otelLogger {
+            CrashReportBridge.shared.initialize(logger: otelLogger)
+        } else {
+            CrashReportBridge.shared.disable()
+        }
     }
 
     // MARK: - Public API (Feature Mapping from Errata)
@@ -258,7 +250,7 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
         level: BreadcrumbLevel = .info,
         data: [String: Any]? = nil
     ) {
-        guard isInitialized, let tracer else { return }
+        guard isInitialized, DiagnosticsConsent.shared.performanceMetricsEnabled, let tracer else { return }
 
         let span = tracer.spanBuilder(spanName: "breadcrumb.\(category)").startSpan()
 
@@ -280,7 +272,7 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
 
     /// Record a metric value
     public func recordMetric(name: String, value: Double, unit: String) {
-        guard isInitialized, let stableMeter else { return }
+        guard isInitialized, DiagnosticsConsent.shared.performanceMetricsEnabled, let stableMeter else { return }
 
         let meter = stableMeter.meterBuilder(name: "seer-app").build()
         var histogram = meter.histogramBuilder(name: name).build()
@@ -289,7 +281,7 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
 
     /// Capture a message with context
     public func captureMessage(_ message: String, level: BreadcrumbLevel = .info, context: [String: Any]? = nil) {
-        guard isInitialized, let tracer else { return }
+        guard isInitialized, DiagnosticsConsent.shared.performanceMetricsEnabled, let tracer else { return }
 
         let span = tracer.spanBuilder(spanName: "message").startSpan()
 
@@ -320,7 +312,7 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
         Task { @MainActor in
             guard DiagnosticsConsent.shared.performanceMetricsEnabled else {
                 Self.logger.debug(
-                    "Received \(count) metric payload(s) but performance metrics consent not granted - discarding"
+                    "Received \(count) metric payload(s) but performance metrics disabled - discarding"
                 )
                 return
             }
@@ -358,7 +350,7 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
         Task { @MainActor in
             guard DiagnosticsConsent.shared.crashReportsEnabled else {
                 Self.logger.debug(
-                    "Received \(count) diagnostic payload(s) but crash reports consent not granted - discarding"
+                    "Received \(count) diagnostic payload(s) but crash reports disabled - discarding"
                 )
                 return
             }
@@ -368,11 +360,11 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
             for jsonData in jsonDataList {
                 if isInitialized {
                     if let jsonString = String(data: jsonData, encoding: .utf8) {
-                        captureMessage(
-                            "MetricKit Diagnostic Report",
-                            level: .error,
-                            context: ["payload": jsonString]
-                        )
+                        otelLogger?.logRecordBuilder()
+                            .setSeverity(.error)
+                            .setBody(.string("MetricKit Diagnostic Report"))
+                            .setAttributes(["diagnostic.payload": .string(jsonString)])
+                            .emit()
                     }
                 }
 
@@ -445,11 +437,8 @@ public extension TelemetryService {
         case password
     }
 
-    /// Streamlined onboarding funnel events. Emitted only when
-    /// `DiagnosticsConsent.performanceMetricsEnabled` is true (the
-    /// `captureMessage` path already gates on `isInitialized`, which
-    /// itself reflects consent). No PII: server hostnames, URLs, and
-    /// usernames are never attached.
+    /// Records onboarding steps when performance diagnostics are enabled.
+    /// Server hostnames, URLs, and usernames are not attached.
     func recordOnboardingWelcomeShown() {
         captureMessage("onboarding_welcome_shown")
     }

@@ -14,9 +14,8 @@ public final class AppState: ObservableObject {
     // MARK: - App Intents
 
     /// Whether the user has opted in to Spotlight / Siri semantic indexing
-    /// of cached media items. Per-device (NOT mirrored to iCloud KVS) to
-    /// match the existing `DiagnosticsConsent` posture and the device-local
-    /// nature of `CSSearchableIndex`. Defaults to `false`.
+    /// of cached media items. Device-local, matching `CSSearchableIndex`,
+    /// and not mirrored to iCloud KVS. Defaults to `false`.
     @Published public var appIntentsIndexingEnabled: Bool {
         didSet {
             UserDefaults.standard.set(

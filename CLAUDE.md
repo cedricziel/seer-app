@@ -80,7 +80,7 @@ CI/Release builds expect `Config/Secrets.xcconfig` — locally copy from
 - `Playback/` — video player with PiP
 - `Downloads/` — offline media downloads
 - `Servers/` — multi-server management
-- `Feedback/` — feedback form, diagnostics consent, privacy settings
+- `Feedback/` — feedback form, diagnostics preferences, privacy settings
 
 **Framework targets** (in `Packages/`)
 - `SeerCore` — `AppState`, `KeychainManager`, SwiftData models
@@ -129,9 +129,9 @@ bumps; first-time tips render in empty states. Content lives in
 **Telemetry & crash reporting** — `TelemetryService` exports via OpenTelemetry
 OTLP/HTTP (endpoint + auth header read from `Info.plist` keys `OTLPEndpoint` /
 `OTLPAuthHeader`, populated from `Config/Secrets.xcconfig`). `CrashReportBridge`
-wraps PLCrashReporter. Both gate on `DiagnosticsConsent` — nothing leaves the
-device unless the user opts in via `PrivacySettingsView` /
-`DiagnosticsConsentSheet`.
+wraps PLCrashReporter. Diagnostics default to enabled under the documented
+legitimate-interest assessment, with independent opt-outs in `PrivacySettingsView`.
+Saved opt-outs remain disabled; both collection and export check preferences.
 
 ### Lint/format limits worth remembering
 

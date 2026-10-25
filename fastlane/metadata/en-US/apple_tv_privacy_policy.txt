@@ -1,10 +1,12 @@
 Privacy Policy
 
-Flowmark Media is a client for Jellyfin and Jellyseerr media servers. The app communicates only with the servers you configure — no data is sent anywhere else by default.
+Flowmark Media is a client for Jellyfin and Jellyseerr media servers. Media traffic goes directly to the servers you configure. The app also sends diagnostics to our diagnostics service unless disabled in Settings.
 
 Server credentials are stored in the system Keychain and synced via iCloud Keychain across your Apple devices when iCloud is enabled. They are never shared with any third party.
 
-Diagnostic data (crash reports and performance measurements) is fully opt-in. Nothing is sent unless you enable it in Settings > Diagnostics. When enabled, only anonymous device model, OS version, app version, locale, crash stack traces, and aggregate performance metrics are collected. Diagnostic data is never linked to your identity and is never used for tracking or advertising.
+Diagnostics are enabled by default on the basis of our legitimate interest under GDPR Article 6(1)(f) in maintaining app stability and performance. Existing opt-outs are preserved. Reports include crash details, performance measurements, onboarding diagnostic events, device model, OS and app versions, and a random installation ID. This ID is stored locally in Keychain without iCloud sync and may survive reinstallation. Reports are pseudonymous, are retained for 30 days, and are not used for advertising or cross-service tracking.
+
+You can object at any time by turning off crash reports and performance data in Server Management > Privacy & Diagnostics without losing app functionality. New exports stop; in-flight requests may finish. Disabling diagnostics does not delete the local ID or reports already received. Contact us for access, restriction, or deletion requests and include the Diagnostics ID from Privacy settings if available. You can complain to your data-protection supervisory authority.
 
 The app contains no third-party SDKs for advertising, analytics, or behavioral tracking.
 

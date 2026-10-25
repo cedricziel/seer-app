@@ -32,3 +32,11 @@ Native builds and visual checks can be blocked by existing source errors or unav
 ## OpenAPI changes
 
 Follow the pinned generator setup in [the API package guide](../../../Packages/JellyseerrAPI/README.md). Regenerate twice and compare output hashes to check determinism. Compile with `xcrun swift build --package-path Packages/JellyseerrAPI --scratch-path "$work/build"`, using a fresh `mktemp -d` directory for `work` and a cleanup trap. Use Xcode's Swift toolchain through `xcrun` so the compiler matches the selected SDK.
+
+For telemetry installation-ID changes, run `SeerCoreTests/InstallationIDStoreTests`.
+These tests use an in-memory Keychain boundary to cover UUID reuse, local-only
+storage, unavailable reads, failed writes, concurrent creation, and invalid stored
+values without accessing user credentials. Verify that `app.installation.id` is
+added to the shared resource only when diagnostics are enabled. Run
+`DiagnosticsPreferencesTests` and `DiagnosticsExporterTests` for default-on
+preferences, legacy opt-out preservation, and export-time category gates.
