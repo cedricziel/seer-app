@@ -64,6 +64,7 @@ final class OnboardingViewModel: ObservableObject {
     private let serverInfoFetcher: ServerInfoFetcher
     private let resolver: WelcomeStateResolver
     private let quickConnectTransportFactory: QuickConnectTransportFactory
+    private let quickConnectTimeout: Duration
     private let passwordAuthenticator: PasswordAuthenticator
 
     private(set) var selectedServer: SelectedServer?
@@ -78,8 +79,10 @@ final class OnboardingViewModel: ObservableObject {
         bonjour: BonjourDiscovery? = nil,
         serverInfoFetcher: ServerInfoFetcher = ServerInfoFetcher(),
         quickConnectTransportFactory: QuickConnectTransportFactory? = nil,
-        passwordAuthenticator: PasswordAuthenticator? = nil
+        passwordAuthenticator: PasswordAuthenticator? = nil,
+        quickConnectTimeout: Duration = .seconds(600)
     ) {
+        self.quickConnectTimeout = quickConnectTimeout
         self.appState = appState
         self.onboardingManager = onboardingManager
         self.bonjour = bonjour ?? BonjourDiscovery()
@@ -115,8 +118,7 @@ final class OnboardingViewModel: ObservableObject {
 
     func stop() {
         bonjour.stop()
-        quickConnectSession?.cancel()
-        quickConnectStateObservation = nil
+        clearQuickConnect()
     }
 
     // MARK: - Welcome
@@ -244,39 +246,44 @@ final class OnboardingViewModel: ObservableObject {
     }
 
     private func beginQuickConnect(server: SelectedServer, transport: any QuickConnectTransport) async {
-        let session = QuickConnectSession(serverURL: server.url, transport: transport)
+        clearQuickConnect()
+        let session = QuickConnectSession(
+            serverURL: server.url, transport: transport, timeout: quickConnectTimeout
+        )
         quickConnectSession = session
-        quickConnectError = nil
-        quickConnectCode = nil
         quickConnectIsPolling = true
         phase = .quickConnect(serverDisplay: server.displayName)
         observeQuickConnect(session)
         TelemetryService.shared.recordOnboardingAuthMethod(.quickConnect)
         await session.start()
+        if quickConnectSession !== session { session.cancel() }
+    }
+
+    private func clearQuickConnect() {
+        quickConnectStateObservation = nil
+        quickConnectSession?.cancel()
+        quickConnectSession = nil
+        quickConnectCode = nil
+        quickConnectError = nil
+        quickConnectIsPolling = false
     }
 
     func switchToPassword() {
-        quickConnectSession?.cancel()
-        quickConnectSession = nil
-        quickConnectStateObservation = nil
-        quickConnectIsPolling = false
+        clearQuickConnect()
         guard let selected = selectedServer else { return }
         phase = .password(serverDisplay: selected.displayName)
     }
 
     func cancelQuickConnect() {
-        quickConnectSession?.cancel()
-        quickConnectSession = nil
-        quickConnectStateObservation = nil
-        quickConnectIsPolling = false
+        clearQuickConnect()
         phase = .welcome
     }
 
     func backToWelcome() {
+        clearQuickConnect()
         phase = .welcome
         manualURLError = nil
         passwordError = nil
-        quickConnectError = nil
     }
 
     // MARK: - Password authentication
@@ -320,14 +327,15 @@ final class OnboardingViewModel: ObservableObject {
     // MARK: - Quick Connect observation
 
     private func observeQuickConnect(_ session: QuickConnectSession) {
-        quickConnectStateObservation = session.$state.sink { [weak self] state in
-            Task { @MainActor in
-                self?.handleQuickConnect(state: state)
+        quickConnectStateObservation = session.$state.sink { [weak self, weak session] state in
+            Task { @MainActor [weak self, weak session] in
+                guard let self, let session, quickConnectSession === session else { return }
+                handleQuickConnect(state: state, session: session)
             }
         }
     }
 
-    private func handleQuickConnect(state: QuickConnectSession.State) {
+    private func handleQuickConnect(state: QuickConnectSession.State, session: QuickConnectSession) {
         switch state {
         case .idle:
             break
@@ -337,11 +345,16 @@ final class OnboardingViewModel: ObservableObject {
             quickConnectIsPolling = true
         case let .approved(authResponse):
             quickConnectIsPolling = false
-            Task { await finishQuickConnectAuth(authResponse: authResponse) }
+            Task {
+                guard quickConnectSession === session else { return }
+                await finishQuickConnectAuth(authResponse: authResponse, session: session)
+            }
         case .expired:
+            quickConnectCode = nil
             quickConnectIsPolling = false
-            quickConnectError = "Code expired. Tap retry to request a new one."
+            quickConnectError = "Code expired. Request a new code to try again."
         case let .failed(error):
+            quickConnectCode = nil
             quickConnectIsPolling = false
             quickConnectError = error.errorDescription
         case .cancelled:
@@ -349,7 +362,7 @@ final class OnboardingViewModel: ObservableObject {
         }
     }
 
-    private func finishQuickConnectAuth(authResponse: AuthResponse) async {
+    private func finishQuickConnectAuth(authResponse: AuthResponse, session: QuickConnectSession) async {
         guard let selected = selectedServer else { return }
         let service = JellyfinService(
             serverURL: selected.url,
@@ -357,6 +370,7 @@ final class OnboardingViewModel: ObservableObject {
             userID: authResponse.user.id
         )
         let deviceID = await service.getDeviceID()
+        guard quickConnectSession === session else { return }
         await persistAndComplete(
             accessToken: authResponse.accessToken,
             userID: authResponse.user.id,

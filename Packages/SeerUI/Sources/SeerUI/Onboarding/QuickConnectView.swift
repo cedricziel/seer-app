@@ -1,24 +1,29 @@
 import SwiftUI
 
-/// Renders the 6-character Quick Connect code with instructions for
-/// approving it on the Jellyfin web client. Pure presentation; the polling
-/// loop and state lives in `JellyfinClient.QuickConnectSession`.
+/// Displays a Quick Connect code or recovery actions when a request fails.
+/// A nil code represents a request in progress; an error hides any unusable code.
 public struct QuickConnectView: View {
-    public let code: String
+    public let code: String?
     public let serverHost: String
+    public let errorMessage: String?
+    public let onRetry: () -> Void
     public let isPolling: Bool
     public let onUsePassword: () -> Void
     public let onCancel: () -> Void
     public let onCopyCode: () -> Void
 
     public init(
-        code: String,
+        code: String?,
         serverHost: String,
         isPolling: Bool = true,
+        errorMessage: String? = nil,
+        onRetry: @escaping () -> Void = {},
         onUsePassword: @escaping () -> Void,
         onCancel: @escaping () -> Void,
         onCopyCode: @escaping () -> Void
     ) {
+        self.errorMessage = errorMessage
+        self.onRetry = onRetry
         self.code = code
         self.serverHost = serverHost
         self.isPolling = isPolling
@@ -32,7 +37,9 @@ public struct QuickConnectView: View {
             VStack(spacing: 32) {
                 header
                     .padding(.top, 24)
-                codeCard
+                if let code, errorMessage == nil {
+                    codeCard(code: code)
+                }
                 statusRow
                 actions
             }
@@ -52,14 +59,16 @@ public struct QuickConnectView: View {
             Text("Quick Connect")
                 .font(.title)
                 .fontWeight(.bold)
-            Text("Enter this code on \(serverHost)")
+            Text(code != nil && errorMessage == nil
+                ? "Enter this code on \(serverHost)"
+                : "Sign in to \(serverHost)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
     }
 
-    private var codeCard: some View {
+    private func codeCard(code: String) -> some View {
         VStack(spacing: 16) {
             // HIG / Dynamic Type: scale relative to .largeTitle so AX text
             // sizes grow the code legibly; minimumScaleFactor protects
@@ -69,7 +78,7 @@ public struct QuickConnectView: View {
                 .tracking(8)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
-                .accessibilityLabel(spelledOutCode)
+                .accessibilityLabel(code.map { String($0) }.joined(separator: ", "))
                 .accessibilityIdentifier("quickconnect.code")
 
             Button {
@@ -89,10 +98,17 @@ public struct QuickConnectView: View {
 
     private var statusRow: some View {
         HStack(spacing: 12) {
-            if isPolling {
+            if let errorMessage {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .accessibilityHidden(true)
+                Text(errorMessage)
+                    .font(.subheadline)
+                    .accessibilityIdentifier("quickconnect.error")
+            } else if isPolling {
                 ProgressView()
                     .progressViewStyle(.circular)
-                Text("Waiting for approval…")
+                Text(code == nil ? "Requesting code…" : "Waiting for approval…")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else {
@@ -107,6 +123,12 @@ public struct QuickConnectView: View {
 
     private var actions: some View {
         VStack(spacing: 12) {
+            if errorMessage != nil {
+                Button("Request New Code", action: onRetry)
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("quickconnect.retry")
+            }
+
             Button("Use Password Instead", action: onUsePassword)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
@@ -121,10 +143,6 @@ public struct QuickConnectView: View {
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("quickconnect.cancel")
         }
-    }
-
-    private var spelledOutCode: String {
-        code.map { String($0) }.joined(separator: ", ")
     }
 }
 

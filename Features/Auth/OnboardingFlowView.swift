@@ -93,9 +93,11 @@ struct OnboardingFlowView: View {
 
     private func quickConnectView(serverDisplay: String) -> some View {
         QuickConnectView(
-            code: viewModel.quickConnectCode ?? "------",
+            code: viewModel.quickConnectCode,
             serverHost: serverDisplay,
             isPolling: viewModel.quickConnectIsPolling,
+            errorMessage: viewModel.quickConnectError,
+            onRetry: { Task { await viewModel.switchToQuickConnect() } },
             onUsePassword: { viewModel.switchToPassword() },
             onCancel: { viewModel.cancelQuickConnect() },
             onCopyCode: {
