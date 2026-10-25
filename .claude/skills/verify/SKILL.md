@@ -23,6 +23,8 @@ These suites use controlled search responses and in-memory SwiftData stores.
 They cover stale pagination responses, preservation of requests outside a page
 or filter, and progress isolation between servers with matching media IDs.
 
+For onboarding persistence changes, run `AuthFeatureTests/OnboardingViewModelTests` on the dedicated simulator. Verify password and Quick Connect reauthentication preserve the saved UUID, settings, and server count while refreshing credentials. Manual and Bonjour onboarding must still create a new server. Keep SwiftData in memory and use test credentials.
+
 Check these journeys on an isolated simulator:
 
 - Search defaults to Library without Jellyseerr; a result opens existing media details and playback.
