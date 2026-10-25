@@ -15,3 +15,5 @@ For telemetry changes, check that CI and TestFlight workflows inject `OTLP_ENDPO
 Report static checks and simulator results separately from telemetry ingestion verification.
 
 For request notification changes, run [scripts/request-tests.sh](scripts/request-tests.sh). This disposable macOS package tests the real poller, request models, and in-memory SwiftData store with controlled network responses and recorded notification output. It covers approval, decline, media completion with unchanged or completed request status, partial and 4K availability, unchanged polls, legacy cache baselines, and server scoping. It does not verify system notification delivery or app wiring; retain the native build and test checks above.
+
+For media detail playback selection, run `.claude/skills/verify/scripts/playback-selection-tests.sh` from the repository root. It compiles the real selection logic, media model, and regression tests in a disposable macOS package with isolated compiler caches. It covers refreshed movie/episode resume ticks, explicit series episode selection, and fallback before details load without app state or network access.
