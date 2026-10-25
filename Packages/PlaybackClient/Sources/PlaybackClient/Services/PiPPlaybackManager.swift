@@ -236,12 +236,6 @@ public final class PiPPlaybackManager {
             // Ensure audio session is active before presenting
             reactivateAudioSession()
 
-            // Resume playback if needed
-            if let player = pipPlayer, player.timeControlStatus != .playing {
-                print("[PiPManager] Resuming player before restoration")
-                player.play()
-            }
-
             presentController(controller, completion: completion)
         #else
             completion(false)
