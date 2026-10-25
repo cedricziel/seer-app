@@ -18,10 +18,9 @@ lockfiles back after checking the version changes. Keep package clones,
 DerivedData, and test results outside the working tree. Follow the project verify
 skill for disposable simulator tests.
 
-The Jellyfin SDK is declared as `JellyfinAPI`, but `JellyfinService` currently sends
-requests through `URLSession` and decodes app-owned models. Adopting the SDK requires
-migrating those requests behind the existing service interface. SDK 1.0 replaced
-its API generator; the current SDK 3.x requires a separate compatibility review.
+Jellyfin SDK upgrades follow the [SDK and server compatibility policy](jellyfin-sdk-policy.md).
+Keep generated API requests behind the app-facing service and preserve app-owned
+models, background downloads, discovery, and playback policy during SDK upgrades.
 
 OpenTelemetry upgrades move API/SDK products and exporters together when their
 package boundaries change. Verify real in-memory metric collection as well as
