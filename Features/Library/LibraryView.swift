@@ -161,6 +161,7 @@ private struct LibraryContentView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) { ServerSwitcherButton() }
+        ToolbarItem(placement: .topBarTrailing) { SettingsButton() }
     }
 
     private var contentView: some View {
@@ -251,7 +252,9 @@ private struct LibraryContentView: View {
                     heroCard(for: hero).padding(.horizontal)
                 }
                 let rest = Array(viewModel.continueWatching.dropFirst())
-                if !rest.isEmpty { landscapeRow(items: rest) }
+                if !rest.isEmpty {
+                    landscapeRow(items: rest)
+                }
             #endif
         }
     }
@@ -305,7 +308,9 @@ private struct LibraryContentView: View {
     }
 
     private func progressFraction(for item: MediaItem) -> Double? {
-        if let percentage = item.playedPercentage { return percentage / 100.0 }
+        if let percentage = item.playedPercentage {
+            return percentage / 100.0
+        }
         guard let positionTicks = item.userData?.playbackPositionTicks,
               let durationTicks = item.runTimeTicks, durationTicks > 0 else { return nil }
         return Double(positionTicks) / Double(durationTicks)
@@ -314,9 +319,15 @@ private struct LibraryContentView: View {
     private func episodeCaption(for item: MediaItem) -> String? {
         guard item.type == .episode else { return nil }
         var parts: [String] = []
-        if let seriesName = item.seriesName { parts.append(seriesName) }
-        if let season = item.parentIndexNumber { parts.append("S\(season)") }
-        if let episode = item.indexNumber { parts.append("E\(episode)") }
+        if let seriesName = item.seriesName {
+            parts.append(seriesName)
+        }
+        if let season = item.parentIndexNumber {
+            parts.append("S\(season)")
+        }
+        if let episode = item.indexNumber {
+            parts.append("E\(episode)")
+        }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
@@ -405,7 +416,9 @@ private struct LibraryContentView: View {
     }
 
     private func latestItemSubtitle(for item: MediaItem, downloaded: Bool) -> String? {
-        if offlineDimmingEnabled, !downloaded { return "Not downloaded" }
+        if offlineDimmingEnabled, !downloaded {
+            return "Not downloaded"
+        }
         return item.year.map { String($0) }
     }
 

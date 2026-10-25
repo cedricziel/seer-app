@@ -82,20 +82,6 @@ struct ServerManagementView: View {
                         .foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                 }
-
-                Section("Help & Feedback") {
-                    NavigationLink {
-                        FeedbackView()
-                    } label: {
-                        Label("Send Feedback", systemImage: "envelope")
-                    }
-
-                    NavigationLink {
-                        PrivacySettingsView()
-                    } label: {
-                        Label("Privacy & Diagnostics", systemImage: "hand.raised")
-                    }
-                }
             }
             .navigationTitle("Manage Servers")
             #if !os(tvOS)
@@ -130,7 +116,11 @@ struct ServerManagementView: View {
                     "Delete Server?",
                     isPresented: .init(
                         get: { serverToDelete != nil },
-                        set: { if !$0 { serverToDelete = nil } }
+                        set: {
+                            if !$0 {
+                                serverToDelete = nil
+                            }
+                        }
                     )
                 ) {
                     Button("Cancel", role: .cancel) {

@@ -6,7 +6,6 @@ import SwiftUI
 struct DownloadsView: View {
     @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
 
-    @State private var showSettings = false
     @State private var selectedDownload: Download?
 
     var body: some View {
@@ -21,15 +20,8 @@ struct DownloadsView: View {
             .navigationTitle("Downloads")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gear")
-                    }
+                    SettingsButton()
                 }
-            }
-            .sheet(isPresented: $showSettings) {
-                DownloadSettingsView()
             }
         }
     }
