@@ -117,3 +117,5 @@ credentials/
 **/__Snapshots__/**/*.diff.png
 
 .playwright-mcp/
+
+__pycache__/
