@@ -1,9 +1,14 @@
 import unittest
 
-from dependency_audit import deferred_reason, release_version, update_kind
+from dependency_audit import deferred_reason, dependency_pins, release_version, update_kind
 
 
 class ReleaseComparisonTests(unittest.TestCase):
+    def test_swift_tool_pins_come_from_shared_manifest(self):
+        pins = {(repo, version, source) for repo, version, source in dependency_pins()}
+        self.assertIn(('realm/SwiftLint', '0.63.2', 'scripts/swift-tools.lock'), pins)
+        self.assertIn(('nicklockwood/SwiftFormat', '0.61.1', 'scripts/swift-tools.lock'), pins)
+
     def test_numeric_versions_do_not_sort_as_strings(self):
         self.assertEqual(update_kind('1.9.0', 'v1.13.3'), 'minor')
 

@@ -34,11 +34,11 @@ build-release: generate
 
 lint:
 	@echo "Running SwiftLint..."
-	swiftlint lint --strict
+	./scripts/swift-tools swiftlint lint --strict --no-cache
 
 format:
 	@echo "Formatting code..."
-	swiftformat .
+	./scripts/swift-tools swiftformat . --cache ignore
 
 clean:
 	@echo "Cleaning..."
@@ -59,7 +59,8 @@ test: generate
 # Install development dependencies
 setup:
 	@echo "Installing dependencies..."
-	brew install xcodegen swiftlint swiftformat ruby || true
+	brew install xcodegen ruby
+	./scripts/swift-tools setup
 
 # Resolve Swift packages
 resolve: generate

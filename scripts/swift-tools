@@ -1,0 +1,72 @@
+#!/bin/bash
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cache="${SEER_SWIFT_TOOLS_CACHE:-$root/.cache/swift-tools}"
+platform="$(uname -s)"
+if [ "$platform" = Linux ]; then
+    arch="$(uname -m)"
+    [ "$arch" != arm64 ] || arch=aarch64
+    platform="Linux-$arch"
+fi
+
+ensure_tool() {
+    local tool="$1" version asset member checksum _platform destination actual repository
+    read -r tool version _platform asset member checksum < <(awk -v tool="$tool" -v platform="$platform" '$1 == tool && $3 == platform {print}' "$root/scripts/swift-tools.lock")
+    if [ -z "${checksum:-}" ]; then
+        echo "Unsupported tool/platform: $1/$platform" >&2
+        return 1
+    fi
+    destination="$cache/$tool-$version-$platform"
+    if [ -x "$destination/$tool" ]; then
+        actual="$("$destination/$tool" --version)"
+        if [ "$actual" != "$version" ]; then
+            echo "Cached $tool has version $actual; expected $version. Remove $destination and retry." >&2
+            return 1
+        fi
+        tool_path="$destination/$tool"
+        return
+    fi
+    mkdir -p "$cache"
+    stage="$(mktemp -d "$cache/.install.XXXXXX")"
+    trap 'rm -rf "$stage"' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    case "$tool" in
+        swiftlint) repository=realm/SwiftLint ;;
+        swiftformat) repository=nicklockwood/SwiftFormat ;;
+    esac
+    curl -fsSL --retry 3 "https://github.com/$repository/releases/download/$version/$asset" -o "$stage/archive.zip"
+    echo "$checksum  $stage/archive.zip" | shasum -a 256 -c - >&2
+    unzip -q "$stage/archive.zip" -d "$stage/unpacked"
+    mkdir "$stage/ready"
+    install -m 0755 "$stage/unpacked/$member" "$stage/ready/$tool"
+    actual="$("$stage/ready/$tool" --version)"
+    [ "$actual" = "$version" ] || { echo "Unexpected $tool version: $actual" >&2; exit 1; }
+    python3 - "$stage/ready" "$destination" <<'PYTHON'
+import os
+import sys
+try:
+    os.rename(sys.argv[1], sys.argv[2])
+except OSError:
+    if not os.path.isdir(sys.argv[2]):
+        raise
+PYTHON
+    rm -rf "$stage"
+    trap - EXIT INT TERM
+    tool_path="$destination/$tool"
+    [ "$("$tool_path" --version)" = "$version" ]
+}
+
+case "${1:-}" in
+    setup)
+        ensure_tool swiftlint
+        ensure_tool swiftformat
+        ;;
+    swiftlint|swiftformat)
+        tool="$1"
+        shift
+        ensure_tool "$tool"
+        exec "$tool_path" "$@"
+        ;;
+    *) echo "Usage: $0 {setup|swiftlint|swiftformat} [arguments...]" >&2; exit 2 ;;
+esac

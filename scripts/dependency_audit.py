@@ -39,13 +39,17 @@ def dependency_pins():
         for pin in json.loads(lockfile.read_text())['pins']:
             repo = pin['location'].removeprefix('https://github.com/').removesuffix('.git')
             yield repo, pin['state']['version'], str(lockfile.relative_to(ROOT))
-    workflow = (ROOT / '.github/workflows/ci.yml').read_text()
-    for name, repo in [('SWIFTLINT', 'realm/SwiftLint'), ('SWIFTFORMAT', 'nicklockwood/SwiftFormat')]:
-        version = re.search(rf'{name}_VERSION: "([^"]+)"', workflow).group(1)
-        yield repo, version, '.github/workflows/ci.yml'
-        hook = (ROOT / '.claude/hooks/session-start.sh').read_text()
-        if f'{name}_VERSION="{version}"' not in hook:
-            raise ValueError(f'{name} versions differ between CI and the session hook')
+    source = 'scripts/swift-tools.lock'
+    tool_versions = {}
+    for line in (ROOT / source).read_text().splitlines():
+        if not line or line.startswith('#'):
+            continue
+        tool, version, *_ = line.split()
+        if tool in tool_versions and tool_versions[tool] != version:
+            raise ValueError(f'{tool} versions differ between platforms')
+        tool_versions[tool] = version
+    for tool, repo in [('swiftlint', 'realm/SwiftLint'), ('swiftformat', 'nicklockwood/SwiftFormat')]:
+        yield repo, tool_versions[tool], source
 
     source = 'Packages/JellyseerrAPI/README.md'
     guide = (ROOT / source).read_text()
