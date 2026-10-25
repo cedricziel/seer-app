@@ -18,7 +18,7 @@ extension MediaDetailView {
         else { return }
 
         do {
-            try await manager.downloadItem(item, serverID: credentials.serverURL.host ?? "default")
+            try await manager.downloadItem(item, serverID: appState.activeServerKey ?? "default")
             await updateDownloadState()
         } catch {
             // Handle error
@@ -30,7 +30,7 @@ extension MediaDetailView {
               let credentials = appState.jellyfinCredentials,
               let download = await manager.download(
                   forItemID: item.id,
-                  serverID: credentials.serverURL.host ?? "default"
+                  serverID: appState.activeServerKey ?? "default"
               )
         else { return }
 
@@ -43,7 +43,7 @@ extension MediaDetailView {
               let credentials = appState.jellyfinCredentials,
               let download = await manager.download(
                   forItemID: item.id,
-                  serverID: credentials.serverURL.host ?? "default"
+                  serverID: appState.activeServerKey ?? "default"
               )
         else { return }
 
@@ -56,7 +56,7 @@ extension MediaDetailView {
               let credentials = appState.jellyfinCredentials,
               let download = await manager.download(
                   forItemID: item.id,
-                  serverID: credentials.serverURL.host ?? "default"
+                  serverID: appState.activeServerKey ?? "default"
               )
         else { return }
 
@@ -69,7 +69,7 @@ extension MediaDetailView {
               let credentials = appState.jellyfinCredentials,
               let download = await manager.download(
                   forItemID: item.id,
-                  serverID: credentials.serverURL.host ?? "default"
+                  serverID: appState.activeServerKey ?? "default"
               )
         else { return }
 
@@ -86,7 +86,7 @@ extension MediaDetailView {
             return
         }
 
-        let serverID = credentials.serverURL.host ?? "default"
+        let serverID = appState.activeServerKey ?? "default"
 
         if let download = await manager.download(forItemID: item.id, serverID: serverID) {
             switch download.state {
@@ -115,7 +115,7 @@ extension MediaDetailView {
               let credentials = appState.jellyfinCredentials
         else { return }
 
-        let serverID = credentials.serverURL.host ?? "default"
+        let serverID = appState.activeServerKey ?? "default"
         do {
             try await manager.downloadItem(episode, serverID: serverID)
             await updateEpisodeDownloadStates(episodes: [episode])
@@ -135,7 +135,7 @@ extension MediaDetailView {
               let credentials = appState.jellyfinCredentials
         else { return }
 
-        let serverID = credentials.serverURL.host ?? "default"
+        let serverID = appState.activeServerKey ?? "default"
         for episode in episodes {
             if let download = await manager.download(forItemID: episode.id, serverID: serverID) {
                 switch download.state {
@@ -164,7 +164,7 @@ extension MediaDetailView {
               let credentials = appState.jellyfinCredentials
         else { return .notDownloaded }
 
-        let serverID = credentials.serverURL.host ?? "default"
+        let serverID = appState.activeServerKey ?? "default"
 
         // Use O(1) dictionary lookup instead of linear search
         guard let download = manager.downloadSync(forItemID: episodeID, serverID: serverID) else {

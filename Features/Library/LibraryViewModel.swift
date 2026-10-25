@@ -26,6 +26,17 @@ public final class LibraryViewModel: ObservableObject {
     @Published var selectedMediaType: MediaTypeFilter = .all
     @Published var isShowingCachedData: Bool = false
     @Published var lastSyncDate: Date?
+    @Published var totalItemCount: Int?
+    @Published var sortOption: SortOption = .dateAdded
+    @Published var watchStatusFilter: WatchStatusFilter = .all
+    /// Set by the pushed grid screen when browsing the cross-library
+    /// "Recently Added" feed (`selectedLibrary == nil` with no specific
+    /// library chosen). Restricts the `.all` media-type filter to
+    /// Movies/Series — matching what `getLatestItems` already curates for
+    /// the home screen — instead of an unrestricted recursive fetch across
+    /// every library, which would otherwise also return Series/Season/
+    /// Episode container rows.
+    @Published var isRecentlyAddedFeed: Bool = false
 
     enum MediaTypeFilter: String, CaseIterable {
         case all = "All", movies = "Movies", shows = "TV Shows"
@@ -44,6 +55,50 @@ public final class LibraryViewModel: ObservableObject {
             case .shows: ["Series"]
             }
         }
+    }
+
+    /// Sort field for the library grid screen, mapped onto Jellyfin's
+    /// `SortBy`/`SortOrder` query values.
+    enum SortOption: String, CaseIterable {
+        case dateAdded = "Date Added", name = "Name", year = "Year", rating = "Rating"
+
+        var jellyfinSortBy: String {
+            switch self {
+            case .dateAdded: "DateCreated"
+            case .name: "SortName"
+            case .year: "ProductionYear"
+            case .rating: "CommunityRating"
+            }
+        }
+
+        var jellyfinSortOrder: String {
+            switch self {
+            case .name: "Ascending"
+            case .dateAdded, .year, .rating: "Descending"
+            }
+        }
+    }
+
+    /// Watched/favorite filter for the library grid screen, mapped onto
+    /// Jellyfin's `Filters` query value.
+    enum WatchStatusFilter: String, CaseIterable {
+        case all = "All", unwatched = "Unwatched", favorites = "Favorites"
+
+        var jellyfinFilters: [String]? {
+            switch self {
+            case .all: nil
+            case .unwatched: ["IsUnplayed"]
+            case .favorites: ["IsFavorite"]
+            }
+        }
+    }
+
+    /// Item types to request from the server for the current selection. See
+    /// `isRecentlyAddedFeed`'s documentation for why `.all` is special-cased
+    /// when no library is selected.
+    private var effectiveIncludeItemTypes: [MediaItem.MediaType]? {
+        guard selectedLibrary == nil, isRecentlyAddedFeed else { return selectedMediaType.jellyfinTypes }
+        return selectedMediaType.jellyfinTypes ?? [.movie, .series]
     }
 
     private var jellyfinService: JellyfinService?
@@ -77,12 +132,42 @@ public final class LibraryViewModel: ObservableObject {
     private func setupService() {
         guard let serverURL = appState.jellyfinServerURL,
               let accessToken = appState.jellyfinAccessToken,
-              let userID = appState.jellyfinUserID else { return }
+              let userID = appState.jellyfinUserID
+        else {
+            serverURL = nil
+            jellyfinService = nil
+            return
+        }
         self.serverURL = serverURL
         jellyfinService = JellyfinService(
             serverURL: serverURL, accessToken: accessToken,
             userID: userID, deviceID: appState.jellyfinDeviceID
         )
+    }
+
+    /// Rebuild the service and clear server-specific state after the active
+    /// server changed. Without this, refreshes keep using the previous
+    /// server's client, token and cache scope.
+    func serverChanged() {
+        cancelAllTasks()
+        // Cancelled loads never reach their `isLoading = false`; reset here so
+        // the view cannot stay on the loading state for the new server.
+        isLoading = false
+        isLoadingMore = false
+        isLoadingLatestItems = false
+        isLoadingContinueWatching = false
+        setupService()
+        serverConfigurationID = appState.activeServer?.id
+        libraries = []
+        selectedLibrary = nil
+        mediaItems = []
+        continueWatching = []
+        latestItems = []
+        hasLoadedLatestItems = false
+        hasLoadedContinueWatching = false
+        errorMessage = nil
+        currentPage = 0
+        hasMoreItems = true
     }
 
     func loadInitialData() async {
@@ -207,12 +292,15 @@ public final class LibraryViewModel: ObservableObject {
         errorMessage = nil
         do {
             let response = try await service.getItems(
-                parentID: selectedLibrary?.id, includeItemTypes: selectedMediaType.jellyfinTypes,
-                limit: pageSize, startIndex: currentPage * pageSize
+                parentID: selectedLibrary?.id, includeItemTypes: effectiveIncludeItemTypes,
+                sortBy: sortOption.jellyfinSortBy, sortOrder: sortOption.jellyfinSortOrder,
+                limit: pageSize, startIndex: currentPage * pageSize,
+                filters: watchStatusFilter.jellyfinFilters
             )
             guard !Task.isCancelled else { return }
             mediaItems = response.items
             hasMoreItems = mediaItems.count < response.totalRecordCount
+            totalItemCount = selectedLibrary != nil ? response.totalRecordCount : nil
             isShowingCachedData = false
             if let cfg = appState.activeServer, let lib = selectedLibrary, let ctx = modelContext {
                 let desc = FetchDescriptor<CachedLibrary>(predicate: #Predicate { $0.id == lib.id })
@@ -238,12 +326,15 @@ public final class LibraryViewModel: ObservableObject {
         currentPage += 1
         do {
             let response = try await service.getItems(
-                parentID: selectedLibrary?.id, includeItemTypes: selectedMediaType.jellyfinTypes,
-                limit: pageSize, startIndex: currentPage * pageSize
+                parentID: selectedLibrary?.id, includeItemTypes: effectiveIncludeItemTypes,
+                sortBy: sortOption.jellyfinSortBy, sortOrder: sortOption.jellyfinSortOrder,
+                limit: pageSize, startIndex: currentPage * pageSize,
+                filters: watchStatusFilter.jellyfinFilters
             )
             guard !Task.isCancelled else { currentPage -= 1; isLoadingMore = false; return }
             mediaItems.append(contentsOf: response.items)
             hasMoreItems = mediaItems.count < response.totalRecordCount
+            totalItemCount = selectedLibrary != nil ? response.totalRecordCount : nil
         } catch {
             currentPage -= 1; if !Task
                 .isCancelled { Self.logger.debug("Failed to load more items: \(error.localizedDescription)") }
@@ -270,7 +361,7 @@ public final class LibraryViewModel: ObservableObject {
             hasLoadedContinueWatching = false
             await loadInitialData()
             guard !Task.isCancelled else { return }
-            if selectedLibrary != nil { await loadMediaItems() }
+            if selectedLibrary != nil || isRecentlyAddedFeed { await loadMediaItems() }
         }
         await refreshTask?.value
     }

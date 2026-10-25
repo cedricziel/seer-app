@@ -6,10 +6,18 @@ import SwiftData
 public actor RequestStatusPoller {
     private let store: NotificationStore
     private let notificationService: RequestNotificationService
-    private let serverID: String
+    /// Configuration ID of the server this poller watches. `nonisolated` so
+    /// the app can compare it synchronously when deciding whether to
+    /// recreate the poller after a server switch.
+    public nonisolated let serverID: String
 
     private var jellyseerrService: JellyseerrService?
     private var pollingTask: Task<Void, Never>?
+
+    /// Set by `stopPolling()`. Checked after awaited work so a poll that was
+    /// already in flight (including one started by a background task) does
+    /// not write to the cache or notify after the poller was retired.
+    private var isStopped = false
 
     /// Polling configuration
     private let pollingInterval: TimeInterval = 15 * 60 // 15 minutes
@@ -36,6 +44,7 @@ public actor RequestStatusPoller {
     /// Start background polling
     public func startPolling() {
         guard pollingTask == nil else { return }
+        isStopped = false
 
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -47,6 +56,7 @@ public actor RequestStatusPoller {
 
     /// Stop background polling
     public func stopPolling() {
+        isStopped = true
         pollingTask?.cancel()
         pollingTask = nil
     }
@@ -61,23 +71,27 @@ public actor RequestStatusPoller {
         do {
             // Fetch current requests from Jellyseerr
             let response = try await service.getRequests(take: 50, skip: 0, filter: .all, sort: .modified)
+            guard !isStopped else { return }
             let currentRequests = response.results
 
-            // Get cached statuses
-            let cachedStatuses = try await store.fetchAllCachedStatuses()
-            let cachedByID = Dictionary(uniqueKeysWithValues: cachedStatuses.map { ($0.requestID, $0) })
+            // Get cached statuses for this server only; request IDs collide across servers
+            let cachedStatuses = try await store.fetchAllCachedStatuses(forServerID: serverID)
+            guard !isStopped else { return }
+            let cachedByID = Dictionary(cachedStatuses.map { ($0.requestID, $0) }) { first, _ in first }
 
             // Detect changes
             var changes: [RequestStatusChange] = []
 
             for request in currentRequests {
+                // Each upsert suspends; a stop in the meantime must end the poll
+                guard !isStopped else { return }
                 let currentStatus = request.status.rawValue
                 let title = request.media.displayTitle ?? "Unknown"
 
                 if let cached = cachedByID[request.id] {
                     // Check for meaningful status changes
                     if cached.status != currentStatus {
-                        if let change = detectChange(
+                        if let change = Self.detectChange(
                             oldStatus: cached.status,
                             newStatus: currentStatus,
                             requestID: request.id,
@@ -107,8 +121,8 @@ public actor RequestStatusPoller {
                 }
             }
 
-            // Send notifications for changes
-            if !changes.isEmpty {
+            // Send notifications for changes (unless retired mid-poll)
+            if !changes.isEmpty, !isStopped {
                 await notificationService.notifyRequestStatusChanges(changes, serverID: serverID)
             }
         } catch {
@@ -119,7 +133,7 @@ public actor RequestStatusPoller {
     // MARK: - Change Detection
 
     /// Detect meaningful status changes
-    private func detectChange(
+    static func detectChange(
         oldStatus: Int,
         newStatus: Int,
         requestID: Int,
@@ -138,13 +152,8 @@ public actor RequestStatusPoller {
             return .declined(requestID: requestID, title: title)
         }
 
-        // Approved/Processing -> Available
+        // Approved/Processing -> Available (content finished downloading)
         if oldStatus == 2 || oldStatus == 5, newStatus == 4 {
-            return .available(requestID: requestID, title: title)
-        }
-
-        // Processing -> Available (content finished downloading)
-        if oldStatus == 5, newStatus == 4 {
             return .available(requestID: requestID, title: title)
         }
 

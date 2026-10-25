@@ -150,7 +150,8 @@ public extension JellyfinService {
         sortOrder: String = "Ascending",
         limit: Int = 50,
         startIndex: Int = 0,
-        recursive: Bool = true
+        recursive: Bool = true,
+        filters: [String]? = nil
     ) async throws -> ItemsResponse {
         guard let userID else {
             throw JellyfinError.notAuthenticated
@@ -179,6 +180,10 @@ public extension JellyfinService {
         if let types = includeItemTypes {
             let typeStrings = types.map(\.rawValue)
             queryItems.append(URLQueryItem(name: "IncludeItemTypes", value: typeStrings.joined(separator: ",")))
+        }
+
+        if let filters, !filters.isEmpty {
+            queryItems.append(URLQueryItem(name: "Filters", value: filters.joined(separator: ",")))
         }
 
         components.queryItems = queryItems
@@ -360,7 +365,7 @@ public extension JellyfinService {
             URLQueryItem(name: "SortBy", value: "PremiereDate,SortName"),
             URLQueryItem(name: "SortOrder", value: "Descending"),
             URLQueryItem(name: "Limit", value: String(limit)),
-            URLQueryItem(name: "Fields", value: "Overview,Genres")
+            URLQueryItem(name: "Fields", value: "Overview,Genres,People")
         ]
 
         guard let url = components.url else {
@@ -546,9 +551,8 @@ public extension JellyfinService {
 public extension JellyfinService {
     func reportPlaybackProgress(itemId: String, positionTicks: Int64, isPaused: Bool) async throws {
         guard userID != nil else { throw JellyfinError.notAuthenticated }
-        guard var components = URLComponents(url: serverURL, resolvingAgainstBaseURL: false),
-              (components.path = "/Sessions/Playing/Progress", true).1,
-              let url = components.url else { throw JellyfinError.invalidURL }
+        // appendingPathComponent keeps any reverse-proxy base path (e.g. /jellyfin)
+        let url = serverURL.appendingPathComponent("Sessions/Playing/Progress")
         var request = try authenticatedRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -563,9 +567,8 @@ public extension JellyfinService {
 
     func setFavorite(itemId: String, isFavorite: Bool) async throws {
         guard let userID else { throw JellyfinError.notAuthenticated }
-        guard var components = URLComponents(url: serverURL, resolvingAgainstBaseURL: false),
-              (components.path = "/Users/\(userID)/FavoriteItems/\(itemId)", true).1,
-              let url = components.url else { throw JellyfinError.invalidURL }
+        // appendingPathComponent keeps any reverse-proxy base path (e.g. /jellyfin)
+        let url = serverURL.appendingPathComponent("Users/\(userID)/FavoriteItems/\(itemId)")
         var request = try authenticatedRequest(url: url)
         request.httpMethod = isFavorite ? "POST" : "DELETE"
         let (_, resp) = try await session.data(for: request)
@@ -576,9 +579,8 @@ public extension JellyfinService {
 
     func markAsPlayed(itemId: String) async throws {
         guard let userID else { throw JellyfinError.notAuthenticated }
-        guard var components = URLComponents(url: serverURL, resolvingAgainstBaseURL: false),
-              (components.path = "/Users/\(userID)/PlayedItems/\(itemId)", true).1,
-              let url = components.url else { throw JellyfinError.invalidURL }
+        // appendingPathComponent keeps any reverse-proxy base path (e.g. /jellyfin)
+        let url = serverURL.appendingPathComponent("Users/\(userID)/PlayedItems/\(itemId)")
         var request = try authenticatedRequest(url: url)
         request.httpMethod = "POST"
         let (_, resp) = try await session.data(for: request)
@@ -589,9 +591,8 @@ public extension JellyfinService {
 
     func markAsUnplayed(itemId: String) async throws {
         guard let userID else { throw JellyfinError.notAuthenticated }
-        guard var components = URLComponents(url: serverURL, resolvingAgainstBaseURL: false),
-              (components.path = "/Users/\(userID)/PlayedItems/\(itemId)", true).1,
-              let url = components.url else { throw JellyfinError.invalidURL }
+        // appendingPathComponent keeps any reverse-proxy base path (e.g. /jellyfin)
+        let url = serverURL.appendingPathComponent("Users/\(userID)/PlayedItems/\(itemId)")
         var request = try authenticatedRequest(url: url)
         request.httpMethod = "DELETE"
         let (_, resp) = try await session.data(for: request)

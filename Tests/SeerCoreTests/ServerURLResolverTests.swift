@@ -8,10 +8,9 @@ final class ServerURLResolverTests: XCTestCase {
     private let internalURL = URL(string: "http://192.168.1.10:8096")!
 
     func testReachabilityFallbackUsedWhenSSIDUnknown() async {
-        // WiFiSSIDMonitor on simulator without granted location permission
-        // returns nil for currentSSID, so the SSID fast path won't apply.
+        // No SSID known, so the SSID fast path won't apply.
         let prober = StubProber(reachable: true)
-        let resolver = ServerURLResolver(prober: prober, dateProvider: { Date() })
+        let resolver = ServerURLResolver(wifiMonitor: StubWiFi(), prober: prober, dateProvider: { Date() })
 
         let config = makeConfig()
 
@@ -23,7 +22,7 @@ final class ServerURLResolverTests: XCTestCase {
 
     func testReachabilityFallbackPrefersExternalWhenInternalUnreachable() async {
         let prober = StubProber(reachable: false)
-        let resolver = ServerURLResolver(prober: prober, dateProvider: { Date() })
+        let resolver = ServerURLResolver(wifiMonitor: StubWiFi(), prober: prober, dateProvider: { Date() })
 
         let config = makeConfig()
 
@@ -36,6 +35,7 @@ final class ServerURLResolverTests: XCTestCase {
         let prober = StubProber(reachable: true)
         let mutableNow = MutableNow(initial: Date(timeIntervalSince1970: 1_000_000))
         let resolver = ServerURLResolver(
+            wifiMonitor: StubWiFi(),
             prober: prober,
             dateProvider: { mutableNow.now }
         )
@@ -61,9 +61,23 @@ final class ServerURLResolverTests: XCTestCase {
         XCTAssertEqual(prober.callCount, 2)
     }
 
+    func testSSIDFastPathReturnsInternalURLWithoutProbing() async {
+        let prober = StubProber(reachable: false)
+        let wifi = StubWiFi(currentSSID: "HomeWiFi", isOnWiFi: true, hasLocationPermission: true)
+        let resolver = ServerURLResolver(wifiMonitor: wifi, prober: prober, dateProvider: { Date() })
+
+        let config = makeConfig()
+
+        XCTAssertEqual(resolver.resolveJellyfinURL(for: config), internalURL)
+        XCTAssertTrue(resolver.isUsingInternalURL(for: config))
+        let resolved = await resolver.probeAndResolve(for: config)
+        XCTAssertEqual(resolved, internalURL)
+        XCTAssertEqual(prober.callCount, 0, "A matching SSID must short-circuit the probe")
+    }
+
     func testProbeAndResolveSkipsProbeWhenInternalNotConfigured() async {
         let prober = StubProber(reachable: true)
-        let resolver = ServerURLResolver(prober: prober, dateProvider: { Date() })
+        let resolver = ServerURLResolver(wifiMonitor: StubWiFi(), prober: prober, dateProvider: { Date() })
 
         let config = ServerConfiguration(
             name: "no-internal",
@@ -89,6 +103,25 @@ final class ServerURLResolverTests: XCTestCase {
 }
 
 // MARK: - Stubs
+
+/// Deterministic Wi-Fi state. Keeps the resolver tests away from
+/// `WiFiSSIDMonitor.shared`, whose CoreLocation setup is not usable in a
+/// host-less test process.
+@MainActor
+final class StubWiFi: WiFiNetworkStatus {
+    var currentSSID: String?
+    var isOnWiFi: Bool
+    var hasLocationPermission: Bool
+
+    init(currentSSID: String? = nil, isOnWiFi: Bool = false, hasLocationPermission: Bool = false) {
+        self.currentSSID = currentSSID
+        self.isOnWiFi = isOnWiFi
+        self.hasLocationPermission = hasLocationPermission
+    }
+
+    func requestLocationPermission() {}
+    func refresh() {}
+}
 
 final class StubProber: ReachabilityProber {
     private struct State {

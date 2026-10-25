@@ -73,9 +73,10 @@ struct ContentView: View {
 }
 
 struct MainTabView: View {
-    @State private var selectedTab: Tab = .library
+    @State private var selectedTab: MainTab = .library
 
-    enum Tab: Hashable {
+    /// Named `MainTab` (not `Tab`) to avoid colliding with SwiftUI's `Tab` view type used below.
+    enum MainTab: Hashable {
         case library
         case discover
         case search
@@ -85,36 +86,29 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            LibraryView()
-                .tabItem {
-                    Label("Library", systemImage: "play.square.stack")
-                }
-                .tag(Tab.library)
+            Tab("Library", systemImage: "play.square.stack", value: .library) {
+                LibraryView()
+            }
 
-            DiscoverView()
-                .tabItem {
-                    Label("Discover", systemImage: "sparkles")
-                }
-                .tag(Tab.discover)
+            Tab("Discover", systemImage: "sparkles", value: .discover) {
+                DiscoverView()
+            }
 
-            SearchView()
-                .tabItem {
-                    Label("Search", systemImage: "magnifyingglass")
-                }
-                .tag(Tab.search)
+            Tab("Search", systemImage: "magnifyingglass", value: .search, role: .search) {
+                SearchView()
+            }
 
-            DownloadsView()
-                .tabItem {
-                    Label("Downloads", systemImage: "arrow.down.circle")
-                }
-                .tag(Tab.downloads)
+            Tab("Downloads", systemImage: "arrow.down.circle", value: .downloads) {
+                DownloadsView()
+            }
 
-            RequestsView()
-                .tabItem {
-                    Label("Requests", systemImage: "list.bullet.clipboard")
-                }
-                .tag(Tab.requests)
+            Tab("Requests", systemImage: "list.bullet.clipboard", value: .requests) {
+                RequestsView()
+            }
         }
+        #if os(iOS)
+        .tabViewStyle(.sidebarAdaptable)
+        #endif
     }
 }
 

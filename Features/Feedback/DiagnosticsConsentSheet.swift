@@ -147,7 +147,7 @@ struct DiagnosticsConsentSheet: View {
                     .foregroundStyle(.secondary)
             }
 
-            Link(destination: URL(string: "https://seer.app/privacy")!) {
+            Link(destination: URL(string: "https://cedricziel.github.io/seer-app/privacy-policy.html")!) {
                 Text("Privacy Policy")
                     .font(.caption)
                     .foregroundStyle(.tint)

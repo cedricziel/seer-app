@@ -101,6 +101,32 @@ public final class AppState: ObservableObject {
         activeServer?.id
     }
 
+    /// Stable string key for the active server, used to scope per-server
+    /// on-device records such as downloads and auto-download rules. This is
+    /// the configuration UUID, never a host name: the host flips between the
+    /// internal and external URL depending on the current network.
+    public var activeServerKey: String? {
+        activeServerID?.uuidString
+    }
+
+    /// Host-based keys earlier versions used for the active server's
+    /// downloads. Used once to migrate existing rows to `activeServerKey`.
+    /// A host that another configuration also uses (same machine, different
+    /// port or path) is ambiguous and is left out so the other server's
+    /// downloads are not re-keyed to this one.
+    public var legacyServerKeys: [String] {
+        guard let server = activeServer else { return [] }
+        let otherHosts = Set(
+            servers
+                .filter { $0.id != server.id }
+                .flatMap { [$0.jellyfinURL.host, $0.internalJellyfinURL?.host] }
+                .compactMap(\.self)
+        )
+        return [server.jellyfinURL.host, server.internalJellyfinURL?.host]
+            .compactMap(\.self)
+            .filter { !otherHosts.contains($0) }
+    }
+
     public var jellyfinServerURL: URL? {
         guard let server = activeServer else { return nil }
         return ServerURLResolver.shared.resolveJellyfinURL(for: server)
