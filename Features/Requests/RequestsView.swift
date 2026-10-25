@@ -17,6 +17,7 @@ private struct RequestsContentView: View {
     @ObservedObject var appState: AppState
     @StateObject private var viewModel: RequestsViewModel
     @State private var selectedRequestDetails: MediaRequest?
+    @State private var selectedRequestIdentity = UUID()
     @State private var showActionError = false
     @State private var actionErrorMessage: String?
 
@@ -66,6 +67,7 @@ private struct RequestsContentView: View {
                 await viewModel.refresh()
             }
             .sheet(item: $selectedRequestDetails) { request in
+                let identity = selectedRequestIdentity
                 RequestDetailsSheet(
                     request: request,
                     displayTitle: viewModel.displayTitle(for: request),
@@ -73,7 +75,7 @@ private struct RequestsContentView: View {
                     onApprove: {
                         Task {
                             do {
-                                try await viewModel.approveRequest(request)
+                                try await viewModel.approveRequest(request, identity: identity)
                             } catch {
                                 actionErrorMessage = error.localizedDescription
                                 showActionError = true
@@ -83,7 +85,7 @@ private struct RequestsContentView: View {
                     onDecline: {
                         Task {
                             do {
-                                try await viewModel.declineRequest(request)
+                                try await viewModel.declineRequest(request, identity: identity)
                             } catch {
                                 actionErrorMessage = error.localizedDescription
                                 showActionError = true
@@ -184,16 +186,20 @@ private struct RequestsContentView: View {
     private var requestsList: some View {
         List {
             ForEach(viewModel.requests) { request in
+                let identity = viewModel.requestIdentity
                 RequestRowView(
                     request: request,
                     displayTitle: viewModel.displayTitle(for: request),
                     posterURL: viewModel.posterURL(for: request),
                     canManageRequests: viewModel.canManageRequests,
-                    onViewDetails: { selectedRequestDetails = request },
+                    onViewDetails: {
+                        selectedRequestIdentity = identity
+                        selectedRequestDetails = request
+                    },
                     onCancelRequest: {
                         Task {
                             do {
-                                try await viewModel.cancelRequest(request)
+                                try await viewModel.cancelRequest(request, identity: identity)
                             } catch {
                                 actionErrorMessage = error.localizedDescription
                                 showActionError = true
@@ -203,7 +209,7 @@ private struct RequestsContentView: View {
                     onApproveRequest: {
                         Task {
                             do {
-                                try await viewModel.approveRequest(request)
+                                try await viewModel.approveRequest(request, identity: identity)
                             } catch {
                                 actionErrorMessage = error.localizedDescription
                                 showActionError = true
@@ -213,7 +219,7 @@ private struct RequestsContentView: View {
                     onDeclineRequest: {
                         Task {
                             do {
-                                try await viewModel.declineRequest(request)
+                                try await viewModel.declineRequest(request, identity: identity)
                             } catch {
                                 actionErrorMessage = error.localizedDescription
                                 showActionError = true
@@ -222,6 +228,7 @@ private struct RequestsContentView: View {
                     }
                 )
                 .onTapGesture {
+                    selectedRequestIdentity = identity
                     selectedRequestDetails = request
                 }
                 .onAppear {
