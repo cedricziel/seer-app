@@ -140,13 +140,14 @@ public final class RequestsViewModel: ObservableObject {
 
     public init(
         appState: AppState,
-        autoRefreshScheduler: RefreshScheduler? = nil
+        autoRefreshScheduler: RefreshScheduler? = nil,
+        session: URLSession? = nil
     ) {
         self.appState = appState
         serverIdentity = { appState.activeServerID }
         serviceFactory = {
             guard let url = appState.jellyseerrServerURL, let key = appState.jellyseerrAPIKey else { return nil }
-            return JellyseerrService(serverURL: url, apiKey: key)
+            return JellyseerrService(serverURL: url, apiKey: key, session: session)
         }
         self.autoRefreshScheduler = autoRefreshScheduler
             ?? RefreshScheduler(interval: Self.defaultAutoRefreshInterval)

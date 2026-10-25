@@ -1,3 +1,4 @@
+import Foundation
 import JellyseerrClient
 import os
 import SeerCore
@@ -242,13 +243,15 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
     }
 
     private let appState: AppState
+    private let session: URLSession?
 
     // MARK: - Initialization
 
-    init(genre: DiscoverGenre, mediaType: MediaTypeBadge.MediaType, appState: AppState) {
+    init(genre: DiscoverGenre, mediaType: MediaTypeBadge.MediaType, appState: AppState, session: URLSession? = nil) {
         self.genre = genre
         self.mediaType = mediaType
         self.appState = appState
+        self.session = session
         setupService()
     }
 
@@ -269,7 +272,7 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
             return
         }
 
-        service = JellyseerrService(serverURL: serverURL, apiKey: apiKey)
+        service = JellyseerrService(serverURL: serverURL, apiKey: apiKey, session: session)
     }
 
     // MARK: - Public Methods

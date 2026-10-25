@@ -49,11 +49,13 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
     }
 
     private let appState: AppState
+    private let session: URLSession?
 
     // MARK: - Initialization
 
-    public init(appState: AppState) {
+    public init(appState: AppState, session: URLSession? = nil) {
         self.appState = appState
+        self.session = session
         setupService()
     }
 
@@ -79,7 +81,7 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             return
         }
 
-        service = JellyseerrService(serverURL: serverURL, apiKey: apiKey)
+        service = JellyseerrService(serverURL: serverURL, apiKey: apiKey, session: session)
 
         // Load permissions if not already set
         if appState.jellyseerrUserPermissions == 0 {

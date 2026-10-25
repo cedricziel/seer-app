@@ -3,7 +3,7 @@ import Foundation
 public actor JellyseerrService {
     public enum RequestFilter: String, Sendable { case all, pending, approved, declined, available, processing }
     public enum RequestSort: String, Sendable { case added, modified }
-    public init(serverURL _: URL, apiKey _: String) {
+    public init(serverURL _: URL, apiKey _: String, session _: URLSession? = nil) {
         fatalError("Verification must inject its API")
     }
 
