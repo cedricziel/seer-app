@@ -13,3 +13,5 @@ Run from the repository root:
 For telemetry changes, check that CI and TestFlight workflows inject `OTLP_ENDPOINT`, `OTLP_AUTH_HEADER`, `OTLP_TENANT_ID`, and `OTLP_DATASET_ID` through Secrets.xcconfig into Info.plist. Keep real keys out of logs, fixtures, and version control. Verify traces, logs, and metrics against an explicitly selected deployment and tenant, with diagnostics consent enabled in the disposable app instance.
 
 Report static checks and simulator results separately from telemetry ingestion verification.
+
+For request notification changes, run [scripts/request-tests.sh](scripts/request-tests.sh). This disposable macOS package tests the real poller, request models, and in-memory SwiftData store with controlled network responses and recorded notification output. It covers approval, decline, media completion, partial and 4K availability, unchanged polls, legacy cache baselines, and server scoping. It does not verify system notification delivery or app wiring; retain the native build and test checks above.

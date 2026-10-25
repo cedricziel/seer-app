@@ -9,9 +9,11 @@ public final class CachedRequestStatus {
     /// on `requestID` alone.
     public var requestID: Int
 
-    /// Current status value (maps to RequestStatus from JellyseerrClient)
-    /// 1 = pending, 2 = approved, 3 = declined, 4 = available, 5 = processing
+    /// Request approval status, independent of media availability.
     public var status: Int
+
+    /// Nil until a poll establishes availability for this request's resolution.
+    public var mediaStatus: Int?
 
     /// Title of the media for notification display
     public var mediaTitle: String

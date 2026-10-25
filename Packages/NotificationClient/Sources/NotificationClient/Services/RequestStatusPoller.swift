@@ -5,7 +5,8 @@ import SwiftData
 /// Actor that polls for request status changes and triggers notifications
 public actor RequestStatusPoller {
     private let store: NotificationStore
-    private let notificationService: RequestNotificationService
+    private let notify: @Sendable ([RequestStatusChange], String) async -> Void
+    private let fetchRequests: (@Sendable () async throws -> RequestsResponse)?
     /// Configuration ID of the server this poller watches. `nonisolated` so
     /// the app can compare it synchronously when deciding whether to
     /// recreate the poller after a server switch.
@@ -28,8 +29,23 @@ public actor RequestStatusPoller {
         serverID: String
     ) {
         store = NotificationStore(modelContainer: modelContainer)
-        self.notificationService = notificationService
+        notify = { changes, serverID in
+            await notificationService.notifyRequestStatusChanges(changes, serverID: serverID)
+        }
+        fetchRequests = nil
         self.serverID = serverID
+    }
+
+    init(
+        modelContainer: ModelContainer,
+        serverID: String,
+        fetchRequests: @escaping @Sendable () async throws -> RequestsResponse,
+        notify: @escaping @Sendable ([RequestStatusChange], String) async -> Void
+    ) {
+        store = NotificationStore(modelContainer: modelContainer)
+        self.serverID = serverID
+        self.fetchRequests = fetchRequests
+        self.notify = notify
     }
 
     // MARK: - Configuration
@@ -63,14 +79,15 @@ public actor RequestStatusPoller {
 
     /// Perform a single poll (can be called from background task)
     public func poll() async {
-        guard let service = jellyseerrService else {
-            print("[RequestStatusPoller] Not configured")
-            return
-        }
-
         do {
-            // Fetch current requests from Jellyseerr
-            let response = try await service.getRequests(take: 50, skip: 0, filter: .all, sort: .modified)
+            let response: RequestsResponse
+            if let fetchRequests {
+                response = try await fetchRequests()
+            } else if let service = jellyseerrService {
+                response = try await service.getRequests(take: 50, skip: 0, filter: .all, sort: .modified)
+            } else {
+                return
+            }
             guard !isStopped else { return }
             let currentRequests = response.results
 
@@ -88,42 +105,25 @@ public actor RequestStatusPoller {
                 let currentStatus = request.status.rawValue
                 let title = request.media.displayTitle ?? "Unknown"
 
-                if let cached = cachedByID[request.id] {
-                    // Check for meaningful status changes
-                    if cached.status != currentStatus {
-                        if let change = Self.detectChange(
-                            oldStatus: cached.status,
-                            newStatus: currentStatus,
-                            requestID: request.id,
-                            title: title
-                        ) {
-                            changes.append(change)
-                        }
-                    }
+                let mediaStatus = request.is4k ? request.media.status4k : request.media.status
 
-                    // Update cached status
-                    try await store.upsertCachedStatus(
-                        requestID: request.id,
-                        status: currentStatus,
-                        mediaTitle: title,
-                        mediaType: request.type.rawValue,
-                        serverID: serverID
-                    )
-                } else {
-                    // New request - cache it but don't notify (user already knows they made it)
-                    try await store.upsertCachedStatus(
-                        requestID: request.id,
-                        status: currentStatus,
-                        mediaTitle: title,
-                        mediaType: request.type.rawValue,
-                        serverID: serverID
-                    )
+                if let cached = cachedByID[request.id] {
+                    changes += Self.detectChanges(cached: cached, request: request)
                 }
+
+                try await store.upsertCachedStatus(
+                    requestID: request.id,
+                    status: currentStatus,
+                    mediaTitle: title,
+                    mediaType: request.type.rawValue,
+                    serverID: serverID,
+                    mediaStatus: mediaStatus
+                )
             }
 
             // Send notifications for changes (unless retired mid-poll)
             if !changes.isEmpty, !isStopped {
-                await notificationService.notifyRequestStatusChanges(changes, serverID: serverID)
+                await notify(changes, serverID)
             }
         } catch {
             print("[RequestStatusPoller] Poll failed: \(error)")
@@ -132,32 +132,28 @@ public actor RequestStatusPoller {
 
     // MARK: - Change Detection
 
-    /// Detect meaningful status changes
-    static func detectChange(
-        oldStatus: Int,
-        newStatus: Int,
-        requestID: Int,
-        title: String
-    ) -> RequestStatusChange? {
-        // Status values:
-        // 1 = pending, 2 = approved, 3 = declined, 4 = available, 5 = processing
-
-        // Pending -> Approved
-        if oldStatus == 1, newStatus == 2 {
-            return .approved(requestID: requestID, title: title)
+    private static func detectChanges(
+        cached: CachedRequestStatusSnapshot,
+        request: MediaRequest
+    ) -> [RequestStatusChange] {
+        let title = request.media.displayTitle ?? "Unknown"
+        var changes: [RequestStatusChange] = []
+        if cached.status == MediaRequest.RequestStatus.pending.rawValue {
+            if request.status == .approved {
+                changes.append(.approved(requestID: request.id, title: title))
+            } else if request.status == .declined {
+                changes.append(.declined(requestID: request.id, title: title))
+            }
         }
 
-        // Pending -> Declined
-        if oldStatus == 1, newStatus == 3 {
-            return .declined(requestID: requestID, title: title)
+        let mediaStatus = request.is4k ? request.media.status4k : request.media.status
+        if request.status == .approved,
+           let previous = cached.mediaStatus,
+           previous != MediaRequest.MediaAvailabilityStatus.available.rawValue,
+           mediaStatus == MediaRequest.MediaAvailabilityStatus.available.rawValue {
+            changes.append(.available(requestID: request.id, title: title))
         }
-
-        // Approved/Processing -> Available (content finished downloading)
-        if oldStatus == 2 || oldStatus == 5, newStatus == 4 {
-            return .available(requestID: requestID, title: title)
-        }
-
-        return nil
+        return changes
     }
 
     // MARK: - Cleanup

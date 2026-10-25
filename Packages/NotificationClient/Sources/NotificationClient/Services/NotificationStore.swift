@@ -7,6 +7,7 @@ import SwiftData
 struct CachedRequestStatusSnapshot: Equatable {
     let requestID: Int
     let status: Int
+    let mediaStatus: Int?
     let mediaTitle: String
     let mediaType: String
     let serverID: String
@@ -82,25 +83,27 @@ actor NotificationStore {
         status: Int,
         mediaTitle: String,
         mediaType: String,
-        serverID: String
+        serverID: String,
+        mediaStatus: Int? = nil
     ) throws {
         let context = ModelContext(modelContainer)
 
         if let existing = try Self.fetchRow(requestID: requestID, serverID: serverID, in: context) {
             existing.status = status
+            existing.mediaStatus = mediaStatus
             existing.mediaTitle = mediaTitle
             existing.mediaType = mediaType
             existing.lastChecked = Date()
         } else {
-            context.insert(
-                CachedRequestStatus(
-                    requestID: requestID,
-                    status: status,
-                    mediaTitle: mediaTitle,
-                    mediaType: mediaType,
-                    serverID: serverID
-                )
+            let row = CachedRequestStatus(
+                requestID: requestID,
+                status: status,
+                mediaTitle: mediaTitle,
+                mediaType: mediaType,
+                serverID: serverID
             )
+            row.mediaStatus = mediaStatus
+            context.insert(row)
         }
 
         try context.save()
@@ -148,6 +151,7 @@ private extension CachedRequestStatus {
         CachedRequestStatusSnapshot(
             requestID: requestID,
             status: status,
+            mediaStatus: mediaStatus,
             mediaTitle: mediaTitle,
             mediaType: mediaType,
             serverID: serverID,
