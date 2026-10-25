@@ -217,8 +217,10 @@ public final class RequestsViewModel: ObservableObject {
 
     private func publish(_ response: RequestsResponse, scope: Scope) {
         requests = response.results
+        if visibleScope != scope {
+            requestIdentity = UUID()
+        }
         visibleScope = scope
-        requestIdentity = UUID()
         totalItems = response.pageInfo.results
         hasMoreItems = requests.count < totalItems
         currentSkip = 0
