@@ -1,4 +1,5 @@
 import Foundation
+import OpenTelemetryApi
 import OpenTelemetrySdk
 @testable import SeerCore
 import XCTest
@@ -53,15 +54,23 @@ final class DiagnosticsExporterTests: XCTestCase {
 }
 
 private final class RecordingSpanExporter: SpanExporter {
-    var exports = 0
-    var flushes = 0
+    private let counts = Locked(initialValue: ExportCounts())
+
+    var exports: Int {
+        counts.locking { $0.exports }
+    }
+
+    var flushes: Int {
+        counts.locking { $0.flushes }
+    }
+
     func export(spans _: [SpanData], explicitTimeout _: TimeInterval?) -> SpanExporterResultCode {
-        exports += 1
+        counts.locking { $0.exports += 1 }
         return .success
     }
 
     func flush(explicitTimeout _: TimeInterval?) -> SpanExporterResultCode {
-        flushes += 1
+        counts.locking { $0.flushes += 1 }
         return .success
     }
 
@@ -69,31 +78,47 @@ private final class RecordingSpanExporter: SpanExporter {
 }
 
 private final class RecordingLogExporter: LogRecordExporter {
-    var exports = 0
-    var flushes = 0
+    private let counts = Locked(initialValue: ExportCounts())
+
+    var exports: Int {
+        counts.locking { $0.exports }
+    }
+
+    var flushes: Int {
+        counts.locking { $0.flushes }
+    }
+
     func export(logRecords _: [ReadableLogRecord], explicitTimeout _: TimeInterval?) -> ExportResult {
-        exports += 1
+        counts.locking { $0.exports += 1 }
         return .success
     }
 
     func forceFlush(explicitTimeout _: TimeInterval?) -> ExportResult {
-        flushes += 1
+        counts.locking { $0.flushes += 1 }
         return .success
     }
 
     func shutdown(explicitTimeout _: TimeInterval?) {}
 }
 
-private final class RecordingMetricExporter: StableMetricExporter {
-    var exports = 0
-    var flushes = 0
-    func export(metrics _: [StableMetricData]) -> ExportResult {
-        exports += 1
+private final class RecordingMetricExporter: MetricExporter {
+    private let counts = Locked(initialValue: ExportCounts())
+
+    var exports: Int {
+        counts.locking { $0.exports }
+    }
+
+    var flushes: Int {
+        counts.locking { $0.flushes }
+    }
+
+    func export(metrics _: [MetricData]) -> ExportResult {
+        counts.locking { $0.exports += 1 }
         return .success
     }
 
     func flush() -> ExportResult {
-        flushes += 1
+        counts.locking { $0.flushes += 1 }
         return .success
     }
 
@@ -104,4 +129,9 @@ private final class RecordingMetricExporter: StableMetricExporter {
     func getAggregationTemporality(for _: InstrumentType) -> AggregationTemporality {
         .cumulative
     }
+}
+
+private struct ExportCounts {
+    var exports = 0
+    var flushes = 0
 }

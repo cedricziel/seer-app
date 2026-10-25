@@ -48,8 +48,8 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
     /// OpenTelemetry tracer for creating spans
     private var tracer: (any Tracer)?
 
-    /// OpenTelemetry stable meter for recording metrics
-    private var stableMeter: (any StableMeterProvider)?
+    /// OpenTelemetry meter provider for recording metrics
+    private var meterProvider: (any MeterProvider)?
 
     /// OpenTelemetry logger for crash reports
     private var otelLogger: (any OpenTelemetryApi.Logger)?
@@ -112,7 +112,7 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
         // Re-enable once upstream ships a fix.
 
         tracer = tracerProvider.get(instrumentationName: "seer-app", instrumentationVersion: Bundle.main.appVersion)
-        stableMeter = meterProvider
+        self.meterProvider = meterProvider
         otelLogger = logProvider.loggerBuilder(instrumentationScopeName: "seer-app").build()
     }
 
@@ -185,23 +185,20 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
         resource: Resource,
         config: OtlpConfiguration,
         endpoint: String
-    ) -> StableMeterProviderSdk? {
+    ) -> MeterProviderSdk? {
         guard let metricsURL = URL(string: "\(endpoint)/v1/metrics") else {
             Self.logger.error("Invalid OTLP metrics endpoint URL")
             return nil
         }
         let exporter = DiagnosticsMetricExporter(
-            exporter: StableOtlpHTTPMetricExporter(endpoint: metricsURL, config: config),
+            exporter: OtlpHttpMetricExporter(endpoint: metricsURL, config: config),
             isEnabled: { DiagnosticsPreferences.shared.performanceMetricsEnabled }
         )
-        let reader = StablePeriodicMetricReaderBuilder(exporter: exporter)
+        let reader = PeriodicMetricReaderBuilder(exporter: exporter)
             .setInterval(timeInterval: 60.0)
             .build()
-        let provider = StableMeterProviderSdk.builder()
-            .setResource(resource: resource)
-            .registerMetricReader(reader: reader)
-            .build()
-        OpenTelemetry.registerStableMeterProvider(meterProvider: provider)
+        let provider = TelemetryMetricRecorder.makeProvider(reader: reader, resource: resource)
+        OpenTelemetry.registerMeterProvider(meterProvider: provider)
         return provider
     }
 
@@ -272,11 +269,9 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
 
     /// Record a metric value
     public func recordMetric(name: String, value: Double, unit: String) {
-        guard isInitialized, DiagnosticsConsent.shared.performanceMetricsEnabled, let stableMeter else { return }
+        guard isInitialized, DiagnosticsConsent.shared.performanceMetricsEnabled, let meterProvider else { return }
 
-        let meter = stableMeter.meterBuilder(name: "seer-app").build()
-        var histogram = meter.histogramBuilder(name: name).build()
-        histogram.record(value: value, attributes: ["unit": AttributeValue.string(unit)])
+        TelemetryMetricRecorder.record(name: name, value: value, unit: unit, provider: meterProvider)
     }
 
     /// Capture a message with context
