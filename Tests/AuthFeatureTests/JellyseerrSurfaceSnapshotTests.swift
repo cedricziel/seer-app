@@ -5,11 +5,6 @@ import SwiftData
 import SwiftUI
 import XCTest
 
-/// Surface-level snapshot tests for the three feature views that render
-/// the deferred-Jellyseerr connect prompt: Discover, Requests, Search.
-/// Component-level rendering is covered by
-/// `JellyseerrConnectCalloutSnapshotTests` in SeerUITests; these tests
-/// pin the prompt embedded in each feature's NavigationStack + toolbar.
 @MainActor
 final class JellyseerrSurfaceSnapshotTests: XCTestCase {
     private var appState: AppState!
@@ -17,12 +12,8 @@ final class JellyseerrSurfaceSnapshotTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        // In-memory SwiftData container so the test doesn't touch the
-        // user's CloudKit-backed store. With no servers added,
-        // `appState.jellyseerrServerURL` is nil and every feature view
-        // renders its `notConfiguredView` branch.
         let schema = Schema([ServerConfiguration.self])
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         modelContainer = try ModelContainer(for: schema, configurations: [config])
         appState = AppState()
         appState.setModelContext(ModelContext(modelContainer))
@@ -52,8 +43,17 @@ final class JellyseerrSurfaceSnapshotTests: XCTestCase {
         )
     }
 
-    func testSearchView_NotConfigured_iPhoneCompact() throws {
+    func testSearchView_Library_iPhoneCompact() throws {
         let view = try SearchView()
+            .environmentObject(XCTUnwrap(appState))
+        assertSnapshot(
+            of: view,
+            as: .image(precision: 0.99, perceptualPrecision: 0.97, layout: .device(config: .iPhone13))
+        )
+    }
+
+    func testSettingsView_iPhoneCompact() throws {
+        let view = try SettingsView()
             .environmentObject(XCTUnwrap(appState))
         assertSnapshot(
             of: view,

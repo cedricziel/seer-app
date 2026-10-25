@@ -59,13 +59,7 @@ private struct RequestsContentView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {
-                        Task {
-                            await viewModel.refresh()
-                        }
-                    }, label: {
-                        Image(systemName: "arrow.clockwise")
-                    })
+                    SettingsButton()
                 }
             }
             .refreshable {
@@ -142,6 +136,9 @@ private struct RequestsContentView: View {
 
     private var filterMenu: some View {
         Menu {
+            Button("Refresh", systemImage: "arrow.clockwise") {
+                Task { await viewModel.refresh() }
+            }
             Section("Filter") {
                 ForEach(RequestsViewModel.RequestFilter.allCases, id: \.self) { filter in
                     Button(action: {
@@ -381,20 +378,19 @@ struct RequestRowView: View {
             }
     }
 
+    @ViewBuilder
     private var statusBadge: some View {
-        Group {
-            switch request.status {
-            case .pending:
-                RequestStatusBadge(status: .pending, style: .full)
-            case .approved:
-                RequestStatusBadge(status: .approved, style: .full)
-            case .declined:
-                RequestStatusBadge(status: .declined, style: .full)
-            case .available:
-                RequestStatusBadge(status: .available, style: .full)
-            case .processing:
-                RequestStatusBadge(status: .processing, style: .full)
-            }
+        switch request.status {
+        case .pending:
+            RequestStatusBadge(status: .pending, style: .full)
+        case .approved:
+            RequestStatusBadge(status: .approved, style: .full)
+        case .declined:
+            RequestStatusBadge(status: .declined, style: .full)
+        case .available:
+            RequestStatusBadge(status: .available, style: .full)
+        case .processing:
+            RequestStatusBadge(status: .processing, style: .full)
         }
     }
 

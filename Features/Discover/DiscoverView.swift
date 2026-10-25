@@ -52,6 +52,9 @@ private struct DiscoverContentView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     ServerSwitcherButton()
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    SettingsButton()
+                }
             }
             .alert("Request Submitted", isPresented: $showRequestSuccess) {
                 Button("OK", role: .cancel) {}
@@ -60,7 +63,11 @@ private struct DiscoverContentView: View {
             }
             .alert("Request Failed", isPresented: .init(
                 get: { requestError != nil },
-                set: { if !$0 { requestError = nil } }
+                set: {
+                    if !$0 {
+                        requestError = nil
+                    }
+                }
             )) {
                 Button("OK", role: .cancel) {}
             } message: {
