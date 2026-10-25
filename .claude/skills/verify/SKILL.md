@@ -8,11 +8,13 @@ description: Verify Seer changes with isolated search-model tests, native builds
 1. Check `git status --short`. Preserve unrelated changes and peer worktrees.
 2. Run [scripts/search-tests.sh](scripts/search-tests.sh) for library-search changes. It compiles the real search model, Jellyfin media types, and regression tests in a disposable macOS Swift package. It does not launch the app or access credentials, preferences, or CloudKit. Requires macOS and the Xcode Swift toolchain. This checks model behavior, not SwiftUI integration.
 3. Run [scripts/request-tests.sh](scripts/request-tests.sh) for request-loading changes. It compiles the real request view model, API models, scheduler, and SwiftData cache model in a disposable macOS package. The [AppState fixture](fixtures/RequestDependencies.swift) and [API fixture](fixtures/RequestService.swift) prevent credentials, preferences, CloudKit, and network access. Continuation-controlled tests cover stale server/filter/sort responses, refresh/pagination ownership, and actions on obsolete rows.
-4. Use the SwiftLint and SwiftFormat versions pinned in `.github/workflows/ci.yml`. Run `swiftlint lint --strict --no-cache` and `swiftformat --lint . --cache ignore`. Compare failures with the baseline. Format only changed files.
+4. Use the versions and checksums in `scripts/swift-tools.lock`. Run `./scripts/swift-tools swiftlint lint --strict --no-cache` and `./scripts/swift-tools swiftformat --lint . --cache ignore`. Compare failures with the baseline. Format only changed files.
 5. Run `openspec validate library-search-settings --strict` when changing that spec. For other changes, validate their change name.
 6. Regenerate the project with `xcodegen generate`. Build iOS and tvOS with `xcodebuild`, a temporary derived-data directory, temporary cloned-package directory, and `CODE_SIGNING_ALLOWED=NO`. Use `-destination 'generic/platform=iOS Simulator'` or `-destination 'generic/platform=tvOS Simulator'`. These builds require SDK services and package downloads; do not mistake sandbox failures for source errors.
 7. For runtime checks, create a dedicated simulator, use test servers and credentials, and delete the simulator in a cleanup trap. Never launch on a user's existing simulator or device. If isolation is unavailable, report runtime checks as unverified.
 8. For dependency maintenance, run `python3 -m unittest discover -s scripts -p 'test_*.py'` and `actionlint .github/workflows/dependency-audit.yml`. Run `python3 scripts/dependency_audit.py` with authenticated `gh`; exit 1 with a release table means unreviewed newer candidates exist, while an API or parsing error means the audit did not complete.
+
+For server URL resolution changes, run [scripts/server-url-tests.sh](scripts/server-url-tests.sh). It runs the real resolver, SwiftData configuration, and resolver tests in a disposable macOS package with stubbed Wi-Fi and reachability. It does not access app data, credentials, or live servers. This checks resolution and cache behavior; verify the browsing connection gate separately on an isolated simulator.
 
 Debug hosted unit tests enter `HostedUnitTestApp` through `SeerAppEntryPoint` when XCTest is injected. This bypasses `SeerApp.init` and its CloudKit stores, telemetry, and background services. UI tests still enter the production app because XCTest runs in a separate runner process. An unsigned host was verified with all 11 LibrarySearchModelTests on an isolated iOS simulator. Do not launch an unsigned production app to run hosted unit tests: CloudKit requires entitlements and can trap before the test suite starts. The SDK invalidDigitCount warning can appear during successful runs; inspect the crash report before diagnosing a startup timeout.
 
@@ -40,6 +42,8 @@ Record feature snapshots on the same iOS runtime as CI, currently iOS 26.5. iOS 
 
 Native builds and visual checks can be blocked by existing source errors or unavailable simulator services. Record the exact blocker and leave those checks incomplete.
 
+For Now Playing artwork ownership changes, run `PlaybackClientTests/PiPArtworkOwnershipTests` on an isolated simulator or through required CI. The injected loader controls delayed completions without network access. Cover closing playback, switching items that share an artwork URL, replacement metadata without artwork, and preserving the latest playback time when current artwork arrives.
+
 ## OpenAPI changes
 
 Follow the pinned generator setup in [the API package guide](../../../Packages/JellyseerrAPI/README.md). Regenerate twice and compare output hashes to check determinism. Compile with `xcrun swift build --package-path Packages/JellyseerrAPI --scratch-path "$work/build"`, using a fresh `mktemp -d` directory for `work` and a cleanup trap. Use Xcode's Swift toolchain through `xcrun` so the compiler matches the selected SDK.
@@ -55,3 +59,5 @@ preferences, legacy opt-out preservation, and export-time category gates.
 For typed App Intent requests, run `JellyseerrClientTests/RequestSearchMatchTests`
 and `SeerCoreTests/Tier1IntentTests`. An explicit type must not fall back to the
 other type, and owning a same-name movie must not suppress a show request.
+
+For shared Swift tooling changes, run `python3 -m unittest scripts/test_swift_tools.py`.

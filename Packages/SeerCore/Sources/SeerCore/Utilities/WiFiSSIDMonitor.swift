@@ -3,18 +3,6 @@ import Foundation
 import Network
 import SystemConfiguration.CaptiveNetwork
 
-/// Read-only view of the current Wi-Fi network state. `WiFiSSIDMonitor` is
-/// the production implementation; tests substitute a stub so resolver logic
-/// never touches CoreLocation.
-@MainActor
-public protocol WiFiNetworkStatus: AnyObject {
-    var currentSSID: String? { get }
-    var isOnWiFi: Bool { get }
-    var hasLocationPermission: Bool { get }
-    func requestLocationPermission()
-    func refresh()
-}
-
 /// Monitors the current WiFi network SSID
 @MainActor
 public final class WiFiSSIDMonitor: ObservableObject, WiFiNetworkStatus {
@@ -27,6 +15,8 @@ public final class WiFiSSIDMonitor: ObservableObject, WiFiNetworkStatus {
     /// Whether location permission is granted (needed for SSID access)
     @Published public private(set) var hasLocationPermission: Bool = false
 
+    @Published public private(set) var networkRevision: UInt64 = 0
+
     private let pathMonitor = NWPathMonitor()
     private let locationManager = CLLocationManager()
     private var locationDelegate: LocationDelegate?
@@ -37,9 +27,7 @@ public final class WiFiSSIDMonitor: ObservableObject, WiFiNetworkStatus {
         locationDelegate = LocationDelegate { [weak self] authorized in
             Task { @MainActor [weak self] in
                 self?.hasLocationPermission = authorized
-                if authorized {
-                    self?.updateSSID()
-                }
+                self?.updateSSID()
             }
         }
         // CoreLocation invokes `locationManagerDidChangeAuthorization` as soon
@@ -60,12 +48,14 @@ public final class WiFiSSIDMonitor: ObservableObject, WiFiNetworkStatus {
 
     /// Manually refresh the current SSID
     public func refresh() {
+        networkRevision &+= 1
         updateSSID()
     }
 
     private func setupNetworkMonitoring() {
         pathMonitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor [weak self] in
+                self?.networkRevision &+= 1
                 let onWiFi = path.usesInterfaceType(.wifi)
                 self?.isOnWiFi = onWiFi
                 if onWiFi {

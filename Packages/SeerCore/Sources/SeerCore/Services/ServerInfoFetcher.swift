@@ -83,6 +83,10 @@ public final class ServerInfoFetcher: Sendable {
 
     public func fetch(from baseURL: URL) async throws -> ServerInfo {
         let data = try await transport.fetchPublicInfo(from: baseURL)
+        return try Self.parse(data)
+    }
+
+    static func parse(_ data: Data) throws -> ServerInfo {
         let raw: RawServerInfo
         do {
             raw = try JSONDecoder().decode(RawServerInfo.self, from: data)
