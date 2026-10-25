@@ -76,11 +76,11 @@ public final class MediaItemSyncService {
             try await syncItems(episodes, serverConfig: serverConfig, library: nil)
 
             // Link episodes to season
-            linkEpisodesToSeason(seasonId: season.id, episodes: episodes)
+            linkEpisodesToSeason(seasonId: season.id, episodes: episodes, serverConfigurationID: serverConfig.id)
         }
 
         // Link seasons to series
-        linkSeasonsToSeries(seriesId: seriesId, seasons: seasons)
+        linkSeasonsToSeries(seriesId: seriesId, seasons: seasons, serverConfigurationID: serverConfig.id)
     }
 
     public func updateCachedItemProgress(
@@ -363,15 +363,15 @@ public final class MediaItemSyncService {
         cached.lastPlayedDate = serverItem.userData?.lastPlayedDate
     }
 
-    private func linkEpisodesToSeason(seasonId: String, episodes: [MediaItem]) {
+    private func linkEpisodesToSeason(seasonId: String, episodes: [MediaItem], serverConfigurationID: UUID) {
         let seasonDescriptor = FetchDescriptor<CachedMediaItem>(
-            predicate: #Predicate { $0.id == seasonId }
+            predicate: #Predicate { $0.id == seasonId && $0.serverConfigurationID == serverConfigurationID }
         )
         guard let season = try? modelContext.fetch(seasonDescriptor).first else { return }
 
         let episodeIds = episodes.map(\.id)
         let episodeDescriptor = FetchDescriptor<CachedMediaItem>(
-            predicate: #Predicate { episodeIds.contains($0.id) }
+            predicate: #Predicate { episodeIds.contains($0.id) && $0.serverConfigurationID == serverConfigurationID }
         )
         guard let cachedEpisodes = try? modelContext.fetch(episodeDescriptor) else { return }
 
@@ -382,15 +382,15 @@ public final class MediaItemSyncService {
         season.episodes = cachedEpisodes
     }
 
-    private func linkSeasonsToSeries(seriesId: String, seasons: [MediaItem]) {
+    private func linkSeasonsToSeries(seriesId: String, seasons: [MediaItem], serverConfigurationID: UUID) {
         let seriesDescriptor = FetchDescriptor<CachedMediaItem>(
-            predicate: #Predicate { $0.id == seriesId }
+            predicate: #Predicate { $0.id == seriesId && $0.serverConfigurationID == serverConfigurationID }
         )
         guard let series = try? modelContext.fetch(seriesDescriptor).first else { return }
 
         let seasonIds = seasons.map(\.id)
         let seasonDescriptor = FetchDescriptor<CachedMediaItem>(
-            predicate: #Predicate { seasonIds.contains($0.id) }
+            predicate: #Predicate { seasonIds.contains($0.id) && $0.serverConfigurationID == serverConfigurationID }
         )
         guard let cachedSeasons = try? modelContext.fetch(seasonDescriptor) else { return }
 

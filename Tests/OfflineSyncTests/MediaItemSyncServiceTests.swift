@@ -163,6 +163,37 @@ final class MediaItemSyncServiceTests: XCTestCase {
         XCTAssertEqual(remaining.first?.serverConfigurationID, otherServer.id)
     }
 
+    func testSeriesSyncLinksOnlyTheSyncingAccountsItems() async throws {
+        URLProtocol.registerClass(SeriesSyncFixtureProtocol.self)
+        defer { URLProtocol.unregisterClass(SeriesSyncFixtureProtocol.self) }
+        let otherServer = try ServerConfiguration(
+            name: "Other", jellyfinURL: XCTUnwrap(URL(string: "https://series-sync.invalid"))
+        )
+        context.insert(otherServer)
+        let series = MediaItem(id: "series", name: "Show", type: .series)
+        let season = MediaItem(id: "season", name: "Season", type: .season, seriesId: "series")
+        let episode = MediaItem(id: "episode", name: "Episode", type: .episode, seriesId: "series")
+        try await service.syncItems([series, season, episode], serverConfig: otherServer, library: nil)
+        try await service.syncItems([series], serverConfig: serverConfig, library: nil)
+        let client = try JellyfinService(
+            serverURL: XCTUnwrap(URL(string: "https://series-sync.invalid")),
+            accessToken: "test-token", userID: "test-user", deviceID: "test-device"
+        )
+
+        try await service.syncSeriesDetails(seriesId: "series", serverConfig: serverConfig, service: client)
+
+        let seasons = try cachedItems(id: "season")
+        let episodes = try cachedItems(id: "episode")
+        let activeSeason = try XCTUnwrap(seasons.first { $0.serverConfigurationID == serverConfig.id })
+        let activeEpisode = try XCTUnwrap(episodes.first { $0.serverConfigurationID == serverConfig.id })
+        let otherSeason = try XCTUnwrap(seasons.first { $0.serverConfigurationID == otherServer.id })
+        let otherEpisode = try XCTUnwrap(episodes.first { $0.serverConfigurationID == otherServer.id })
+        XCTAssertEqual(activeSeason.parentSeries?.serverConfigurationID, serverConfig.id)
+        XCTAssertEqual(activeEpisode.parentSeason?.serverConfigurationID, serverConfig.id)
+        XCTAssertNil(otherSeason.parentSeries)
+        XCTAssertNil(otherEpisode.parentSeason)
+    }
+
     func testSync_isScopedToServerConfiguration() async throws {
         let otherServer = try ServerConfiguration(
             name: "Other",
@@ -178,4 +209,31 @@ final class MediaItemSyncServiceTests: XCTestCase {
         XCTAssertEqual(rows.count, 2, "Same item id on two servers must be two rows")
         XCTAssertEqual(Set(rows.map(\.serverConfigurationID)), [serverConfig.id, otherServer.id])
     }
+}
+
+private class SeriesSyncFixtureProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.host == "series-sync.invalid"
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let url = request.url,
+              let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)
+        else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+        let body = url.path.contains("/Seasons")
+            ? #"{"Items":[{"Id":"season","Name":"Season","Type":"Season","SeriesId":"series"}],"TotalRecordCount":1}"#
+            : #"{"Items":[{"Id":"episode","Name":"E","Type":"Episode","SeriesId":"series"}],"TotalRecordCount":1}"#
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }
