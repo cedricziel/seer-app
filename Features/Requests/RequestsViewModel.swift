@@ -1,9 +1,25 @@
+import Combine
 import Foundation
 import JellyseerrClient
 import os
 import SeerCore
 import SwiftData
-import SwiftUI
+
+protocol RequestService: AnyObject, Sendable {
+    func getRequests(
+        take: Int,
+        skip: Int,
+        filter: JellyseerrService.RequestFilter,
+        sort: JellyseerrService.RequestSort
+    ) async throws -> RequestsResponse
+    func cancelRequest(id: Int) async throws
+    func approveRequest(id: Int) async throws -> MediaRequest
+    func declineRequest(id: Int) async throws -> MediaRequest
+    func getMovieDetails(tmdbId: Int) async throws -> MovieDetails
+    func getTVDetails(tmdbId: Int) async throws -> TVDetails
+}
+
+extension JellyseerrService: RequestService {}
 
 /// View model for managing and viewing requests
 @MainActor
@@ -17,8 +33,23 @@ public final class RequestsViewModel: ObservableObject {
     @Published var isLoadingMore: Bool = false
     @Published var errorMessage: String?
 
-    @Published var selectedFilter: RequestFilter = .all
-    @Published var selectedSort: RequestSort = .added
+    @Published var selectedFilter: RequestFilter = .all {
+        didSet {
+            if oldValue != selectedFilter {
+                invalidateLoads()
+            }
+        }
+    }
+
+    @Published var selectedSort: RequestSort = .added {
+        didSet {
+            if oldValue != selectedSort {
+                invalidateLoads()
+            }
+        }
+    }
+
+    @Published private(set) var requestIdentity = UUID()
 
     /// Cache of media titles by TMDB ID
     @Published var mediaTitles: [Int: String] = [:]
@@ -66,9 +97,35 @@ public final class RequestsViewModel: ObservableObject {
 
     // MARK: - Private Properties
 
-    private var jellyseerrService: JellyseerrService?
+    private var jellyseerrService: (any RequestService)?
+    private var serverIdentity: () -> UUID?
+    private var serviceServerID: UUID?
+    private let serviceFactory: () -> (any RequestService)?
     private let appState: AppState
     private let autoRefreshScheduler: RefreshScheduler
+    private struct Scope: Equatable {
+        let serverID: UUID
+        let filter: RequestFilter
+        let sort: RequestSort
+    }
+
+    private var generation = UUID()
+    private var visibleScope: Scope?
+    private var currentScope: Scope? {
+        guard let serverID = serverIdentity() else { return nil }
+        return Scope(serverID: serverID, filter: selectedFilter, sort: selectedSort)
+    }
+
+    private func invalidateLoads() {
+        generation = UUID()
+        isLoading = false
+        isLoadingMore = false
+    }
+
+    private func owns(_ operation: UUID, scope: Scope) -> Bool {
+        generation == operation && currentScope == scope
+    }
+
     private var currentSkip: Int = 0
     private let pageSize: Int = 20
     private var hasMoreItems: Bool = true
@@ -81,29 +138,36 @@ public final class RequestsViewModel: ObservableObject {
         autoRefreshScheduler: RefreshScheduler? = nil
     ) {
         self.appState = appState
+        serverIdentity = { appState.activeServerID }
+        serviceFactory = {
+            guard let url = appState.jellyseerrServerURL, let key = appState.jellyseerrAPIKey else { return nil }
+            return JellyseerrService(serverURL: url, apiKey: key)
+        }
         self.autoRefreshScheduler = autoRefreshScheduler
             ?? RefreshScheduler(interval: Self.defaultAutoRefreshInterval)
         setupService()
     }
 
+    init(appState: AppState, service: any RequestService, serverIdentity: @escaping () -> UUID?) {
+        self.appState = appState
+        self.serverIdentity = serverIdentity
+        autoRefreshScheduler = RefreshScheduler(interval: Self.defaultAutoRefreshInterval)
+        serviceFactory = { service }
+        setupService()
+    }
+
     private func setupService() {
-        // Always clear first so a switch to an unconfigured server doesn't
-        // leak the previous Jellyseerr client into the next session.
-        jellyseerrService = nil
-
-        guard let serverURL = appState.jellyseerrServerURL,
-              let apiKey = appState.jellyseerrAPIKey
-        else {
-            return
-        }
-
-        jellyseerrService = JellyseerrService(serverURL: serverURL, apiKey: apiKey)
+        serviceServerID = serverIdentity()
+        jellyseerrService = serviceFactory()
     }
 
     /// Tear down auto-refresh, rebuild the Jellyseerr client against the
     /// new active server, then refresh and resume polling.
     func handleActiveServerChange() async {
         stopAutoRefresh()
+        invalidateLoads()
+        requestIdentity = UUID()
+        visibleScope = nil
         setupService()
         currentSkip = 0
         hasMoreItems = true
@@ -117,44 +181,49 @@ public final class RequestsViewModel: ObservableObject {
     // MARK: - Public Methods
 
     func loadRequests() async {
-        guard jellyseerrService != nil else {
+        if serviceServerID != serverIdentity() {
+            setupService()
+            requests = []
+            visibleScope = nil
+            requestIdentity = UUID()
+            mediaTitles = [:]
+            mediaPosterPaths = [:]
+        }
+        invalidateLoads()
+        guard let service = jellyseerrService, let scope = currentScope else {
             errorMessage = "Jellyseerr not configured"
             return
         }
-
-        guard let serverID = appState.activeServerID else { return }
-        let filter = selectedFilter
+        let operation = generation
         isLoading = true
         errorMessage = nil
-        currentSkip = 0
-        hasMoreItems = true
-        do {
-            let response = try await jellyseerrService!.getRequests(
-                take: pageSize,
-                skip: 0,
-                filter: filter.apiFilter,
-                sort: selectedSort.apiSort
-            )
-
-            requests = response.results
-            totalItems = response.pageInfo.results
-            hasMoreItems = requests.count < totalItems
-
-            // Fetch media details (titles, posters) in background
-            Task {
-                await fetchMediaDetails()
+        defer {
+            if owns(operation, scope: scope) {
+                isLoading = false
             }
-
-            // Opportunistically populate the AppEntity cache so
-            // CheckRequestStatusIntent has data to surface. Errors
-            // during cache write are swallowed to OS log — UI must
-            // never break because of a cache hiccup.
-            cacheLiveRequestsToSwiftData(response, filter: filter, serverID: serverID)
+        }
+        do {
+            let response = try await service.getRequests(
+                take: pageSize, skip: 0, filter: scope.filter.apiFilter, sort: scope.sort.apiSort
+            )
+            guard owns(operation, scope: scope), !Task.isCancelled else { return }
+            publish(response, scope: scope)
+            Task { await fetchMediaDetails() }
         } catch {
+            guard owns(operation, scope: scope), !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
+    }
 
-        isLoading = false
+    private func publish(_ response: RequestsResponse, scope: Scope) {
+        requests = response.results
+        visibleScope = scope
+        requestIdentity = UUID()
+        totalItems = response.pageInfo.results
+        hasMoreItems = requests.count < totalItems
+        currentSkip = 0
+        errorMessage = nil
+        cacheLiveRequestsToSwiftData(response, filter: scope.filter, serverID: scope.serverID)
     }
 
     private func cacheLiveRequestsToSwiftData(
@@ -240,34 +309,31 @@ public final class RequestsViewModel: ObservableObject {
     }
 
     func loadMoreRequests() async {
-        guard let service = jellyseerrService,
-              hasMoreItems,
-              !isLoadingMore
-        else {
-            return
-        }
-
-        guard let serverID = appState.activeServerID else { return }
-        let filter = selectedFilter
+        guard let service = jellyseerrService, let scope = currentScope,
+              visibleScope == scope, serviceServerID == scope.serverID, hasMoreItems, !isLoading,
+              !isLoadingMore else { return }
+        generation = UUID()
+        let operation = generation
+        let skip = currentSkip + pageSize
         isLoadingMore = true
-        currentSkip += pageSize
+        defer {
+            if owns(operation, scope: scope) {
+                isLoadingMore = false
+            }
+        }
         do {
             let response = try await service.getRequests(
-                take: pageSize,
-                skip: currentSkip,
-                filter: filter.apiFilter,
-                sort: selectedSort.apiSort
+                take: pageSize, skip: skip, filter: scope.filter.apiFilter, sort: scope.sort.apiSort
             )
-
+            guard owns(operation, scope: scope), !Task.isCancelled else { return }
+            currentSkip = skip
             requests.append(contentsOf: response.results)
             hasMoreItems = requests.count < response.pageInfo.results
-            cacheLiveRequestsToSwiftData(response, filter: filter, serverID: serverID)
+            cacheLiveRequestsToSwiftData(response, filter: scope.filter, serverID: scope.serverID)
         } catch {
-            currentSkip -= pageSize
+            guard owns(operation, scope: scope), !Task.isCancelled else { return }
             Self.logger.debug("Failed to load more requests: \(error.localizedDescription)")
         }
-
-        isLoadingMore = false
     }
 
     func filterChanged() async {
@@ -300,59 +366,54 @@ public final class RequestsViewModel: ObservableObject {
     /// Refreshes without flipping `isLoading` so we don't yank the list
     /// from under the user mid-scroll.
     func silentRefresh() async {
-        // Skip if a manual load is already in flight — otherwise the poll
-        // could finish last and reset `requests`/`currentSkip`, dropping
-        // freshly-loaded rows or yanking the list mid-scroll.
-        guard !isLoading, !isLoadingMore else { return }
-        guard let service = jellyseerrService else { return }
-        guard let serverID = appState.activeServerID else { return }
-        let filter = selectedFilter
+        guard !isLoading, !isLoadingMore,
+              let service = jellyseerrService, let scope = currentScope,
+              serviceServerID == scope.serverID else { return }
+        generation = UUID()
+        let operation = generation
         do {
             let response = try await service.getRequests(
-                take: pageSize,
-                skip: 0,
-                filter: filter.apiFilter,
-                sort: selectedSort.apiSort
+                take: pageSize, skip: 0, filter: scope.filter.apiFilter, sort: scope.sort.apiSort
             )
-            requests = response.results
-            totalItems = response.pageInfo.results
-            hasMoreItems = requests.count < totalItems
-            currentSkip = 0
-            errorMessage = nil
-
-            // Refresh the AppEntity cache so CheckRequestStatusIntent
-            // reflects the latest state.
-            cacheLiveRequestsToSwiftData(response, filter: filter, serverID: serverID)
+            guard owns(operation, scope: scope), !Task.isCancelled else { return }
+            publish(response, scope: scope)
         } catch {
-            // Background refresh failures shouldn't surface — the user will
-            // see the next manual refresh attempt if it persists.
+            guard owns(operation, scope: scope), !Task.isCancelled else { return }
             Self.logger.debug("Auto-refresh failed: \(error.localizedDescription)")
         }
     }
 
     // MARK: - Request Actions
 
-    /// Cancel a request by ID
-    func cancelRequest(_ request: MediaRequest) async throws {
-        guard let service = jellyseerrService else { return }
-        try await service.cancelRequest(id: request.id)
-        // Refresh to update the list
-        await refresh()
+    func cancelRequest(_ request: MediaRequest, identity: UUID) async throws {
+        try await performAction(.cancel, request: request, identity: identity)
     }
 
-    /// Approve a pending request (admin only)
-    func approveRequest(_ request: MediaRequest) async throws {
-        guard let service = jellyseerrService else { return }
-        _ = try await service.approveRequest(id: request.id)
-        // Refresh to update the list
-        await refresh()
+    func approveRequest(_ request: MediaRequest, identity: UUID) async throws {
+        try await performAction(.approve, request: request, identity: identity)
     }
 
-    /// Decline a pending request (admin only)
-    func declineRequest(_ request: MediaRequest) async throws {
-        guard let service = jellyseerrService else { return }
-        _ = try await service.declineRequest(id: request.id)
-        // Refresh to update the list
+    func declineRequest(_ request: MediaRequest, identity: UUID) async throws {
+        try await performAction(.decline, request: request, identity: identity)
+    }
+
+    private enum RequestAction { case cancel, approve, decline }
+
+    private func performAction(_ action: RequestAction, request: MediaRequest, identity: UUID) async throws {
+        guard requestIdentity == identity, let scope = currentScope,
+              visibleScope == scope, serviceServerID == scope.serverID, requests.contains(request),
+              let service = jellyseerrService else { return }
+        do {
+            switch action {
+            case .cancel: try await service.cancelRequest(id: request.id)
+            case .approve: _ = try await service.approveRequest(id: request.id)
+            case .decline: _ = try await service.declineRequest(id: request.id)
+            }
+        } catch {
+            guard currentScope == scope, requestIdentity == identity else { return }
+            throw error
+        }
+        guard currentScope == scope, requestIdentity == identity else { return }
         await refresh()
     }
 
@@ -392,9 +453,12 @@ public final class RequestsViewModel: ObservableObject {
 
     /// Fetch media details (title, poster) for all requests
     func fetchMediaDetails() async {
-        guard let service = jellyseerrService else { return }
+        guard let service = jellyseerrService, let scope = currentScope, visibleScope == scope else { return }
+        let identity = requestIdentity
+        let snapshot = requests
 
-        for request in requests {
+        for request in snapshot {
+            guard currentScope == scope, requestIdentity == identity else { return }
             guard let tmdbId = request.media.tmdbId else { continue }
 
             // Skip if already cached
@@ -403,23 +467,27 @@ public final class RequestsViewModel: ObservableObject {
             }
 
             do {
-                if request.type == .movie {
-                    let details = try await service.getMovieDetails(tmdbId: tmdbId)
-                    mediaTitles[tmdbId] = details.title
-                    if let posterPath = details.posterPath {
-                        mediaPosterPaths[tmdbId] = posterPath
-                    }
-                } else {
-                    let details = try await service.getTVDetails(tmdbId: tmdbId)
-                    mediaTitles[tmdbId] = details.name
-                    if let posterPath = details.posterPath {
-                        mediaPosterPaths[tmdbId] = posterPath
-                    }
+                let (title, posterPath) = try await mediaDetails(for: request, tmdbId: tmdbId, service: service)
+                guard currentScope == scope, requestIdentity == identity else { return }
+                mediaTitles[tmdbId] = title
+                if let posterPath {
+                    mediaPosterPaths[tmdbId] = posterPath
                 }
             } catch {
                 // Silently fail for individual lookups
                 Self.logger.debug("Failed to fetch details for TMDB ID \(tmdbId): \(error.localizedDescription)")
             }
         }
+    }
+
+    private func mediaDetails(
+        for request: MediaRequest, tmdbId: Int, service: any RequestService
+    ) async throws -> (String, String?) {
+        if request.type == .movie {
+            let details = try await service.getMovieDetails(tmdbId: tmdbId)
+            return (details.title, details.posterPath)
+        }
+        let details = try await service.getTVDetails(tmdbId: tmdbId)
+        return (details.name, details.posterPath)
     }
 }
