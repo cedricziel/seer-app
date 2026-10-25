@@ -37,6 +37,13 @@ These suites use controlled search responses and in-memory SwiftData stores.
 They cover stale pagination responses, preservation of requests outside a page
 or filter, and progress isolation between servers with matching media IDs.
 
+For notification permission or logout changes, run [the isolated notification tests](../../../.github/skills/verify/scripts/notification-tests.sh).
+The macOS harness uses an injected notification center and in-memory SwiftData.
+It covers Settings grants/revocations, inactive sessions, and retirement during authorization, including suppression of permission prompts.
+Run `NotificationClientTests` and `AuthFeatureTests/RequestPollingSchedulingTests` on a disposable iOS simulator.
+These cover permanent poller retirement, in-flight fetch suppression, and cold-background rescheduling before a poller exists.
+Check navigation after What's New or PiP dismissal and after switching saved servers, using test accounts and app data.
+
 For onboarding persistence changes, run `AuthFeatureTests/OnboardingViewModelTests` on the dedicated simulator. Verify password and Quick Connect reauthentication preserve the saved UUID, settings, and server count while refreshing credentials. Manual and Bonjour onboarding must still create a new server. Keep SwiftData in memory and use test credentials.
 
 For offline library initialization changes, run the hosted `LibraryFeatureTests/LibraryOfflineInitializationTests` suite on a disposable simulator with `-parallel-testing-enabled NO`. It uses an in-memory SwiftData store, fixed offline connectivity, temporary server credentials, and a URL protocol trap that rejects fixture-server requests. It covers home, independent library/recently-added grids, offline filters and sorting, movie metadata, and series seasons/episodes isolated between server accounts. Use an empty `Config/Secrets.xcconfig` in a temporary source snapshot. Do not copy production secrets.
@@ -115,5 +122,3 @@ platform-specific entitlements and ensure the Mac app has App Sandbox enabled.
 Release-lane tests cover iOS default behavior, tvOS signing and IPA selection,
 macOS installer signing and PKG selection, and rejection of unknown targets. tvOS development signing fetches the certificate
 without a development profile, so TestFlight does not require a registered Apple TV.
-
-For notification permission or logout changes, run [the isolated notification tests](../../../.github/skills/verify/scripts/notification-tests.sh). The macOS harness uses an injected notification center and in-memory SwiftData. It covers Settings grants/revocations, inactive sessions, and retirement during authorization, including suppression of permission prompts. Run `NotificationClientTests` and `AuthFeatureTests/RequestPollingSchedulingTests` on a disposable iOS simulator for permanent poller retirement, in-flight fetch suppression, and cold-background rescheduling without an initialized poller. Check notification navigation after What's New or PiP dismissal and after switching saved servers; use test accounts and app data.
