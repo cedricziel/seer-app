@@ -18,5 +18,9 @@
   "nicklockwood/SwiftFormat": {
     "version": "0.64.2",
     "reason": "New formatting rules require a separate source cleanup."
+  },
+  "jellyfin/jellyfin-sdk-swift": {
+    "version": "3.3.1",
+    "reason": "Upstream JellyfinSocket optional existential syntax fails Swift 6.2 compilation; retain SDK 3.3.0."
   }
 }

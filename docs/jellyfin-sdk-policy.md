@@ -1,6 +1,6 @@
 # Jellyfin SDK and server compatibility
 
-Seer targets the current stable Jellyfin server and the current stable Swift SDK.
+Seer targets the current stable Jellyfin server and the current stable Swift SDK compatible with the supported Swift toolchain.
 Older server releases are best-effort compatibility targets. Seer does not add
 legacy endpoint fallbacks solely to support an obsolete server branch.
 Jellyfin's upstream [security policy](https://github.com/jellyfin/jellyfin/security)
@@ -9,8 +9,10 @@ guarantees security patches only for its most recent stable release.
 The policy review on October 25, 2026 found server
 [12.3](https://github.com/jellyfin/jellyfin/releases/tag/v12.3) and Swift SDK
 [3.3.1](https://github.com/jellyfin/jellyfin-sdk-swift/releases/tag/3.3.1) current.
-The SDK was generated from the server 12.1 API. SDK 3.3.1 preserves the 3.3.0
-public API and fixes session-configuration/delegate handling. These versions record the review;
+The SDK was generated from the server 12.1 API. Seer pins SDK 3.3.0 because
+3.3.1 uses optional existential syntax in JellyfinSocket that fails Swift 6.2
+compilation. The app copies its session configuration before handing it to the SDK;
+the unused socket-session changes in 3.3.1 are deferred. These versions record the review;
 they do not freeze the support policy to those releases.
 
 ## Confirmed legacy gap

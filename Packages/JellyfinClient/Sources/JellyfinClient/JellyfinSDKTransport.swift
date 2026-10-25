@@ -26,7 +26,7 @@ public struct JellyfinSDKTransport: Sendable {
                 version: clientVersion
             ),
             delegate: delegate,
-            sessionConfiguration: sessionConfiguration,
+            sessionConfiguration: sessionConfiguration.copy() as? URLSessionConfiguration ?? sessionConfiguration,
             sessionDelegate: sessionDelegate
         )
         delegate.jellyfinClient = client

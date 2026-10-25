@@ -21,7 +21,7 @@ configFiles:
 packages:
   JellyfinAPI:
     url: https://github.com/jellyfin/jellyfin-sdk-swift
-    from: "3.3.0"
+    exactVersion: "3.3.0"
   Get:
     url: https://github.com/kean/Get
     from: "2.2.1"
