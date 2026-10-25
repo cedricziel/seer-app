@@ -4,18 +4,44 @@ import SeerUI
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var appState: AppState
     @StateObject private var onboardingManager = OnboardingManager()
+    @StateObject private var wifiMonitor = WiFiSSIDMonitor.shared
+    @State private var resolvedContext: ServerURLResolver.Context?
     @State private var showPiPRestorePlayer = false
+
+    private var resolutionContext: ServerURLResolver.Context? {
+        _ = wifiMonitor.networkRevision
+        _ = wifiMonitor.currentSSID
+        guard let server = appState.activeServer else { return nil }
+        return ServerURLResolver.shared.context(for: server)
+    }
 
     var body: some View {
         Group {
             if appState.isAuthenticated {
-                MainTabView()
-                    .environmentObject(onboardingManager)
+                if resolvedContext == resolutionContext {
+                    MainTabView()
+                        .environmentObject(onboardingManager)
+                } else {
+                    ProgressView("Connecting to server...")
+                }
             } else {
                 OnboardingFlowView(appState: appState, onboardingManager: onboardingManager)
                     .environmentObject(onboardingManager)
+            }
+        }
+        .task(id: resolutionContext) {
+            guard let server = appState.activeServer else { return }
+            let context = resolutionContext
+            _ = await ServerURLResolver.shared.probeAndResolve(for: server)
+            guard !Task.isCancelled, context == resolutionContext else { return }
+            resolvedContext = context
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                wifiMonitor.refresh()
             }
         }
         .animation(.easeInOut, value: appState.isAuthenticated)

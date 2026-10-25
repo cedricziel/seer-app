@@ -15,3 +15,5 @@ For telemetry changes, check that CI and TestFlight workflows inject `OTLP_ENDPO
 Report static checks and simulator results separately from telemetry ingestion verification.
 
 For request notification changes, run [scripts/request-tests.sh](scripts/request-tests.sh). This disposable macOS package tests the real poller, request models, and in-memory SwiftData store with controlled network responses and recorded notification output. It covers approval, decline, media completion with unchanged or completed request status, partial and 4K availability, unchanged polls, legacy cache baselines, and server scoping. It does not verify system notification delivery or app wiring; retain the native build and test checks above.
+
+For server URL resolution changes, run [the isolated resolver tests](../../../.claude/skills/verify/scripts/server-url-tests.sh). The macOS package uses the real resolver and configuration model with stubbed Wi-Fi and reachability, without app data or live servers. Verify the browsing connection gate separately on an isolated simulator.

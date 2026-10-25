@@ -90,6 +90,112 @@ final class ServerURLResolverTests: XCTestCase {
         XCTAssertEqual(prober.callCount, 0)
     }
 
+    func testSynchronousConsumersUseReachabilityResult() async {
+        let resolver = ServerURLResolver(wifiMonitor: StubWiFi(), prober: StubProber(reachable: true))
+        let config = makeConfig()
+
+        _ = await resolver.probeAndResolve(for: config)
+
+        XCTAssertEqual(resolver.resolveJellyfinURL(for: config), internalURL)
+        XCTAssertTrue(resolver.isUsingInternalURL(for: config))
+    }
+
+    func testURLChangeDoesNotReuseProbeForOldHost() async throws {
+        let prober = StubProber(reachable: true)
+        let resolver = ServerURLResolver(wifiMonitor: StubWiFi(), prober: prober)
+        let config = makeConfig()
+        _ = await resolver.probeAndResolve(for: config)
+        config.internalJellyfinURL = try XCTUnwrap(URL(string: "http://192.168.1.20:8096"))
+
+        XCTAssertEqual(resolver.resolveJellyfinURL(for: config), externalURL)
+        _ = await resolver.probeAndResolve(for: config)
+
+        XCTAssertEqual(prober.callCount, 2)
+    }
+
+    func testNetworkChangeInvalidatesCachedInternalURL() async {
+        let wifi = StubWiFi()
+        let prober = StubProber(reachable: true)
+        let resolver = ServerURLResolver(wifiMonitor: wifi, prober: prober)
+        let config = makeConfig()
+        _ = await resolver.probeAndResolve(for: config)
+
+        wifi.networkRevision += 1
+
+        XCTAssertEqual(resolver.resolveJellyfinURL(for: config), externalURL)
+        _ = await resolver.probeAndResolve(for: config)
+        XCTAssertEqual(prober.callCount, 2)
+    }
+
+    func testUnreachableInternalURLIsUsedByNeitherConsumer() async {
+        let resolver = ServerURLResolver(wifiMonitor: StubWiFi(), prober: StubProber(reachable: false))
+        let config = makeConfig()
+
+        let resolved = await resolver.probeAndResolve(for: config)
+
+        XCTAssertEqual(resolved, externalURL)
+        XCTAssertEqual(resolver.resolveJellyfinURL(for: config), externalURL)
+        XCTAssertFalse(resolver.isUsingInternalURL(for: config))
+    }
+
+    func testConfigurationChangeDuringProbeDiscardsResult() async throws {
+        let prober = SuspendedProber()
+        let resolver = ServerURLResolver(wifiMonitor: StubWiFi(), prober: prober)
+        let config = makeConfig()
+        let resolution = Task { await resolver.probeAndResolve(for: config) }
+        await prober.waitUntilStarted()
+        config.internalJellyfinURL = try XCTUnwrap(URL(string: "http://192.168.1.20:8096"))
+
+        await prober.complete()
+        let resolved = await resolution.value
+
+        XCTAssertEqual(resolved, externalURL)
+        XCTAssertEqual(resolver.resolveJellyfinURL(for: config), externalURL)
+    }
+
+    func testNetworkChangeDuringProbeDiscardsResult() async {
+        let wifi = StubWiFi()
+        let prober = SuspendedProber()
+        let resolver = ServerURLResolver(wifiMonitor: wifi, prober: prober)
+        let config = makeConfig()
+        let resolution = Task { await resolver.probeAndResolve(for: config) }
+        await prober.waitUntilStarted()
+        wifi.networkRevision += 1
+
+        await prober.complete()
+        let resolved = await resolution.value
+
+        XCTAssertEqual(resolved, externalURL)
+        XCTAssertEqual(resolver.resolveJellyfinURL(for: config), externalURL)
+    }
+
+    func testExternalURLChangeInvalidatesCachedProbe() async throws {
+        let prober = StubProber(reachable: true)
+        let resolver = ServerURLResolver(wifiMonitor: StubWiFi(), prober: prober)
+        let config = makeConfig()
+        _ = await resolver.probeAndResolve(for: config)
+        let updatedExternalURL = try XCTUnwrap(URL(string: "https://new.example.com"))
+        config.jellyfinURL = updatedExternalURL
+
+        XCTAssertEqual(resolver.resolveJellyfinURL(for: config), updatedExternalURL)
+        _ = await resolver.probeAndResolve(for: config)
+        XCTAssertEqual(prober.callCount, 2)
+    }
+
+    func testSynchronousConsumersKeepResolvedAddressUntilNextProbe() async {
+        let now = MutableNow(initial: Date())
+        let resolver = ServerURLResolver(
+            wifiMonitor: StubWiFi(),
+            prober: StubProber(reachable: true),
+            dateProvider: { now.now }
+        )
+        let config = makeConfig()
+        _ = await resolver.probeAndResolve(for: config)
+        now.advance(by: 61)
+
+        XCTAssertEqual(resolver.resolveJellyfinURL(for: config), internalURL)
+    }
+
     // MARK: - Helpers
 
     private func makeConfig() -> ServerConfiguration {
@@ -109,6 +215,7 @@ final class ServerURLResolverTests: XCTestCase {
 /// host-less test process.
 @MainActor
 final class StubWiFi: WiFiNetworkStatus {
+    var networkRevision: UInt64 = 0
     var currentSSID: String?
     var isOnWiFi: Bool
     var hasLocationPermission: Bool
@@ -155,5 +262,30 @@ final class MutableNow {
 
     func advance(by seconds: TimeInterval) {
         now = now.addingTimeInterval(seconds)
+    }
+}
+
+private actor SuspendedProber: ReachabilityProber {
+    private var continuation: CheckedContinuation<Bool, Never>?
+    private var started: CheckedContinuation<Void, Never>?
+
+    func probe(url _: URL) async -> Bool {
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+            started?.resume()
+            started = nil
+        }
+    }
+
+    func waitUntilStarted() async {
+        if continuation != nil {
+            return
+        }
+        await withCheckedContinuation { started = $0 }
+    }
+
+    func complete() {
+        continuation?.resume(returning: true)
+        continuation = nil
     }
 }

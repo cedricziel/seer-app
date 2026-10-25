@@ -217,6 +217,20 @@ public final class AppState: ObservableObject {
         )
     }
 
+    /// Resolves the configured address before reading credentials for that server.
+    /// Returns nil if the configuration changes while the probe is in flight.
+    public func resolvedJellyfinCredentials(for serverID: UUID) async -> JellyfinCredentials? {
+        guard let server = configuration(for: serverID) else { return nil }
+        let resolver = ServerURLResolver.shared
+        let context = resolver.context(for: server)
+        _ = await resolver.probeAndResolve(for: server)
+        guard !Task.isCancelled,
+              let current = configuration(for: serverID),
+              context == resolver.context(for: current)
+        else { return nil }
+        return jellyfinCredentials(for: serverID)
+    }
+
     // MARK: - Initialization
 
     public init() {
