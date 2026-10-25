@@ -152,8 +152,39 @@ final class ServiceClientLifecycleTests: XCTestCase {
         XCTAssertEqual(state.jellyseerrUserPermissions, 0)
     }
 
+    func testVerifiedConnectionRetainsPermissionsAfterCredentialSave() throws {
+        try state.saveJellyseerrCredentials(
+            serverURL: XCTUnwrap(URL(string: "https://first.invalid")), apiKey: "replacement-test-key",
+            permissions: 2
+        )
+
+        XCTAssertEqual(state.jellyseerrUserPermissions, 2)
+        XCTAssertTrue(state.canManageRequests)
+    }
+
+    func testSavingNonactiveCredentialsCannotChangeActivePermissions() {
+        state.saveJellyseerrCredentials(serverID: second.id, apiKey: "second-test-key", permissions: 2)
+
+        XCTAssertEqual(state.jellyseerrUserPermissions, 1)
+    }
+
     func testOldPermissionResponseCannotGrantPermissionsOnNewServer() async throws {
         let model = DiscoverViewModel(appState: state)
+        let configurationID = state.serviceConfigurationID
+        let service = try JellyseerrService(serverURL: XCTUnwrap(first.jellyseerrURL), apiKey: "first-test-key")
+        LifecycleRequestTrap.authState.withLock { $0.hold = true }
+        let load = Task { await model.loadUserPermissions(service: service, configurationID: configurationID) }
+        await LifecycleRequestTrap.waitForAuth()
+
+        state.switchServer(to: second.id)
+        LifecycleRequestTrap.completeAuth()
+        await load.value
+
+        XCTAssertEqual(state.jellyseerrUserPermissions, 0)
+    }
+
+    func testOldSearchPermissionResponseCannotGrantPermissionsOnNewServer() async throws {
+        let model = SearchViewModel(appState: state)
         let configurationID = state.serviceConfigurationID
         let service = try JellyseerrService(serverURL: XCTUnwrap(first.jellyseerrURL), apiKey: "first-test-key")
         LifecycleRequestTrap.authState.withLock { $0.hold = true }

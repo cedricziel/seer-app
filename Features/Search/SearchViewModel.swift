@@ -80,16 +80,19 @@ public final class SearchViewModel: ObservableObject {
 
         // Load permissions if not already set
         if appState.jellyseerrUserPermissions == 0 {
+            let configurationID = appState.serviceConfigurationID
+            let service = jellyseerrService
             Task {
-                await loadUserPermissions()
+                await loadUserPermissions(service: service, configurationID: configurationID)
             }
         }
     }
 
     /// Load user permissions from Jellyseerr
-    private func loadUserPermissions() async {
-        guard let service = jellyseerrService else { return }
-        let configurationID = appState.serviceConfigurationID
+    func loadUserPermissions(
+        service: JellyseerrService?, configurationID: AppState.ServiceConfigurationID
+    ) async {
+        guard let service else { return }
 
         do {
             let userInfo = try await service.verifyAuth()

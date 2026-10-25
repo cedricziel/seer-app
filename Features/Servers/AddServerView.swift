@@ -175,9 +175,6 @@ struct AddServerView: View {
             let service = JellyseerrService(serverURL: url, apiKey: jellyseerrAPIKey)
             let userInfo = try await service.verifyAuth()
 
-            // Set user permissions from Jellyseerr
-            appState.setJellyseerrPermissions(userInfo.permissions)
-
             // Update server configuration with Jellyseerr URL
             var updatedConfig = config
             updatedConfig.jellyseerrURL = url
@@ -185,7 +182,9 @@ struct AddServerView: View {
             serverConfig = updatedConfig
 
             // Save Jellyseerr credentials
-            appState.saveJellyseerrCredentials(serverID: config.id, apiKey: jellyseerrAPIKey)
+            appState.saveJellyseerrCredentials(
+                serverID: config.id, apiKey: jellyseerrAPIKey, permissions: userInfo.permissions
+            )
 
             currentStep = .complete
         } catch let error as JellyseerrService.JellyseerrError {

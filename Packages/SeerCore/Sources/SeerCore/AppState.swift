@@ -438,16 +438,16 @@ public final class AppState: ObservableObject {
     }
 
     /// Save Jellyseerr credentials for a server
-    public func saveJellyseerrCredentials(serverID: UUID, apiKey: String) {
+    public func saveJellyseerrCredentials(serverID: UUID, apiKey: String, permissions: Int? = nil) {
         KeychainManager.shared.saveCredential(apiKey, for: serverID, key: .jellyseerrAPIKey)
         if serverID == activeServerID {
-            clearJellyseerrPermissions()
+            jellyseerrUserPermissions = permissions ?? 0
             credentialRevision = UUID()
         }
     }
 
     /// Save Jellyseerr credentials (updates active server)
-    public func saveJellyseerrCredentials(serverURL: URL, apiKey: String) {
+    public func saveJellyseerrCredentials(serverURL: URL, apiKey: String, permissions: Int? = nil) {
         guard let serverID = activeServerID,
               let config = activeServer
         else {
@@ -457,7 +457,7 @@ public final class AppState: ObservableObject {
         config.jellyseerrURL = serverURL
         try? modelContext?.save()
         objectWillChange.send()
-        saveJellyseerrCredentials(serverID: serverID, apiKey: apiKey)
+        saveJellyseerrCredentials(serverID: serverID, apiKey: apiKey, permissions: permissions)
     }
 
     /// Clear all stored credentials and log out

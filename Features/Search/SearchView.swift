@@ -346,10 +346,11 @@ private struct SearchContentView: View {
     @MainActor
     @Sendable
     private func connectJellyseerr(url: URL, apiKey: String) async throws {
+        let configurationID = appState.serviceConfigurationID
         let service = JellyseerrService(serverURL: url, apiKey: apiKey)
         let userInfo = try await service.verifyAuth()
-        appState.setJellyseerrPermissions(userInfo.permissions)
-        appState.saveJellyseerrCredentials(serverURL: url, apiKey: apiKey)
+        guard configurationID == appState.serviceConfigurationID else { throw CancellationError() }
+        appState.saveJellyseerrCredentials(serverURL: url, apiKey: apiKey, permissions: userInfo.permissions)
     }
 
     private func handleRequestAction(_ result: SearchResult) {
