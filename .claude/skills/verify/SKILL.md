@@ -40,6 +40,8 @@ Record feature snapshots on the same iOS runtime as CI, currently iOS 26.5. iOS 
 
 Native builds and visual checks can be blocked by existing source errors or unavailable simulator services. Record the exact blocker and leave those checks incomplete.
 
+For Now Playing artwork ownership changes, run `PlaybackClientTests/PiPArtworkOwnershipTests` on an isolated simulator or through required CI. The injected loader controls delayed completions without network access. Cover closing playback, switching items that share an artwork URL, replacement metadata without artwork, and preserving the latest playback time when current artwork arrives.
+
 ## OpenAPI changes
 
 Follow the pinned generator setup in [the API package guide](../../../Packages/JellyseerrAPI/README.md). Regenerate twice and compare output hashes to check determinism. Compile with `xcrun swift build --package-path Packages/JellyseerrAPI --scratch-path "$work/build"`, using a fresh `mktemp -d` directory for `work` and a cleanup trap. Use Xcode's Swift toolchain through `xcrun` so the compiler matches the selected SDK.
