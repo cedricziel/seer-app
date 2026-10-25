@@ -1,5 +1,5 @@
 @testable import SeerApp
-import SeerUI
+import enum SeerUI.DownloadButtonState
 import XCTest
 
 @MainActor
