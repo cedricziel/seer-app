@@ -124,6 +124,15 @@ extension MediaDetailView {
         }
     }
 
+    func cancelEpisodeDownload(_ episode: MediaItem) async {
+        guard let manager = downloadManager,
+              let download = await manager.download(
+                  forItemID: episode.id, serverID: appState.activeServerKey ?? "default"
+              ) else { return }
+        try? await manager.cancelDownload(download.id)
+        await updateEpisodeDownloadStates(episodes: [episode])
+    }
+
     func downloadSeason(episodes: [MediaItem]) async {
         for episode in episodes {
             await downloadEpisode(episode)

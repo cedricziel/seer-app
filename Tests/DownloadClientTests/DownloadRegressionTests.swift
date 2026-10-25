@@ -66,6 +66,36 @@ final class DownloadRegressionTests: XCTestCase {
         XCTAssertEqual(saved?.totalBytes, 0)
     }
 
+    func testResumeReusesExistingDownloadRow() async throws {
+        let download = makeDownload()
+        download.state = .paused
+        download.resumeData = Data("saved resume data".utf8)
+        try await manager.store.insert(download)
+        let item = MediaItem(id: "episode", name: "Episode", type: .episode)
+
+        try await manager.downloadItem(item, serverID: "test-server", quality: .high)
+
+        let rows = try await manager.store.fetchAllDownloads()
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.id, download.id)
+        XCTAssertEqual(rows.first?.state, .pending)
+        XCTAssertEqual(rows.first?.resumeData, Data("saved resume data".utf8))
+    }
+
+    func testRetryReusesExistingDownloadRow() async throws {
+        let download = makeDownload()
+        download.state = .failed
+        try await manager.store.insert(download)
+        let item = MediaItem(id: "episode", name: "Episode", type: .episode)
+
+        try await manager.downloadItem(item, serverID: "test-server", quality: .high)
+
+        let rows = try await manager.store.fetchAllDownloads()
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.id, download.id)
+        XCTAssertEqual(rows.first?.state, .pending)
+    }
+
     private func makeDownload() -> Download {
         Download(
             serverID: "test-server",

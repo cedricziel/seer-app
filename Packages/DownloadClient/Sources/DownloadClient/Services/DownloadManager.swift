@@ -254,6 +254,10 @@ public final class DownloadManager {
 
         // Check if already downloaded or downloading
         if let existing = try await store.fetchDownload(itemID: item.id, serverID: serverID) {
+            if existing.state == .paused || existing.state == .failed {
+                try await resumeDownload(existing.id)
+                return
+            }
             if existing.state == .completed {
                 throw DownloadError.alreadyDownloaded
             }

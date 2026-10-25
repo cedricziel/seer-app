@@ -16,6 +16,7 @@ struct SeasonDisclosureRow: View {
     var onPlayEpisode: ((MediaItem) -> Void)?
     var onTapEpisode: ((MediaItem) -> Void)?
     var onDownloadEpisode: ((MediaItem) async -> Void)?
+    var onCancelEpisodeDownload: ((MediaItem) async -> Void)?
     var onDownloadSeason: (() async -> Void)?
     var downloadStateForEpisode: ((MediaItem) -> DownloadButtonState)?
 
@@ -70,6 +71,8 @@ struct SeasonDisclosureRow: View {
                             onPlay: onPlayEpisode != nil ? { onPlayEpisode?(episode) } : nil,
                             onTap: onTapEpisode != nil ? { onTapEpisode?(episode) } : nil,
                             onDownload: onDownloadEpisode != nil ? { await onDownloadEpisode?(episode) } : nil,
+                            onCancelDownload: onCancelEpisodeDownload != nil ?
+                                { await onCancelEpisodeDownload?(episode) } : nil,
                             downloadState: downloadStateForEpisode?(episode) ?? .notDownloaded
                         )
                     }
@@ -88,6 +91,7 @@ struct EpisodeRow: View {
     var onPlay: (() -> Void)?
     var onTap: (() -> Void)?
     var onDownload: (() async -> Void)?
+    var onCancelDownload: (() async -> Void)?
     var onDeleteDownload: (() -> Void)?
     var onMarkWatched: ((Bool) -> Void)?
     var downloadState: DownloadButtonState = .notDownloaded
@@ -166,7 +170,7 @@ struct EpisodeRow: View {
                     CompactDownloadButton(
                         state: downloadState,
                         onDownload: { Task { await onDownload() } },
-                        onCancel: {}
+                        onCancel: { Task { await onCancelDownload?() } }
                     )
                 }
 
@@ -288,19 +292,19 @@ public struct CompactDownloadButton: View {
         self.onCancel = onCancel
     }
 
+    func performAction() {
+        switch state {
+        case .notDownloaded, .failed, .paused:
+            onDownload()
+        case .downloading, .pending, .waitingForWiFi:
+            onCancel()
+        case .completed:
+            break
+        }
+    }
+
     public var body: some View {
-        Button {
-            switch state {
-            case .notDownloaded, .failed:
-                onDownload()
-            case .downloading, .pending, .waitingForWiFi:
-                onCancel()
-            case .paused:
-                onDownload() // Resume
-            case .completed:
-                break // Already downloaded
-            }
-        } label: {
+        Button(action: performAction) {
             Group {
                 switch state {
                 case .notDownloaded:
