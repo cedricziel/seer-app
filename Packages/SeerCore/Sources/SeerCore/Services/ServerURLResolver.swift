@@ -39,9 +39,12 @@ public struct URLSessionReachabilityProber: ReachabilityProber {
                 delegateQueue: nil
             )
             defer { session.invalidateAndCancel() }
-            let (_, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else { return false }
-            return (200 ... 299).contains(http.statusCode)
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse,
+                  (200 ... 299).contains(http.statusCode)
+            else { return false }
+            _ = try ServerInfoFetcher.parse(data)
+            return true
         } catch {
             return false
         }
@@ -67,6 +70,12 @@ public final class ServerURLResolver: ObservableObject {
         let currentSSID: String?
         let isOnWiFi: Bool
         let networkRevision: UInt64
+
+        /// Whether existing clients still target this configuration's destinations.
+        public func matchesConfiguration(of other: Context) -> Bool {
+            serverID == other.serverID && externalURL == other.externalURL &&
+                internalURL == other.internalURL && ssids == other.ssids
+        }
     }
 
     /// Identifies the configured destinations and network used by a resolution.
@@ -106,8 +115,8 @@ public final class ServerURLResolver: ObservableObject {
         guard config.hasInternalURL, let internalURL = config.internalJellyfinURL else {
             return config.jellyfinURL
         }
-        if let ssid = wifiMonitor.currentSSID, config.internalNetworkSSIDs.contains(ssid) {
-            return internalURL
+        if let ssid = wifiMonitor.currentSSID {
+            return config.internalNetworkSSIDs.contains(ssid) ? internalURL : config.jellyfinURL
         }
         if let cached = validProbe(for: config, requireFresh: false), cached.reachable {
             return internalURL
@@ -123,7 +132,7 @@ public final class ServerURLResolver: ObservableObject {
         return cached
     }
 
-    /// Probes when SSID does not match. Results expire after 60 seconds and are
+    /// Probes when SSID is unavailable. Results expire after 60 seconds and are
     /// discarded when configured destinations or network state change during the probe.
     public func probeAndResolve(for config: ServerConfiguration) async -> URL {
         guard config.hasInternalURL,
@@ -133,9 +142,8 @@ public final class ServerURLResolver: ObservableObject {
         }
 
         // SSID fast path
-        if let currentSSID = wifiMonitor.currentSSID,
-           config.internalNetworkSSIDs.contains(currentSSID) {
-            return internalURL
+        if let currentSSID = wifiMonitor.currentSSID {
+            return config.internalNetworkSSIDs.contains(currentSSID) ? internalURL : config.jellyfinURL
         }
 
         if let cached = validProbe(for: config) {

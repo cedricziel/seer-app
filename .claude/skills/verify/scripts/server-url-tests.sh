@@ -7,10 +7,13 @@ trap 'rm -rf "$verify_dir"' EXIT HUP INT TERM
 
 mkdir -p "$verify_dir/Sources/SeerCore" "$verify_dir/Tests/SeerCoreTests"
 cp "$repo_root/Packages/SeerCore/Sources/SeerCore/Services/ServerURLResolver.swift" \
+    "$repo_root/Packages/SeerCore/Sources/SeerCore/Services/ServerInfoFetcher.swift" \
     "$repo_root/Packages/SeerCore/Sources/SeerCore/Models/ServerConfiguration.swift" \
     "$repo_root/Packages/SeerCore/Sources/SeerCore/Utilities/WiFiNetworkStatus.swift" \
     "$verify_dir/Sources/SeerCore/"
-cp "$repo_root/Tests/SeerCoreTests/ServerURLResolverTests.swift" "$verify_dir/Tests/SeerCoreTests/"
+cp "$repo_root/Tests/SeerCoreTests/ServerURLResolverTests.swift" \
+    "$repo_root/Tests/SeerCoreTests/ServerInfoFetcherTests.swift" \
+    "$verify_dir/Tests/SeerCoreTests/"
 
 cat > "$verify_dir/Sources/SeerCore/WiFiSSIDMonitor.swift" <<'SWIFT'
 import Foundation

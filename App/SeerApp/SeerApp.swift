@@ -123,6 +123,9 @@ struct SeerApp: App {
                 .onChange(of: appState.activeServerID) { _, _ in
                     configureServicesCredentials()
                 }
+                .onChange(of: appState.jellyfinServerURL) { _, _ in
+                    downloadManager?.configure(from: appState)
+                }
                 .onChange(of: appState.appIntentsIndexingEnabled) { _, _ in
                     spotlightIndexer?.reconcile()
                 }

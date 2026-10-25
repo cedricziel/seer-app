@@ -196,6 +196,47 @@ final class ServerURLResolverTests: XCTestCase {
         XCTAssertEqual(resolver.resolveJellyfinURL(for: config), internalURL)
     }
 
+    func testNetworkRefreshPreservesClientConfigurationIdentity() {
+        let wifi = StubWiFi()
+        let resolver = ServerURLResolver(wifiMonitor: wifi, prober: StubProber(reachable: true))
+        let config = makeConfig()
+        let original = resolver.context(for: config)
+        wifi.networkRevision += 1
+        let refreshed = resolver.context(for: config)
+
+        XCTAssertNotEqual(original, refreshed)
+        XCTAssertTrue(original.matchesConfiguration(of: refreshed))
+    }
+
+    func testURLChangesInvalidateClientConfigurationIdentity() throws {
+        let resolver = ServerURLResolver(wifiMonitor: StubWiFi(), prober: StubProber(reachable: true))
+        let config = makeConfig()
+        let original = resolver.context(for: config)
+        config.internalJellyfinURL = try XCTUnwrap(URL(string: "http://192.168.1.20:8096"))
+
+        XCTAssertFalse(original.matchesConfiguration(of: resolver.context(for: config)))
+    }
+
+    func testServerChangesInvalidateClientConfigurationIdentity() {
+        let resolver = ServerURLResolver(wifiMonitor: StubWiFi(), prober: StubProber(reachable: true))
+        let original = resolver.context(for: makeConfig())
+
+        XCTAssertFalse(original.matchesConfiguration(of: resolver.context(for: makeConfig())))
+    }
+
+    func testKnownDifferentNetworkUsesExternalWithoutProbing() async {
+        let wifi = StubWiFi(currentSSID: "CoffeeShop", isOnWiFi: true, hasLocationPermission: true)
+        let prober = StubProber(reachable: true)
+        let resolver = ServerURLResolver(wifiMonitor: wifi, prober: prober)
+        let config = makeConfig()
+
+        let resolved = await resolver.probeAndResolve(for: config)
+
+        XCTAssertEqual(resolved, externalURL)
+        XCTAssertEqual(resolver.resolveJellyfinURL(for: config), externalURL)
+        XCTAssertEqual(prober.callCount, 0)
+    }
+
     // MARK: - Helpers
 
     private func makeConfig() -> ServerConfiguration {

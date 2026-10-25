@@ -9,11 +9,10 @@ struct ContentView: View {
     @StateObject private var onboardingManager = OnboardingManager()
     @StateObject private var wifiMonitor = WiFiSSIDMonitor.shared
     @State private var resolvedContext: ServerURLResolver.Context?
+    @State private var resolvedServerURL: URL?
     @State private var showPiPRestorePlayer = false
 
     private var resolutionContext: ServerURLResolver.Context? {
-        _ = wifiMonitor.networkRevision
-        _ = wifiMonitor.currentSSID
         guard let server = appState.activeServer else { return nil }
         return ServerURLResolver.shared.context(for: server)
     }
@@ -21,8 +20,10 @@ struct ContentView: View {
     var body: some View {
         Group {
             if appState.isAuthenticated {
-                if resolvedContext == resolutionContext {
+                if let resolvedContext, let currentContext = resolutionContext,
+                   resolvedContext.matchesConfiguration(of: currentContext) {
                     MainTabView()
+                        .id(resolvedServerURL)
                         .environmentObject(onboardingManager)
                 } else {
                     ProgressView("Connecting to server...")
@@ -35,8 +36,9 @@ struct ContentView: View {
         .task(id: resolutionContext) {
             guard let server = appState.activeServer else { return }
             let context = resolutionContext
-            _ = await ServerURLResolver.shared.probeAndResolve(for: server)
+            guard let serverURL = await appState.resolveJellyfinURL(for: server.id) else { return }
             guard !Task.isCancelled, context == resolutionContext else { return }
+            resolvedServerURL = serverURL
             resolvedContext = context
         }
         .onChange(of: scenePhase) { _, phase in
