@@ -338,7 +338,7 @@ final class OnboardingViewModelTests: XCTestCase {
         defer { model.stop() }
         try model.selectSuggestion(XCTUnwrap(model.welcomeSuggestions.primary))
         if quickConnect {
-            try await Self.waitFor(timeout: 2) { appState.isAuthenticated }
+            try await Self.waitFor(timeout: 2) { self.appState.isAuthenticated }
         } else {
             try await Self.waitFor(timeout: 1) {
                 model.phase == .password(serverDisplay: "Saved server")
