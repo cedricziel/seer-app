@@ -87,7 +87,7 @@ CI/Release builds expect `Config/Secrets.xcconfig` — locally copy from
   (`ServerConfiguration`, `CachedLibrary`, `CachedMediaItem`, `CachedUserProgress`),
   `TelemetryService` (OpenTelemetry), `CrashReportBridge` (PLCrashReporter),
   `DiagnosticsConsent`, `ServerURLResolver`
-- `JellyfinClient` — Jellyfin HTTP service and app models implemented with `URLSession`
+- `JellyfinClient` — app-facing Jellyfin service and app-owned models; SDK changes follow [the compatibility policy](docs/jellyfin-sdk-policy.md)
 - `JellyseerrAPI` — local SwiftPM package; the generated Jellyseerr OpenAPI
   client (excluded from SwiftLint/SwiftFormat — do not hand-edit
   `Sources/JellyseerrAPI/Generated`)

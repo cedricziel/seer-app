@@ -1,4 +1,5 @@
 import Foundation
+import JellyfinClient
 
 /// Service for managing video playback with Jellyfin
 public actor PlaybackService {
@@ -7,12 +8,8 @@ public actor PlaybackService {
     private var userID: String
     private var deviceID: String
 
-    private let session: URLSession
+    private let transport: JellyfinSDKTransport
     private let decoder: JSONDecoder
-    private let encoder: JSONEncoder
-
-    private let clientName = "Seer"
-    private let clientVersion = "1.0.0"
 
     public enum PlaybackError: LocalizedError, Sendable {
         case invalidURL
@@ -44,40 +41,32 @@ public actor PlaybackService {
         serverURL: URL,
         accessToken: String,
         userID: String,
-        deviceID: String
+        deviceID: String,
+        sessionConfiguration: URLSessionConfiguration? = nil
     ) {
         self.serverURL = serverURL
         self.accessToken = accessToken
         self.userID = userID
         self.deviceID = deviceID
 
-        let config = URLSessionConfiguration.default
+        let config = (sessionConfiguration?.copy() as? URLSessionConfiguration) ?? .default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 300
-        session = URLSession(configuration: config)
+        transport = JellyfinSDKTransport(
+            serverURL: serverURL,
+            accessToken: accessToken,
+            deviceID: deviceID,
+            sessionConfiguration: config
+        )
 
         decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-
-        encoder = JSONEncoder()
     }
 
     // MARK: - Public API
 
     /// Get playback info for an item
     public func getPlaybackInfo(itemId: String, startPositionTicks: Int64 = 0) async throws -> PlaybackInfoResponse {
-        let url = serverURL
-            .appendingPathComponent("Items")
-            .appendingPathComponent(itemId)
-            .appendingPathComponent("PlaybackInfo")
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-        request.addValue(authorizationHeader(), forHTTPHeaderField: "Authorization")
-
-        // Build request body with device profile
         let requestBody = PlaybackInfoRequest(
             userId: userID,
             maxStreamingBitrate: 120_000_000,
@@ -86,9 +75,9 @@ public actor PlaybackService {
             autoOpenLiveStream: true
         )
 
-        request.httpBody = try encoder.encode(requestBody)
-
-        let (data, response) = try await performRequest(request)
+        let (data, response) = try await performRequest {
+            try await transport.playbackInfo(itemID: itemId, body: requestBody)
+        }
         try validateResponse(response, data: data)
 
         return try decoder.decode(PlaybackInfoResponse.self, from: data)
@@ -112,12 +101,6 @@ public actor PlaybackService {
 
     /// Report playback has started
     public func reportPlaybackStart(state: PlaybackState) async throws {
-        let url = serverURL.appendingPathComponent("Sessions/Playing")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue(authorizationHeader(), forHTTPHeaderField: "Authorization")
-
         let body = PlaybackStartInfo(
             canSeek: true,
             itemId: state.itemId,
@@ -127,25 +110,13 @@ public actor PlaybackService {
             playMethod: state.playMethod.rawValue
         )
 
-        request.httpBody = try encoder.encode(body)
-
-        let (_, response) = try await performRequest(request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200 ... 299).contains(httpResponse.statusCode)
-        else {
-            // Non-critical error, just log
-            return
+        _ = try await performRequest {
+            try await transport.playbackStarted(body: body)
         }
     }
 
     /// Report playback progress
     public func reportPlaybackProgress(state: PlaybackState) async throws {
-        let url = serverURL.appendingPathComponent("Sessions/Playing/Progress")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue(authorizationHeader(), forHTTPHeaderField: "Authorization")
-
         let body = PlaybackProgressInfo(
             canSeek: true,
             itemId: state.itemId,
@@ -158,25 +129,13 @@ public actor PlaybackService {
             playMethod: state.playMethod.rawValue
         )
 
-        request.httpBody = try encoder.encode(body)
-
-        let (_, response) = try await performRequest(request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200 ... 299).contains(httpResponse.statusCode)
-        else {
-            // Non-critical error
-            return
+        _ = try await performRequest {
+            try await transport.playbackProgress(body: body)
         }
     }
 
     /// Report playback has stopped
     public func reportPlaybackStopped(state: PlaybackState) async throws {
-        let url = serverURL.appendingPathComponent("Sessions/Playing/Stopped")
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.addValue(authorizationHeader(), forHTTPHeaderField: "Authorization")
-
         let body = PlaybackStopInfo(
             itemId: state.itemId,
             mediaSourceId: state.mediaSourceId,
@@ -184,31 +143,18 @@ public actor PlaybackService {
             positionTicks: state.positionTicks
         )
 
-        request.httpBody = try encoder.encode(body)
-
-        let (_, response) = try await performRequest(request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200 ... 299).contains(httpResponse.statusCode)
-        else {
-            return
+        _ = try await performRequest {
+            try await transport.playbackStopped(body: body)
         }
     }
 
     // MARK: - Private Helpers
 
-    private func authorizationHeader() -> String {
-        """
-        MediaBrowser Client="\(clientName)", \
-        Device="iOS", \
-        DeviceId="\(deviceID)", \
-        Version="\(clientVersion)", \
-        Token="\(accessToken)"
-        """
-    }
-
-    private func performRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
+    private func performRequest(
+        _ operation: () async throws -> (Data, HTTPURLResponse)
+    ) async throws -> (Data, HTTPURLResponse) {
         do {
-            return try await session.data(for: request)
+            return try await operation()
         } catch {
             throw PlaybackError.networkError(error)
         }

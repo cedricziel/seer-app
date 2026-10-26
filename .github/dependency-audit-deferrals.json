@@ -1,8 +1,4 @@
 {
-  "jellyfin/jellyfin-sdk-swift": {
-    "version": "3.3.0",
-    "reason": "Adopt the SDK behind JellyfinService in a separate migration."
-  },
   "apple/swift-collections": {
     "version": "1.7.4",
     "reason": "Requires Swift 6.4; retain Swift 6.2 support."
@@ -22,5 +18,9 @@
   "nicklockwood/SwiftFormat": {
     "version": "0.64.2",
     "reason": "New formatting rules require a separate source cleanup."
+  },
+  "jellyfin/jellyfin-sdk-swift": {
+    "version": "3.3.1",
+    "reason": "Upstream JellyfinSocket optional existential syntax fails Swift 6.2 compilation; retain SDK 3.3.0."
   }
 }

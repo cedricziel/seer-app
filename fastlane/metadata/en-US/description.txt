@@ -23,7 +23,7 @@ Flowmark Media connects directly to your Jellyfin and Jellyseerr servers. Diagno
 
 REQUIREMENTS
 
-• A Jellyfin server (10.8+) you have access to
+• A Jellyfin server running the latest stable release that you have access to
 • Optionally, a Jellyseerr instance for media requests
 • iOS 26 or tvOS 26 or later
 

@@ -5,6 +5,8 @@ description: Verify Seer changes with static checks and isolated builds, includi
 
 Run from the repository root:
 
+For Jellyfin SDK changes, run the `JellyfinClientTests` and `PlaybackClientTests` targets in the isolated hosted test setup above. The URLProtocol fixture covers credential restoration and reauthentication, base paths and literal-plus queries, Quick Connect, library requests, error mapping, and complete playback JSON payloads. Stubbed responses do not establish live-server compatibility; record the server versions actually exercised against `docs/jellyfin-sdk-policy.md`.
+
 For PiP restoration changes, run `.claude/skills/verify/scripts/pip-tests.sh SIMULATOR_RUNTIME_IDENTIFIER`. The script creates and deletes its own simulator and test project. It compiles the real manager and covers paused, buffering, and playing restoration plus artwork callback isolation without launching the app or loading media URLs.
 
 1. Run `./scripts/swift-tools swiftlint lint --strict --no-cache`, `./scripts/swift-tools swiftformat --lint . --cache ignore`, `plutil -lint App/SeerApp/Info.plist`, and `git diff --check`. Separate pre-existing failures from changed-file failures.
