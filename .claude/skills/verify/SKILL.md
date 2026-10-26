@@ -134,3 +134,4 @@ seasons, 4K, movie submission, and rejection of a previous title's details. Pass
 Append `before` to run the same assertions against
 `origin/main`; loading and recovery assertions must fail before the fix. Review
 exported screenshots. The harness does not verify live service responses.
+For tvOS CloudKit releases, inspect the exported app entitlements and embedded provisioning profile. Both must include `aps-environment = production`; App Store Connect rejects CloudKit-enabled tvOS apps without it. Confirm upload validation in the release workflow.
