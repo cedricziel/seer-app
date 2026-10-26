@@ -19,16 +19,21 @@ cp "$repo/Features/Downloads/DownloadActionFeedback.swift" "$work/App/"
 cp "$repo/Features/Downloads/DownloadErrorAlert.swift" "$work/App/"
 cp "$repo/Packages/DownloadClient/Sources/DownloadClient/Models/Download.swift" \
     "$repo/Packages/DownloadClient/Sources/DownloadClient/Models/DownloadState.swift" \
-    "$repo/Packages/DownloadClient/Sources/DownloadClient/Models/DownloadQuality.swift" \
-    "$repo/Packages/SeerUI/Sources/SeerUI/DownloadButton.swift" "$work/App/"
+    "$repo/Packages/DownloadClient/Sources/DownloadClient/Models/DownloadQuality.swift" "$work/App/"
 if [ "$mode" = before ]; then
     git -C "$repo" show origin/main:Features/Downloads/DownloadsView.swift > "$work/DownloadsView.swift"
 else
     cp "$repo/Features/Downloads/DownloadsView.swift" "$work/DownloadsView.swift"
 fi
-python3 - "$work" <<'PY'
+python3 - "$work" "$repo" <<'PY'
 import pathlib,sys
 work=pathlib.Path(sys.argv[1])
+repo=pathlib.Path(sys.argv[2])
+buttons=(repo/'Features/Library/SeasonEpisodeViews.swift').read_text()
+state=(repo/'Packages/SeerUI/Sources/SeerUI/DownloadButton.swift').read_text()
+state=state[state.index('public enum DownloadButtonState:'):state.index('/// A styled button')]
+compact=buttons[buttons.index('public struct CompactDownloadButton:'):]
+(work/'App/CompactDownloadButton.swift').write_text('import SwiftUI\n'+state+compact)
 source=(work/'DownloadsView.swift').read_text()
 row=source[source.index('struct DownloadRow:'):source.index('#Preview')]
 (work/'App/DownloadRow.swift').write_text('import SwiftUI\n'+row)
@@ -71,10 +76,11 @@ struct FixtureView: View {
         let download = Download(serverID: "test-server", itemID: "test-movie", mediaSourceID: "source",
                                 name: "Test movie", mediaType: "Movie")
         download.state = .failed
-        download.errorMessage = "Server unavailable. Check your connection and retry."
+        download.errorMessage = ProcessInfo.processInfo.arguments.contains("missing-reason")
+            ? "   " : "Server unavailable. Check your connection and retry."
         return download
     }()
-    private var before: Bool { ProcessInfo.processInfo.arguments.contains("before") }
+    private let before = false
 
     var body: some View {
         NavigationStack {
@@ -122,6 +128,13 @@ final class FeedbackUITests: XCTestCase {
     }
 
     @MainActor
+    func testBlankFailureReasonOffersRecovery() {
+        let app = launch(["missing-reason"])
+        XCTAssertTrue(app.staticTexts["The download could not finish. Try again."].exists)
+        XCTAssertTrue(app.buttons["Retry download for Test movie"].exists)
+    }
+
+    @MainActor
     func testEpisodeSheetPresentsImmediateDownloadError() {
         let app = launch()
         app.buttons["Episode details"].tap()
@@ -132,9 +145,9 @@ final class FeedbackUITests: XCTestCase {
     }
 
     @MainActor
-    private func launch() -> XCUIApplication {
+    private func launch(_ arguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        if ProcessInfo.processInfo.environment["VERIFY_BEFORE"] == "1" { app.launchArguments = ["before"] }
+        app.launchArguments = arguments
         app.launch()
         return app
     }
@@ -156,7 +169,6 @@ settings:
   base:
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     SWIFT_VERSION: "6.0"
-    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
     GENERATE_INFOPLIST_FILE: YES
     CODE_SIGNING_ALLOWED: NO
     INFOPLIST_KEY_UILaunchScreen_Generation: YES
@@ -165,6 +177,9 @@ targets:
     type: application
     platform: iOS
     sources: [App]
+    settings:
+      base:
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
   FeedbackUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -176,13 +191,9 @@ schemes:
       targets: {Fixture: all, FeedbackUITests: [test]}
     test:
       targets: [FeedbackUITests]
-      environmentVariables:
-        VERIFY_BEFORE: "${VERIFY_BEFORE}"
 YAML
 if [ "$mode" = before ]; then
-    export VERIFY_BEFORE=1
-else
-    export VERIFY_BEFORE=0
+    sed -i '' 's/private let before = false/private let before = true/' "$work/App/Fixture.swift"
 fi
 (cd "$work" && xcodegen generate)
 simulator=$(xcrun simctl create "Seer download feedback $mode" com.apple.CoreSimulator.SimDeviceType.iPhone-17 "$runtime")
