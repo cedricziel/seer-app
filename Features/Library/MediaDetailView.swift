@@ -31,6 +31,7 @@ struct MediaDetailView: View {
     @State var seriesViewModel: SeriesDetailViewModel?
     @State var showPlayer: Bool = false
     @State var selectedEpisodeForPlayback: MediaItem?
+    @State var downloadFeedback = DownloadActionFeedback()
     @State var downloadState: DownloadButtonState = .notDownloaded
     @State var episodeDownloadStates: [String: DownloadButtonState] = [:]
     @State var selectedEpisodeForDetail: MediaItem?
@@ -95,6 +96,7 @@ struct MediaDetailView: View {
                 seriesViewModel?.setupOfflineSync(modelContext: modelContext, networkMonitor: networkMonitor)
                 await seriesViewModel?.loadSeasons()
             }
+            .downloadErrorAlert(downloadFeedback)
             .alert("Request Submitted", isPresented: $showRequestSuccess) {
                 Button("OK", role: .cancel) {}
             } message: {

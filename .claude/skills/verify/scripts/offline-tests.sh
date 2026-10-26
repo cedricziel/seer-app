@@ -15,6 +15,7 @@ cp "$repo_root"/Packages/DownloadClient/Sources/DownloadClient/Models/*.swift \
     "$verify_dir/Sources/DownloadClient/"
 cp "$repo_root/Packages/JellyfinClient/Sources/JellyfinClient/Models/MediaItem.swift" \
     "$verify_dir/Sources/JellyfinClient/"
+cp "$repo_root/Features/Downloads/DownloadActionFeedback.swift" "$verify_dir/Sources/SeerApp/"
 cp "$repo_root/Features/Downloads/DownloadPlaybackDestination.swift" "$verify_dir/Sources/SeerApp/"
 cp "$repo_root/Tests/DownloadClientTests/BackgroundSessionManagerTests.swift" \
     "$repo_root/Tests/DownloadClientTests/DownloadTransferTests.swift" \
@@ -22,6 +23,7 @@ cp "$repo_root/Tests/DownloadClientTests/BackgroundSessionManagerTests.swift" \
     "$repo_root/Tests/DownloadClientTests/DownloadStoragePathTests.swift" \
     "$repo_root/Tests/DownloadClientTests/DownloadPlaybackProgressTests.swift" \
     "$verify_dir/Tests/DownloadClientTests/"
+cp "$repo_root/Tests/LibraryFeatureTests/DownloadActionFeedbackTests.swift" "$verify_dir/Tests/DownloadPlaybackTests/"
 cp "$repo_root/Tests/LibraryFeatureTests/DownloadPlaybackTests.swift" "$verify_dir/Tests/DownloadPlaybackTests/"
 
 cat > "$verify_dir/Package.swift" <<'SWIFT'
@@ -43,5 +45,5 @@ SWIFT
 
 CLANG_MODULE_CACHE_PATH="$verify_dir/clang-cache" \
 SWIFTPM_MODULECACHE_OVERRIDE="$verify_dir/module-cache" \
-xcrun swift test --package-path "$verify_dir" --disable-sandbox --jobs 4 \
+xcrun swift test --package-path "$verify_dir" --disable-sandbox --jobs 2 \
     --cache-path "$verify_dir/cache" --manifest-cache local

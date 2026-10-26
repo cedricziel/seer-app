@@ -1,11 +1,8 @@
 import DownloadClient
 import JellyfinClient
-import os
 import SeerCore
 import SeerUI
 import SwiftUI
-
-private let logger = Logger(subsystem: "com.seer.app", category: "MediaDetailViewDownloads")
 
 // MARK: - Download Methods Extension
 
@@ -17,11 +14,9 @@ extension MediaDetailView {
               let credentials = appState.jellyfinCredentials
         else { return }
 
-        do {
+        await downloadFeedback.perform {
             try await manager.downloadItem(item, serverID: appState.activeServerKey ?? "default")
             await updateDownloadState()
-        } catch {
-            // Handle error
         }
     }
 
@@ -34,7 +29,9 @@ extension MediaDetailView {
               )
         else { return }
 
-        try? await manager.pauseDownload(download.id)
+        await downloadFeedback.perform {
+            try await manager.pauseDownload(download.id)
+        }
         await updateDownloadState()
     }
 
@@ -47,7 +44,9 @@ extension MediaDetailView {
               )
         else { return }
 
-        try? await manager.resumeDownload(download.id)
+        await downloadFeedback.perform {
+            try await manager.resumeDownload(download.id)
+        }
         await updateDownloadState()
     }
 
@@ -60,7 +59,9 @@ extension MediaDetailView {
               )
         else { return }
 
-        try? await manager.cancelDownload(download.id)
+        await downloadFeedback.perform {
+            try await manager.cancelDownload(download.id)
+        }
         await updateDownloadState()
     }
 
@@ -73,7 +74,9 @@ extension MediaDetailView {
               )
         else { return }
 
-        try? await manager.deleteDownload(download.id)
+        await downloadFeedback.perform {
+            try await manager.deleteDownload(download.id)
+        }
         await updateDownloadState()
     }
 
@@ -116,11 +119,9 @@ extension MediaDetailView {
         else { return }
 
         let serverID = appState.activeServerKey ?? "default"
-        do {
+        await downloadFeedback.perform {
             try await manager.downloadItem(episode, serverID: serverID)
             await updateEpisodeDownloadStates(episodes: [episode])
-        } catch {
-            logger.debug("Failed to download episode: \(error.localizedDescription)")
         }
     }
 
@@ -129,7 +130,9 @@ extension MediaDetailView {
               let download = await manager.download(
                   forItemID: episode.id, serverID: appState.activeServerKey ?? "default"
               ) else { return }
-        try? await manager.cancelDownload(download.id)
+        await downloadFeedback.perform {
+            try await manager.cancelDownload(download.id)
+        }
         await updateEpisodeDownloadStates(episodes: [episode])
     }
 
