@@ -49,6 +49,9 @@ def unresolved_libraries(app):
         for library in sorted(libraries):
             if library.startswith(('/System/Library/', '/usr/lib/')):
                 continue
+            # Swift's core runtime is in the OS shared cache on supported platforms.
+            if library == '@rpath/libswiftCore.dylib' and Path('/usr/lib/swift') in search_paths:
+                continue
             if library.startswith('@rpath/'):
                 candidates = [path / library[7:] for path in search_paths]
             else:

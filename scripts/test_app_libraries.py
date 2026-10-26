@@ -56,6 +56,20 @@ class AppLibrariesTest(unittest.TestCase):
         commands[deque] = (set(), set())
         self.assertEqual(self.check(commands), [])
 
+    def test_swift_core_in_system_runpath_does_not_need_a_bundled_copy(self):
+        commands = self.bundle()
+        framework = self.app / 'Frameworks/Client.framework/Client'
+        commands[framework] = ({'@rpath/libswiftCore.dylib'}, {'/usr/lib/swift'})
+        self.assertEqual(self.check(commands), [])
+
+    def test_system_swift_runpath_does_not_hide_a_missing_package(self):
+        commands = self.bundle()
+        framework = self.app / 'Frameworks/Client.framework/Client'
+        commands[framework] = ({'@rpath/DequeModule.framework/DequeModule'}, {'/usr/lib/swift'})
+        errors = self.check(commands)
+        self.assertEqual(len(errors), 1)
+        self.assertIn('DequeModule', errors[0])
+
     def test_parser_checks_required_libraries_but_allows_missing_weak_libraries(self):
         output = '''Load command 0
           cmd LC_ID_DYLIB
