@@ -197,7 +197,12 @@ YAML
 xcodegen generate --spec "$work/project.yml"
 sim=$(xcrun simctl create "UX004 isolated sheets" com.apple.CoreSimulator.SimDeviceType.iPhone-17 "$runtime")
 set +e
-xcodebuild test -project "$work/RequestSeasonVerification.xcodeproj" -scheme Harness -destination "platform=iOS Simulator,id=$sim" -jobs 2 -parallel-testing-enabled NO -derivedDataPath "$work/DerivedData" -clonedSourcePackagesDirPath "$work/Packages" -resultBundlePath "$work/Result.xcresult" CODE_SIGNING_ALLOWED=NO > "$evidence/build.log" 2>&1
+xcodebuild test -project "$work/RequestSeasonVerification.xcodeproj" -scheme Harness \
+ -destination "platform=iOS Simulator,id=$sim" -jobs 2 -parallel-testing-enabled NO \
+ -collect-test-diagnostics never -test-timeouts-enabled YES \
+ -default-test-execution-time-allowance 120 -derivedDataPath "$work/DerivedData" \
+ -clonedSourcePackagesDirPath "$work/Packages" -resultBundlePath "$work/Result.xcresult" \
+ CODE_SIGNING_ALLOWED=NO > "$evidence/build.log" 2>&1
 result=$?
 set -e
 xcrun xcresulttool export attachments --path "$work/Result.xcresult" --output-path "$evidence" || true
