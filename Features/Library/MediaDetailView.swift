@@ -351,5 +351,6 @@ struct MediaDetailView: View {
             viewModel: LibraryViewModel(appState: AppState())
         )
         .environmentObject(AppState())
+        .environmentObject(NetworkMonitor(isConnected: false))
     }
 }
