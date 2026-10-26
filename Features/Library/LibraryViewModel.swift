@@ -325,6 +325,9 @@ public final class LibraryViewModel: ObservableObject {
     }
 
     func selectLibrary(_ library: Library?) async {
+        if serviceConfigurationID != appState.serviceConfigurationID {
+            serverChanged()
+        }
         selectedLibrary = library
         currentPage = 0
         hasMoreItems = true

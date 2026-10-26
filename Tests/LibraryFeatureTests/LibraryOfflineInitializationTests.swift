@@ -69,6 +69,25 @@ final class LibraryOfflineInitializationTests: XCTestCase {
         XCTAssertNil(model.errorMessage)
     }
 
+    func testGridEntryAfterReauthenticationPreservesRequestedLibraryAndCachedItems() async throws {
+        let model = LibraryViewModel(appState: appState, session: session)
+        appState.saveJellyfinCredentials(
+            serverID: server.id, accessToken: "renewed-test-token", userID: "test-user", deviceID: "test-device"
+        )
+        let library = try JSONDecoder().decode(
+            Library.self, from: Data(#"{"Id":"movies","Name":"Cached movies"}"#.utf8)
+        )
+
+        await model.enterDestination(
+            .library(library), modelContext: container.mainContext, networkMonitor: monitor
+        )
+
+        XCTAssertEqual(model.selectedLibrary?.id, "movies")
+        XCTAssertEqual(model.mediaItems.map(\.id), ["movie"])
+        XCTAssertTrue(model.isShowingCachedData)
+        XCTAssertNil(model.errorMessage)
+    }
+
     func testIndependentGridEntryLoadsCachedLibraryItems() async throws {
         let model = LibraryViewModel(appState: appState, session: session)
 
