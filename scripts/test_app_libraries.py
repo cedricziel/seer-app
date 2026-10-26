@@ -70,6 +70,31 @@ class AppLibrariesTest(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn('DequeModule', errors[0])
 
+    def test_swift_concurrency_in_system_runpath_does_not_need_a_bundled_copy(self):
+        commands = self.bundle()
+        framework = self.app / 'Frameworks/Client.framework/Client'
+        commands[framework] = ({'@rpath/libswift_Concurrency.dylib'}, {'/usr/lib/swift'})
+        self.assertEqual(self.check(commands), [])
+
+    def test_absolute_dependency_on_build_host_is_rejected(self):
+        commands = self.bundle()
+        host_library = Path(self.temp.name) / 'Host.dylib'
+        host_library.touch()
+        framework = self.app / 'Frameworks/Client.framework/Client'
+        commands[framework] = ({str(host_library)}, set())
+        self.assertEqual(len(self.check(commands)), 1)
+
+    def test_embedded_symlink_to_build_host_is_rejected(self):
+        commands = self.bundle()
+        host_library = Path(self.temp.name) / 'Host.dylib'
+        host_library.touch()
+        embedded = self.app / 'Frameworks/Host.dylib'
+        embedded.symlink_to(host_library)
+        framework = self.app / 'Frameworks/Client.framework/Client'
+        commands[framework] = ({'@rpath/Host.dylib'}, set())
+        commands[embedded] = (set(), set())
+        self.assertEqual(len(self.check(commands)), 1)
+
     def test_parser_checks_required_libraries_but_allows_missing_weak_libraries(self):
         output = '''Load command 0
           cmd LC_ID_DYLIB

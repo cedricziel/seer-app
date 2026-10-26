@@ -6,6 +6,11 @@ import plistlib
 import subprocess
 from pathlib import Path
 
+SYSTEM_SWIFT_LIBRARIES = {
+    '@rpath/libswiftCore.dylib',
+    '@rpath/libswift_Concurrency.dylib',
+}
+
 
 def load_commands(binary):
     output = subprocess.check_output(['otool', '-l', str(binary)], text=True)
@@ -49,14 +54,15 @@ def unresolved_libraries(app):
         for library in sorted(libraries):
             if library.startswith(('/System/Library/', '/usr/lib/')):
                 continue
-            # Swift's core runtime is in the OS shared cache on supported platforms.
-            if library == '@rpath/libswiftCore.dylib' and Path('/usr/lib/swift') in search_paths:
+            # These Swift runtimes are in the OS shared cache on supported platforms.
+            if library in SYSTEM_SWIFT_LIBRARIES and Path('/usr/lib/swift') in search_paths:
                 continue
             if library.startswith('@rpath/'):
                 candidates = [path / library[7:] for path in search_paths]
             else:
                 candidates = [expand(library)]
-            if not any(path.is_file() for path in candidates):
+            if not any(path.resolve().is_relative_to(app.resolve()) and path.is_file()
+                       for path in candidates):
                 errors.append(f'{binary.relative_to(app)}: cannot resolve {library}')
     return errors
 
