@@ -77,3 +77,10 @@ For App Intents server identity changes, run `SeerCoreTests/AppEntityQueryTests`
 hosted test app. Cover duplicate item IDs across servers, saved entities targeting
 an inactive server, and rejection of unbound entities. Legacy unqualified entity
 IDs must require reselection instead of resolving against the active server.
+
+For Quick Connect recovery changes, run `AuthFeatureTests/OnboardingViewModelTests`
+and `SeerUITests/QuickConnectViewSnapshotTests`. Cover expiration, failed code
+requests, replacement-code loading, late responses after cancellation, and retry
+against a saved server. Review expired, failed, and replacement-request snapshots;
+unusable codes and Copy code must be absent while Request New Code and password
+sign-in remain available on errors. Record baselines on the CI runtime.

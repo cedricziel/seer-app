@@ -178,32 +178,117 @@ final class OnboardingViewModelTests: XCTestCase {
 
     // MARK: - 8.9 — Quick Connect expiry preserves server
 
-    func testQuickConnectExpiryShowsInlineErrorPreservesServer() async throws {
+    func testQuickConnectFailureClearsCodeAndRetryKeepsSelectedServer() async throws {
+        let failed = ScriptedQuickConnectTransport(
+            isEnabledResult: .success(true),
+            initiateResult: .success(.init(code: "OLD123", secret: "old-secret"))
+        )
+        let replacement = SuspendedQuickConnectTransport()
+        defer { replacement.initiation?.resume(throwing: CancellationError()) }
+        var nextTransport: any QuickConnectTransport = failed
+        let model = makeModel(
+            quickConnectEnabled: true,
+            serverInfoResult: .success(makeServerInfo()),
+            quickConnectTransportFactory: { _ in nextTransport }
+        )
+        defer { model.stop() }
+        await Self.runManualEntry(model: model, url: "https://server.example.com")
+        try await Self.waitFor(timeout: 1) { model.quickConnectError != nil }
+        let selected = model.selectedServer
+        XCTAssertEqual(model.quickConnectError, "Network error: Server returned an unexpected response.")
+        XCTAssertNil(model.quickConnectCode)
+        XCTAssertFalse(model.quickConnectIsPolling)
+
+        nextTransport = replacement
+        let retry = Task { await model.switchToQuickConnect() }
+        try await Self.waitFor(timeout: 1) { replacement.initiation != nil }
+        XCTAssertNil(model.quickConnectCode)
+        XCTAssertNil(model.quickConnectError)
+        XCTAssertTrue(model.quickConnectIsPolling)
+        try XCTUnwrap(replacement.initiation).resume(returning: .init(code: "NEW456", secret: "new-secret"))
+        replacement.initiation = nil
+        await retry.value
+        try await Self.waitFor(timeout: 1) { model.quickConnectCode == "NEW456" }
+
+        XCTAssertNil(model.quickConnectError)
+        XCTAssertTrue(model.quickConnectIsPolling)
+        XCTAssertEqual(model.selectedServer, selected)
+        XCTAssertEqual(model.phase, .quickConnect(serverDisplay: "MacMini"))
+    }
+
+    func testQuickConnectExpiryClearsCodeAndPreservesServer() async throws {
         let transport = ScriptedQuickConnectTransport(
             isEnabledResult: .success(true),
-            initiateResult: .success(QuickConnectInitiateResponse(code: "AAA111", secret: "S1")),
-            authenticateResult: .success(Self.makeAuthResponse())
+            initiateResult: .success(.init(code: "OLD123", secret: "old-secret"))
         )
-        // Always return not-authenticated so the session never approves.
-        transport.defaultStateResponse = QuickConnectStateResponse(authenticated: false)
+        transport.defaultStateResponse = .init(authenticated: false)
+        let model = makeModel(
+            quickConnectEnabled: true,
+            serverInfoResult: .success(makeServerInfo()),
+            quickConnectTransportFactory: { _ in transport },
+            quickConnectTimeout: .zero
+        )
+        defer { model.stop() }
+        await Self.runManualEntry(model: model, url: "https://server.example.com")
+        try await Self.waitFor(timeout: 1) { model.quickConnectError != nil }
 
+        XCTAssertEqual(model.quickConnectError, "Code expired. Request a new code to try again.")
+        XCTAssertNil(model.quickConnectCode)
+        XCTAssertFalse(model.quickConnectIsPolling)
+        XCTAssertEqual(model.selectedServer?.url, URL(string: "https://server.example.com"))
+        XCTAssertEqual(model.phase, .quickConnect(serverDisplay: "MacMini"))
+    }
+
+    func testLeavingQuickConnectDiscardsQueuedSessionUpdates() async {
+        let transport = ScriptedQuickConnectTransport(
+            isEnabledResult: .success(true),
+            initiateResult: .success(.init(code: "OLD123", secret: "old-secret"))
+        )
+        transport.defaultStateResponse = .init(authenticated: false)
         let model = makeModel(
             quickConnectEnabled: true,
             serverInfoResult: .success(makeServerInfo()),
             quickConnectTransportFactory: { _ in transport }
         )
-
+        defer { model.stop() }
         await Self.runManualEntry(model: model, url: "https://server.example.com")
+        model.switchToPassword()
+        await Task.yield()
 
-        try await Self.waitFor(timeout: 3.0) {
-            if case .quickConnect = model.phase {
-                return true
-            }
-            return false
+        XCTAssertEqual(model.phase, .password(serverDisplay: "MacMini"))
+        XCTAssertFalse(model.quickConnectIsPolling)
+        XCTAssertNil(model.quickConnectCode)
+        XCTAssertNil(model.quickConnectError)
+        XCTAssertFalse(appState.isAuthenticated)
+    }
+
+    func testCancellingWhileRequestingCodeIgnoresLateResponse() async throws {
+        let transport = SuspendedQuickConnectTransport()
+        defer { transport.initiation?.resume(throwing: CancellationError()) }
+        let model = makeModel(
+            quickConnectEnabled: true,
+            serverInfoResult: .success(makeServerInfo()),
+            quickConnectTransportFactory: { _ in transport }
+        )
+        defer { model.stop() }
+        let request = Task {
+            await Self.runManualEntry(model: model, url: "https://server.example.com")
         }
+        try await Self.waitFor(timeout: 1) { transport.initiation != nil }
+        XCTAssertNil(model.quickConnectCode)
+        XCTAssertTrue(model.quickConnectIsPolling)
 
-        XCTAssertEqual(model.selectedServer?.url, URL(string: "https://server.example.com"))
-        XCTAssertNotNil(model.selectedServer, "selectedServer must be preserved during Quick Connect")
+        model.cancelQuickConnect()
+        try XCTUnwrap(transport.initiation).resume(returning: .init(code: "LATE12", secret: "late-secret"))
+        transport.initiation = nil
+        await request.value
+        await Task.yield()
+
+        XCTAssertEqual(model.phase, .welcome)
+        XCTAssertNil(model.quickConnectCode)
+        XCTAssertNil(model.quickConnectError)
+        XCTAssertFalse(model.quickConnectIsPolling)
+        XCTAssertFalse(appState.isAuthenticated)
     }
 
     // MARK: - 8.11 — Bonjour acceptance stores server selection
@@ -307,7 +392,14 @@ final class OnboardingViewModelTests: XCTestCase {
         try await assertReauthenticationPreservesSavedServer(quickConnect: true)
     }
 
-    private func assertReauthenticationPreservesSavedServer(quickConnect: Bool) async throws {
+    func testQuickConnectRetryPreservesSyncedServerIdentityAndSettings() async throws {
+        try await assertReauthenticationPreservesSavedServer(quickConnect: true, retryQuickConnect: true)
+    }
+
+    private func assertReauthenticationPreservesSavedServer(
+        quickConnect: Bool,
+        retryQuickConnect: Bool = false
+    ) async throws {
         let original = try ServerConfiguration(
             name: "Saved server",
             emoji: "🎬",
@@ -327,10 +419,13 @@ final class OnboardingViewModelTests: XCTestCase {
             authenticateResult: .success(auth)
         )
         transport.defaultStateResponse = .init(authenticated: true)
+        var selectedTransport = retryQuickConnect
+            ? ScriptedQuickConnectTransport(isEnabledResult: .success(true))
+            : transport
         let model = makeModel(
             quickConnectEnabled: quickConnect,
             serverInfoResult: .success(makeServerInfo()),
-            quickConnectTransportFactory: { _ in transport },
+            quickConnectTransportFactory: { _ in selectedTransport },
             passwordAuthenticator: { _, _, _ in
                 .init(response: auth, deviceID: "test-device")
             }
@@ -338,6 +433,11 @@ final class OnboardingViewModelTests: XCTestCase {
         defer { model.stop() }
         try model.selectSuggestion(XCTUnwrap(model.welcomeSuggestions.primary))
         if quickConnect {
+            if retryQuickConnect {
+                try await Self.waitFor(timeout: 1) { model.quickConnectError != nil }
+                selectedTransport = transport
+                await model.switchToQuickConnect()
+            }
             try await Self.waitFor(timeout: 2) { self.appState.isAuthenticated }
         } else {
             try await Self.waitFor(timeout: 1) {
@@ -395,7 +495,8 @@ final class OnboardingViewModelTests: XCTestCase {
         bonjour: BonjourDiscovery? = nil,
         serverInfoResult: Result<ServerInfo, Error>? = nil,
         quickConnectTransportFactory: OnboardingViewModel.QuickConnectTransportFactory? = nil,
-        passwordAuthenticator: OnboardingViewModel.PasswordAuthenticator? = nil
+        passwordAuthenticator: OnboardingViewModel.PasswordAuthenticator? = nil,
+        quickConnectTimeout: Duration = .seconds(600)
     ) -> OnboardingViewModel {
         let factory: OnboardingViewModel.QuickConnectTransportFactory =
             quickConnectTransportFactory ?? { _ in
@@ -412,7 +513,8 @@ final class OnboardingViewModelTests: XCTestCase {
             bonjour: bonjour,
             serverInfoFetcher: fetcher,
             quickConnectTransportFactory: factory,
-            passwordAuthenticator: passwordAuthenticator
+            passwordAuthenticator: passwordAuthenticator,
+            quickConnectTimeout: quickConnectTimeout
         )
     }
 
@@ -592,5 +694,26 @@ private final class ScriptedQuickConnectTransport: QuickConnectTransport {
             throw QuickConnectSession.QuickConnectError.invalidResponse
         }
         return try authenticateResult.get()
+    }
+}
+
+@MainActor
+private final class SuspendedQuickConnectTransport: QuickConnectTransport {
+    var initiation: CheckedContinuation<QuickConnectInitiateResponse, any Error>?
+
+    func isEnabled(serverURL _: URL) async throws -> Bool {
+        true
+    }
+
+    func initiate(serverURL _: URL) async throws -> QuickConnectInitiateResponse {
+        try await withCheckedThrowingContinuation { initiation = $0 }
+    }
+
+    func pollState(serverURL _: URL, secret _: String) async throws -> QuickConnectStateResponse {
+        .init(authenticated: false)
+    }
+
+    func authenticate(serverURL _: URL, secret _: String) async throws -> AuthResponse {
+        throw QuickConnectSession.QuickConnectError.invalidResponse
     }
 }
