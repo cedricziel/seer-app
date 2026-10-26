@@ -2,14 +2,16 @@ import SwiftUI
 
 public extension View {
     /// Presents a player in a resizable Mac sheet or a full-screen mobile presentation.
+    /// - Parameter onDismiss: Called when the platform presentation finishes dismissing.
     func playerCover(
         isPresented: Binding<Bool>,
+        onDismiss: (() -> Void)? = nil,
         @ViewBuilder content: @escaping () -> some View
     ) -> some View {
         #if os(macOS)
-            sheet(isPresented: isPresented, content: content)
+            sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
         #else
-            fullScreenCover(isPresented: isPresented, content: content)
+            fullScreenCover(isPresented: isPresented, onDismiss: onDismiss, content: content)
         #endif
     }
 

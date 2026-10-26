@@ -13,6 +13,7 @@ For PiP restoration changes, run `.claude/skills/verify/scripts/pip-tests.sh SIM
 2. Generate the Xcode project with `xcodegen generate`. Never edit the generated project directly.
 3. For dependency maintenance, run `python3 -m unittest discover -s scripts -p 'test_*.py'` and `actionlint .github/workflows/dependency-audit.yml`. Run `python3 scripts/dependency_audit.py` with authenticated `gh`; exit 1 with a release table means unreviewed newer candidates exist, while an API or parsing error means the audit did not complete.
 4. Build and test relevant schemes using a temporary directory outside the checkout for DerivedData, package clones, and result bundles. Use a disposable simulator and test credentials. Delete the simulator and temporary directory after verification, including on failure. Do not launch against existing simulator or user data. If isolation is unavailable, report runtime verification as blocked.
+   Use a fresh DerivedData directory when a dependency moves a module between packages or changes its product type. Old products can shadow a new module even with correct package checkouts.
 
 For download changes, run `DownloadClientTests/DownloadRegressionTests` and
 `LibraryFeatureTests/EpisodeDownloadActionTests` on the disposable simulator.

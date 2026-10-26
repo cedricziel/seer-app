@@ -103,6 +103,7 @@ struct SeerApp: App {
             return state.isAuthenticated && state.activeServerKey != nil
                 && state.jellyseerrServerURL != nil && state.jellyseerrAPIKey != nil
         }
+        notifManager.actionDelegate = appDelegate
         notifManager.setup()
         _notificationManager = State(initialValue: notifManager)
 
@@ -130,6 +131,7 @@ struct SeerApp: App {
                 .environmentObject(offlineSyncService)
                 .environmentObject(networkMonitor)
                 .environmentObject(flowmarkRouter)
+                .environmentObject(appDelegate.notificationNavigation)
                 .modelContainer(modelContainer)
                 .task {
                     await setupServices()

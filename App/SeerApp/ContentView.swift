@@ -1,3 +1,4 @@
+import NotificationClient
 import PlaybackClient
 import SeerCore
 import SeerUI
@@ -6,11 +7,15 @@ import SwiftUI
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var notificationNavigation: NotificationNavigation
     @StateObject private var onboardingManager = OnboardingManager()
     @StateObject private var wifiMonitor = WiFiSSIDMonitor.shared
     @State private var resolvedContext: ServerURLResolver.Context?
     @State private var resolvedServerURL: URL?
     @State private var showPiPRestorePlayer = false
+    @State private var checkedAuthentication: Bool?
+    @State private var whatsNewPresentationActive = false
+    @State private var pipPresentationActive = false
 
     private var resolutionContext: ServerURLResolver.Context? {
         guard let server = appState.activeServer else { return nil }
@@ -22,9 +27,13 @@ struct ContentView: View {
             if appState.isAuthenticated {
                 if let resolvedContext, let currentContext = resolutionContext,
                    resolvedContext.matchesConfiguration(of: currentContext) {
-                    MainTabView()
-                        .id(resolvedServerURL)
-                        .environmentObject(onboardingManager)
+                    MainTabView(
+                        notificationPresentationReady: checkedAuthentication == true
+                            && !onboardingManager.showWhatsNew && !whatsNewPresentationActive
+                            && !showPiPRestorePlayer && !pipPresentationActive
+                    )
+                    .id(resolvedServerURL)
+                    .environmentObject(onboardingManager)
                 } else {
                     ProgressView("Connecting to server...")
                 }
@@ -47,7 +56,16 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut, value: appState.isAuthenticated)
-        .playerCover(isPresented: $showPiPRestorePlayer) {
+        .onChange(of: notificationNavigation.pendingDestination?.id, initial: true) { _, _ in
+            guard let destination = notificationNavigation.pendingDestination,
+                  appState.servers.contains(where: { $0.id == destination.serverID }),
+                  appState.activeServerID != destination.serverID
+            else { return }
+            appState.switchServer(to: destination.serverID)
+        }
+        .playerCover(isPresented: $showPiPRestorePlayer, onDismiss: {
+            pipPresentationActive = false
+        }, content: {
             let pipManager = PiPPlaybackManager.shared
             if let item = pipManager.pipItem,
                let player = pipManager.pipPlayer {
@@ -61,8 +79,10 @@ struct ContentView: View {
             } else {
                 Color.clear.onAppear { showPiPRestorePlayer = false }
             }
-        }
-        .sheet(isPresented: $onboardingManager.showWhatsNew) {
+        })
+        .sheet(isPresented: $onboardingManager.showWhatsNew, onDismiss: {
+            whatsNewPresentationActive = false
+        }, content: {
             WhatsNewView(
                 appName: "Flowmark",
                 features: WhatsNewData.features,
@@ -72,26 +92,41 @@ struct ContentView: View {
             )
             .interactiveDismissDisabled()
             .presentationDetents([.large])
-        }
+        })
         .onChange(of: PiPPlaybackManager.shared.shouldRestorePlayer) { _, shouldRestore in
             if shouldRestore {
+                pipPresentationActive = true
                 showPiPRestorePlayer = true
                 PiPPlaybackManager.shared.clearRestoreRequest()
             }
+        }
+        .onChange(of: onboardingManager.showWhatsNew) { _, presented in
+            if presented { whatsNewPresentationActive = true }
         }
         .onAppear {
             if appState.isAuthenticated {
                 onboardingManager.checkAndShowWhatsNew()
             }
+            checkedAuthentication = appState.isAuthenticated
+        }
+        .onChange(of: appState.isAuthenticated) { _, authenticated in
+            checkedAuthentication = nil
+            if authenticated { onboardingManager.checkAndShowWhatsNew() }
+            checkedAuthentication = authenticated
         }
     }
 }
 
 struct MainTabView: View {
-    @EnvironmentObject private var router: FlowmarkURLRouter
+    let notificationPresentationReady: Bool
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var flowmarkRouter: FlowmarkURLRouter
+    @EnvironmentObject private var notificationNavigation: NotificationNavigation
+    @State private var showNotificationError = false
+    @State private var notificationDestination: NotificationNavigation.Destination?
 
     var body: some View {
-        TabView(selection: $router.selectedTab) {
+        TabView(selection: $flowmarkRouter.selectedTab) {
             Tab("Library", systemImage: "play.square.stack", value: .library) {
                 LibraryView()
             }
@@ -112,9 +147,45 @@ struct MainTabView: View {
                 RequestsView()
             }
         }
+        .task(id: notificationPresentationReady ? notificationNavigation.pendingDestination?.id : nil) {
+            openNotificationDestination()
+        }
+        .sheet(item: $notificationDestination) { destination in
+            NotificationDestinationView(destination: destination)
+                .id(destination.id)
+                .id(appState.serviceConfigurationID)
+        }
+        .alert("Notification unavailable", isPresented: $showNotificationError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The notification's server is no longer configured.")
+        }
         #if os(iOS)
         .tabViewStyle(.sidebarAdaptable)
         #endif
+    }
+
+    private func openNotificationDestination() {
+        guard notificationPresentationReady, let pending = notificationNavigation.pendingDestination else { return }
+        guard appState.servers.contains(where: { $0.id == pending.serverID }) else {
+            notificationNavigation.clear()
+            showNotificationError = true
+            return
+        }
+        guard let destination = notificationNavigation.consume(
+            if: notificationPresentationReady,
+            activateServer: { serverID in
+                if appState.activeServerID != serverID {
+                    appState.switchServer(to: serverID)
+                }
+                return appState.activeServerID == serverID && appState.isAuthenticated
+            }
+        ) else { return }
+        switch destination {
+        case .request: flowmarkRouter.selectedTab = .requests
+        case .download: flowmarkRouter.selectedTab = .downloads
+        }
+        notificationDestination = destination
     }
 }
 
@@ -122,4 +193,5 @@ struct MainTabView: View {
     ContentView()
         .environmentObject(AppState())
         .environmentObject(FlowmarkURLRouter())
+        .environmentObject(NotificationNavigation())
 }
