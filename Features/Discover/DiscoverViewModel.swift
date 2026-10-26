@@ -39,6 +39,15 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
 
     // MARK: - Private Properties
 
+    private enum Section: String, CaseIterable {
+        case trending = "Trending"
+        case movies = "Upcoming Movies"
+        case television = "Upcoming TV Shows"
+        case movieGenres = "Movie Genres"
+        case tvGenres = "TV Genres"
+    }
+
+    private var failedSections: Set<Section> = []
     private var service: JellyseerrService?
     private var serviceConfigurationID: AppState.ServiceConfigurationID?
     private var jellyseerrService: JellyseerrService? {
@@ -69,6 +78,7 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
         tvGenres = []
         tvDetails = nil
         errorMessage = nil
+        failedSections = []
         isLoading = false
         isLoadingTrending = false
         isLoadingUpcomingMovies = false
@@ -117,9 +127,9 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             return
         }
 
+        guard !isLoading else { return }
         let configurationID = appState.serviceConfigurationID
         isLoading = true
-        errorMessage = nil
 
         // Load all sections in parallel
         await withTaskGroup(of: Void.self) { group in
@@ -146,9 +156,11 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             trending = response.results
             trendingPage = response.page
             trendingTotalPages = response.totalPages
+            setFailure(false, for: .trending)
         } catch {
             guard configurationID == appState.serviceConfigurationID else { return }
             Self.logger.debug("Failed to load trending: \(error.localizedDescription)")
+            setFailure(true, for: .trending)
         }
 
         isLoadingTrending = false
@@ -167,9 +179,11 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             upcomingMovies = response.results
             upcomingMoviesPage = response.page
             upcomingMoviesTotalPages = response.totalPages
+            setFailure(false, for: .movies)
         } catch {
             guard configurationID == appState.serviceConfigurationID else { return }
             Self.logger.debug("Failed to load upcoming movies: \(error.localizedDescription)")
+            setFailure(true, for: .movies)
         }
 
         isLoadingUpcomingMovies = false
@@ -188,9 +202,11 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             upcomingTV = response.results
             upcomingTVPage = response.page
             upcomingTVTotalPages = response.totalPages
+            setFailure(false, for: .television)
         } catch {
             guard configurationID == appState.serviceConfigurationID else { return }
             Self.logger.debug("Failed to load upcoming TV: \(error.localizedDescription)")
+            setFailure(true, for: .television)
         }
 
         isLoadingUpcomingTV = false
@@ -203,21 +219,48 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
 
         isLoadingGenres = true
 
-        do {
-            async let movieGenresTask = service.getMovieGenres()
-            async let tvGenresTask = service.getTVGenres()
+        async let movies: () = loadGenres(service: service, configurationID: configurationID, isMovie: true)
+        async let television: () = loadGenres(service: service, configurationID: configurationID, isMovie: false)
+        _ = await (movies, television)
 
-            let movies = try await movieGenresTask
-            let television = try await tvGenresTask
+        guard configurationID == appState.serviceConfigurationID else { return }
+        isLoadingGenres = false
+    }
+
+    private func loadGenres(
+        service: JellyseerrService, configurationID: AppState.ServiceConfigurationID, isMovie: Bool
+    ) async {
+        let section: Section = isMovie ? .movieGenres : .tvGenres
+        do {
+            let genres: [DiscoverGenre] = if isMovie {
+                try await service.getMovieGenres()
+            } else {
+                try await service.getTVGenres()
+            }
             guard configurationID == appState.serviceConfigurationID else { return }
-            movieGenres = movies
-            tvGenres = television
+            if isMovie {
+                movieGenres = genres
+            } else {
+                tvGenres = genres
+            }
+            setFailure(false, for: section)
         } catch {
             guard configurationID == appState.serviceConfigurationID else { return }
             Self.logger.debug("Failed to load genres: \(error.localizedDescription)")
+            setFailure(true, for: section)
         }
+    }
 
-        isLoadingGenres = false
+    private func setFailure(_ failed: Bool, for section: Section) {
+        if failed {
+            failedSections.insert(section)
+        } else {
+            failedSections.remove(section)
+        }
+        let names = Section.allCases.filter { failedSections.contains($0) }.map(\.rawValue)
+        errorMessage = names.isEmpty
+            ? nil
+            : "Couldn't load \(names.joined(separator: ", ")). Check your connection and try again."
     }
 
     /// Refresh all content

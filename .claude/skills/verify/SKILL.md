@@ -146,3 +146,10 @@ watch/type filters and sorting after recovery, and selected accessibility traits
 before and after filter or season changes. Append `before` to test `origin/main`.
 This checks view wiring and the accessibility tree, not live Jellyfin responses or
 spoken VoiceOver output. Review the exported screenshots.
+
+For Discover loading changes, run `LibraryFeatureTests/DiscoverLoadingTests`
+and `LibraryFeatureTests/ServiceClientLifecycleTests` on a disposable simulator.
+The ephemeral URLSession fixture covers total failure and retry, partial content,
+independent genre failures, retained content after failed refresh, and stale
+responses after server or credential changes. It uses in-memory SwiftData and
+throwaway server credentials; it does not verify live Jellyseerr compatibility.

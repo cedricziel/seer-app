@@ -29,7 +29,7 @@ an active PR. UX001 replaces the archived sign-in task after PR 75 merged.
 | ID | Priority | Status | Experience to fix | Area | Completion check |
 | --- | --- | --- | --- | --- | --- |
 | UX001 | P2 | Complete, [PR #93](https://github.com/cedricziel/seer-app/pull/93) | Quick Connect expiration and failures appear only as "Polling paused", with no retry. | Onboarding | Show the actual error, offer a new code, and retain password sign-in. Test expiration and retry. |
-| UX002 | P2 | Queued | Discover can become blank when its initial section loads fail. | Discover | Show an actionable error and Retry; preserve any sections that loaded successfully. |
+| UX002 | P2 | In progress, chat `01a17687-86ac-7652-b3dd-88623c0e9584` | Discover can become blank when its initial section loads fail. | Discover | Show an actionable error and Retry; preserve any sections that loaded successfully. |
 | UX003 | P2 | Complete, [PR #103](https://github.com/cedricziel/seer-app/pull/103), chat `01a17635-2d2c-7fd0-8d71-b598f1905ec9` | Failed library-grid loads show a passive message without recovery. | Library | Offer visible Retry and verify recovery without leaving the screen or changing filters. |
 | UX004 | P2 | Complete, [PR #100](https://github.com/cedricziel/seer-app/pull/100), chat `01a175c7-4e30-7a12-b4d3-8562f22549af` | TV requests can submit an empty season selection while seasons are still loading. | Request options | Disable submission until a valid selection is ready. Distinguish loading errors from no seasons and offer Retry. |
 | UX005 | P2 | Queued | Cancel Request is hidden in a long-press menu and absent from normal request details. | Requests | Add an eligible cancellation action to details, confirmation, loading state, and failure feedback. |
@@ -48,7 +48,8 @@ an active PR. UX001 replaces the archived sign-in task after PR 75 merged.
   error handlers and [DiscoverView](../Features/Discover/DiscoverView.swift) empty sections.
   Revalidated at `94d8c6f`: the existing ErrorView calls refresh, but all four
   section-load catch blocks only log failures and never set `errorMessage`.
-  Initial network failures therefore do not reach ErrorView. UX002 remains queued.
+  Revalidated at `c5acf75` for UX002. Initial network failures still do not reach
+  ErrorView; the active Discover task owns recovery and partial-success coverage.
 - UX003 and UX008: [LibraryGridView](../Features/Library/LibraryGridView.swift)
   error state and filter buttons; UX008 also covers
   [series season controls](../Features/Library/MediaDetailView+SeriesSection.swift).
