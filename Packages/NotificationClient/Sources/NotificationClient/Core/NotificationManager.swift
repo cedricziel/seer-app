@@ -58,11 +58,16 @@ public final class NotificationManager: NSObject {
 
     /// Request notification permission if not already requested
     /// - Parameter context: Optional context to show user why we need permission
+    /// - Parameter canRequestAuthorization: Rechecked after lookup before showing a permission prompt.
     /// - Returns: Whether permission was granted
     @discardableResult
-    public func requestPermissionIfNeeded(context _: String? = nil) async -> Bool {
+    public func requestPermissionIfNeeded(
+        context _: String? = nil,
+        canRequestAuthorization: @MainActor () -> Bool = { true }
+    ) async -> Bool {
         let status = await refreshAuthorization()
         guard status == .notDetermined else { return isAuthorized }
+        guard canRequestAuthorization() else { return false }
 
         // Request permission
         do {
@@ -96,16 +101,18 @@ public final class NotificationManager: NSObject {
     // MARK: - Scheduling
 
     /// Schedule a notification
+    /// - Parameter canDeliver: Rechecked after authorization lookup to suppress retired sessions.
     public func scheduleNotification(
         title: String,
         body: String,
         category: NotificationCategory,
         userInfo: [String: Any] = [:],
-        identifier: String = UUID().uuidString
+        identifier: String = UUID().uuidString,
+        canDeliver: @MainActor () -> Bool = { true }
     ) async throws {
         #if !os(tvOS)
             await refreshAuthorization()
-            guard isAuthorized else { return }
+            guard isAuthorized, canDeliver() else { return }
 
             let content = UNMutableNotificationContent()
             content.title = title

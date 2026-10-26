@@ -31,34 +31,37 @@ final class NotificationManagerTests: XCTestCase {
         XCTAssertEqual(center.authorizationRequests, 0)
     }
 
-    func testSchedulingUsesAuthorizationGrantedInSettings() async throws {
-        let center = InMemoryNotificationCenter(status: .denied)
-        let manager = try makeManager(center: center)
-        await manager.refresh()
-        center.status = .authorized
+    #if !os(tvOS)
+        func testSchedulingUsesAuthorizationGrantedInSettings() async throws {
+            let center = InMemoryNotificationCenter(status: .denied)
+            let manager = try makeManager(center: center)
+            await manager.refresh()
+            center.status = .authorized
 
-        try await manager.scheduleNotification(
-            title: "Ready", body: "Download complete", category: .downloadCompleted, identifier: "download-1"
-        )
+            try await manager.scheduleNotification(
+                title: "Ready", body: "Download complete", category: .downloadCompleted, identifier: "download-1"
+            )
 
-        XCTAssertTrue(manager.isAuthorized)
-        XCTAssertEqual(center.pendingRequests.map(\.identifier), ["download-1"])
-        XCTAssertEqual(center.pendingRequests.first?.content.title, "Ready")
-    }
+            XCTAssertTrue(manager.isAuthorized)
+            XCTAssertEqual(center.pendingRequests.map(\.identifier), ["download-1"])
+            XCTAssertEqual(center.pendingRequests.first?.content.title, "Ready")
+        }
 
-    func testSchedulingStopsAfterAuthorizationRevokedInSettings() async throws {
-        let center = InMemoryNotificationCenter(status: .authorized)
-        let manager = try makeManager(center: center)
-        await manager.refresh()
-        center.status = .denied
+        func testSchedulingStopsAfterAuthorizationRevokedInSettings() async throws {
+            let center = InMemoryNotificationCenter(status: .authorized)
+            let manager = try makeManager(center: center)
+            await manager.refresh()
+            center.status = .denied
 
-        try await manager.scheduleNotification(
-            title: "Ready", body: "Download complete", category: .downloadCompleted, identifier: "download-1"
-        )
+            try await manager.scheduleNotification(
+                title: "Ready", body: "Download complete", category: .downloadCompleted, identifier: "download-1"
+            )
 
-        XCTAssertFalse(manager.isAuthorized)
-        XCTAssertTrue(center.pendingRequests.isEmpty)
-    }
+            XCTAssertFalse(manager.isAuthorized)
+            XCTAssertTrue(center.pendingRequests.isEmpty)
+        }
+
+    #endif
 
     func testFirstPermissionRequestUpdatesAuthorizationCache() async throws {
         let center = InMemoryNotificationCenter(status: .notDetermined)
@@ -71,20 +74,23 @@ final class NotificationManagerTests: XCTestCase {
         XCTAssertEqual(center.authorizationRequests, 1)
     }
 
-    func testProvisionalAuthorizationAllowsSchedulingWithoutPrompt() async throws {
-        let center = InMemoryNotificationCenter(status: .provisional)
-        let manager = try makeManager(center: center)
+    #if !os(tvOS)
+        func testProvisionalAuthorizationAllowsSchedulingWithoutPrompt() async throws {
+            let center = InMemoryNotificationCenter(status: .provisional)
+            let manager = try makeManager(center: center)
 
-        let granted = await manager.requestPermissionIfNeeded()
-        try await manager.scheduleNotification(
-            title: "Ready", body: "Download complete", category: .downloadCompleted, identifier: "download-1"
-        )
+            let granted = await manager.requestPermissionIfNeeded()
+            try await manager.scheduleNotification(
+                title: "Ready", body: "Download complete", category: .downloadCompleted, identifier: "download-1"
+            )
 
-        XCTAssertTrue(granted)
-        XCTAssertTrue(manager.isAuthorized)
-        XCTAssertEqual(center.pendingRequests.map(\.identifier), ["download-1"])
-        XCTAssertEqual(center.authorizationRequests, 0)
-    }
+            XCTAssertTrue(granted)
+            XCTAssertTrue(manager.isAuthorized)
+            XCTAssertEqual(center.pendingRequests.map(\.identifier), ["download-1"])
+            XCTAssertEqual(center.authorizationRequests, 0)
+        }
+
+    #endif
 
     private func makeManager(center: InMemoryNotificationCenter) throws -> NotificationManager {
         let schema = Schema([NotificationPreferences.self, CachedRequestStatus.self])

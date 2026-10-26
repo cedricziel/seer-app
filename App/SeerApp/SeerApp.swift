@@ -1,3 +1,6 @@
+#if os(iOS)
+    import BackgroundTasks
+#endif
 import DownloadClient
 import JellyfinClient
 import Kingfisher
@@ -24,6 +27,7 @@ struct SeerApp: App {
     @State private var downloadNotificationService: DownloadNotificationService?
     @State private var requestNotificationService: RequestNotificationService?
     @State private var requestStatusPoller: RequestStatusPoller?
+    @State private var requestPollingTask: Task<Void, Never>?
     #if !os(tvOS)
         @State private var spotlightIndexer: SpotlightIndexer?
     #endif
@@ -94,6 +98,11 @@ struct SeerApp: App {
         // `application(_:didFinishLaunchingWithOptions:)` returns, otherwise a
         // notification tap that cold-launches the app is never delivered.
         let notifManager = NotificationManager(modelContainer: notificationModelContainer)
+        appDelegate.requestPollingAllowed = { [weak state] in
+            guard let state else { return false }
+            return state.isAuthenticated && state.activeServerKey != nil
+                && state.jellyseerrServerURL != nil && state.jellyseerrAPIKey != nil
+        }
         notifManager.setup()
         _notificationManager = State(initialValue: notifManager)
 
@@ -125,10 +134,8 @@ struct SeerApp: App {
                 .task {
                     await setupServices()
                 }
-                .onChange(of: appState.isAuthenticated) { _, isAuthenticated in
-                    if isAuthenticated {
-                        configureServicesCredentials()
-                    }
+                .onChange(of: appState.isAuthenticated) { _, _ in
+                    configureServicesCredentials()
                 }
                 .onChange(of: appState.activeServerID) { _, _ in
                     configureServicesCredentials()
@@ -173,10 +180,7 @@ struct SeerApp: App {
         downloadManager?.configure(from: appState)
         syncDownloadedPlaybackProgress()
 
-        // (Re)bind the request status poller to the active server
-        if let service = requestNotificationService {
-            ensureRequestStatusPoller(notificationService: service)
-        }
+        configureRequestPolling()
     }
 
     @MainActor
@@ -205,34 +209,40 @@ struct SeerApp: App {
         }
     }
 
-    /// Creates a poller for the active server if none exists yet or the active
-    /// server changed, then configures it with the server's Jellyseerr
-    /// credentials. A poller is bound to one server ID for the lifetime of
-    /// its cache, so switching servers must replace it rather than reconfigure it.
     @MainActor
-    private func ensureRequestStatusPoller(notificationService: RequestNotificationService) {
-        guard let serverKey = appState.activeServerKey else { return }
+    private func configureRequestPolling() {
+        requestPollingTask?.cancel()
+        requestPollingTask = nil
+        requestNotificationService?.retire()
+        requestNotificationService = nil
+        let previous = requestStatusPoller
+        requestStatusPoller = nil
+        appDelegate.requestStatusPoller = nil
+        #if os(iOS)
+            BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: SeerAppDelegate.requestPollTaskIdentifier)
+        #endif
+        Task { await previous?.retire() }
 
-        let poller: RequestStatusPoller
-        if let existing = requestStatusPoller, existing.serverID == serverKey {
-            poller = existing
-        } else {
-            let previous = requestStatusPoller
-            Task { await previous?.stopPolling() }
-            poller = RequestStatusPoller(
-                modelContainer: notificationModelContainer,
-                notificationService: notificationService,
-                serverID: serverKey
-            )
-            requestStatusPoller = poller
-            appDelegate.requestStatusPoller = poller
-        }
-
-        guard let jellyseerrURL = appState.jellyseerrServerURL,
-              let apiKey = appState.jellyseerrAPIKey
+        guard appState.isAuthenticated, let serverKey = appState.activeServerKey,
+              let url = appState.jellyseerrServerURL, let apiKey = appState.jellyseerrAPIKey,
+              let notificationManager
         else { return }
-        Task {
-            await poller.configure(serverURL: jellyseerrURL, apiKey: apiKey)
+        let state = appState
+        let service = RequestNotificationService(notificationManager: notificationManager) {
+            state.isAuthenticated && state.activeServerKey == serverKey
+        }
+        let poller = RequestStatusPoller(
+            modelContainer: notificationModelContainer,
+            notificationService: service,
+            serverID: serverKey
+        )
+        requestNotificationService = service
+        requestStatusPoller = poller
+        appDelegate.requestStatusPoller = poller
+        requestPollingTask = Task {
+            guard !Task.isCancelled else { return }
+            await poller.configure(serverURL: url, apiKey: apiKey)
+            guard !Task.isCancelled else { return }
             await poller.startPolling()
         }
     }
@@ -252,10 +262,6 @@ struct SeerApp: App {
         // Notification manager was created in `init`; wire the rest here
         guard let notifManager = notificationManager else { return }
         appDelegate.notificationManager = notifManager
-
-        // Setup request notification service
-        let reqNotifService = RequestNotificationService(notificationManager: notifManager)
-        requestNotificationService = reqNotifService
 
         // Setup download notification service
         let dlNotifService = DownloadNotificationService(notificationManager: notifManager)
@@ -281,7 +287,7 @@ struct SeerApp: App {
         )
 
         // Setup request status poller for the active server (if any)
-        ensureRequestStatusPoller(notificationService: reqNotifService)
+        configureRequestPolling()
     }
 
     /// Configures Kingfisher image cache with appropriate limits
