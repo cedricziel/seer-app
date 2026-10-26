@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.8.0](https://github.com/cedricziel/seer-app/compare/v0.7.1...v0.8.0) (2026-10-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **jellyfin:** Target current stable Jellyfin; 10.8 legacy routes are no longer supported.
+
+### Features
+
+* **navigation:** add library search and app settings ([#67](https://github.com/cedricziel/seer-app/issues/67)) ([9595762](https://github.com/cedricziel/seer-app/commit/95957625ce9318c9f6ed063a9a62d083d6d8d81b))
+* **release:** publish iOS, tvOS, and native macOS builds ([#74](https://github.com/cedricziel/seer-app/issues/74)) ([fdc0401](https://github.com/cedricziel/seer-app/commit/fdc0401b63a71241933f3d990c2c2119bc0a492e))
+* **telemetry:** enable diagnostics with a settings opt-out ([58b1b7b](https://github.com/cedricziel/seer-app/commit/58b1b7b1a9584c0ee357e642b6cae1b2201b5ee3))
+
+
+### Bug Fixes
+
+* **app-intents:** bind saved media entities to their server ([#84](https://github.com/cedricziel/seer-app/issues/84)) ([c751261](https://github.com/cedricziel/seer-app/commit/c751261e9c8bb99004cd173e38f7343dcdd354f5))
+* **app-intents:** consume shortcut routes in library navigation ([#92](https://github.com/cedricziel/seer-app/issues/92)) ([911c0cc](https://github.com/cedricziel/seer-app/commit/911c0ccdd0020c043cbe3a958242c1c4031e4aae))
+* **app-intents:** require the requested media type ([#88](https://github.com/cedricziel/seer-app/issues/88)) ([9cb896a](https://github.com/cedricziel/seer-app/commit/9cb896aa0acf7d78c256d9d9575c353170c37809))
+* **auth:** preserve saved server identity when signing back in ([#75](https://github.com/cedricziel/seer-app/issues/75)) ([0e4693f](https://github.com/cedricziel/seer-app/commit/0e4693fa79744c970eed9dd75c5d47150b8e2cd2))
+* **auth:** recover from failed Quick Connect sessions ([#93](https://github.com/cedricziel/seer-app/issues/93)) ([a033166](https://github.com/cedricziel/seer-app/commit/a0331662150e5122989a13b244fe912c08271800))
+* **clients:** refresh services when configuration changes ([#81](https://github.com/cedricziel/seer-app/issues/81)) ([b5e2e20](https://github.com/cedricziel/seer-app/commit/b5e2e20407a084c02c2f0f78c565fe9047df0ecb))
+* **downloads:** harden offline media on iOS and tvOS ([#78](https://github.com/cedricziel/seer-app/issues/78)) ([0492496](https://github.com/cedricziel/seer-app/commit/049249601fa243aa7245c61827903bb2b56ef717))
+* **downloads:** preserve episode actions and completed file sizes ([#86](https://github.com/cedricziel/seer-app/issues/86)) ([9b35a02](https://github.com/cedricziel/seer-app/commit/9b35a02e1ead7d1abd767e477119614486d1c927))
+* **library:** initialize offline browsing before loading ([#80](https://github.com/cedricziel/seer-app/issues/80)) ([5779530](https://github.com/cedricziel/seer-app/commit/5779530ff01a51e1ad34b6c7bcb5252362ecfd05))
+* **network:** resolve internal Jellyfin URL before browsing ([#77](https://github.com/cedricziel/seer-app/issues/77)) ([afbe76e](https://github.com/cedricziel/seer-app/commit/afbe76eca721a82410c157d0bd4c194b15ca2707))
+* **notifications:** refresh cached system authorization ([#83](https://github.com/cedricziel/seer-app/issues/83)) ([2542643](https://github.com/cedricziel/seer-app/commit/2542643d7b0038d56153c21d6d3403fae5526a3b))
+* **notifications:** retire request polling after logout ([#96](https://github.com/cedricziel/seer-app/issues/96)) ([94aa3cf](https://github.com/cedricziel/seer-app/commit/94aa3cfbf2513d8341bb348b9a87ed3f4e489746))
+* **notifications:** track media availability separately ([#76](https://github.com/cedricziel/seer-app/issues/76)) ([8bb6fc7](https://github.com/cedricziel/seer-app/commit/8bb6fc78ba3bb177e664bff77da3013e0e964c13))
+* **playback:** preserve PiP playback state on restoration ([#89](https://github.com/cedricziel/seer-app/issues/89)) ([c244b1b](https://github.com/cedricziel/seer-app/commit/c244b1b376af34a2d591d5fba9a9c194b31c5332))
+* **playback:** reject artwork from superseded metadata ([#90](https://github.com/cedricziel/seer-app/issues/90)) ([92ab33a](https://github.com/cedricziel/seer-app/commit/92ab33aa5d9ed8e8a162523bc11aa1fe5353d04e))
+* **playback:** use refreshed media details when resuming ([#85](https://github.com/cedricziel/seer-app/issues/85)) ([3cfe648](https://github.com/cedricziel/seer-app/commit/3cfe6486d0c7aee9264046af3a1bae47ee3c1980))
+* **requests:** isolate asynchronous request state ([#79](https://github.com/cedricziel/seer-app/issues/79)) ([28d3edf](https://github.com/cedricziel/seer-app/commit/28d3edf8084e1637e2d30ec8e763c617e5326d26))
+* **requests:** preserve actions across unchanged refreshes ([#87](https://github.com/cedricziel/seer-app/issues/87)) ([1bd3ccb](https://github.com/cedricziel/seer-app/commit/1bd3ccb571a019e49db3eedc15becf6bab3be754))
+* **servers:** recover internal URL configuration ([#98](https://github.com/cedricziel/seer-app/issues/98)) ([015883e](https://github.com/cedricziel/seer-app/commit/015883e0146f843a7309a42580d87025093b280e))
+* **state:** isolate progress, pagination, and request caches ([#73](https://github.com/cedricziel/seer-app/issues/73)) ([a517623](https://github.com/cedricziel/seer-app/commit/a5176230d393402b02ee8f6cbf915aad3c7d05b7))
+* **telemetry:** collect diagnostics with OpenTelemetry 2.6 ([#95](https://github.com/cedricziel/seer-app/issues/95)) ([bd0021d](https://github.com/cedricziel/seer-app/commit/bd0021d2ab460d85c09957aa57997aedc55675a6))
+* **telemetry:** send SignalDB tenant and dataset headers ([#54](https://github.com/cedricziel/seer-app/issues/54)) ([1b865cb](https://github.com/cedricziel/seer-app/commit/1b865cb767525571d31c7d198a0fc991a97bd660))
+* **testing:** isolate hosted unit tests from production startup ([#56](https://github.com/cedricziel/seer-app/issues/56)) ([01a9403](https://github.com/cedricziel/seer-app/commit/01a9403bcd92cb5f845a064989d0c16eeaaa0e29))
+* **tooling:** use pinned Swift tools across development and CI ([#82](https://github.com/cedricziel/seer-app/issues/82)) ([7f87a40](https://github.com/cedricziel/seer-app/commit/7f87a40760994433448fb5758fed2bf032519756))
+
+
+### Code Refactoring
+
+* **jellyfin:** route API operations through the SDK ([#97](https://github.com/cedricziel/seer-app/issues/97)) ([2970306](https://github.com/cedricziel/seer-app/commit/2970306acfe8ec2ff54ef98ce029764d2f02c0ba))
+
 ## [0.7.1](https://github.com/cedricziel/seer-app/compare/v0.7.0...v0.7.1) (2026-09-06)
 
 
