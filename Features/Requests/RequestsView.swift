@@ -9,6 +9,7 @@ struct RequestsView: View {
 
     var body: some View {
         RequestsContentView(appState: appState)
+            .id(appState.serviceConfigurationID)
     }
 }
 
@@ -115,11 +116,6 @@ private struct RequestsContentView: View {
         .onDisappear {
             viewModel.stopAutoRefresh()
         }
-        .onChange(of: appState.activeServerID) {
-            Task {
-                await viewModel.handleActiveServerChange()
-            }
-        }
     }
 
     // MARK: - Not Configured View
@@ -128,9 +124,7 @@ private struct RequestsContentView: View {
         JellyseerrConnectPrompt(
             title: "Manage Requests",
             description: "Connect Jellyseerr to track and manage media requests.",
-            onSuccess: {
-                Task { await viewModel.refresh() }
-            }
+            onSuccess: {}
         )
     }
 

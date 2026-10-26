@@ -39,39 +39,69 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
 
     // MARK: - Private Properties
 
-    private var jellyseerrService: JellyseerrService?
+    private var service: JellyseerrService?
+    private var serviceConfigurationID: AppState.ServiceConfigurationID?
+    private var jellyseerrService: JellyseerrService? {
+        if serviceConfigurationID != appState.serviceConfigurationID {
+            setupService()
+        }
+        return service
+    }
+
     private let appState: AppState
+    private let session: URLSession?
 
     // MARK: - Initialization
 
-    public init(appState: AppState) {
+    public init(appState: AppState, session: URLSession? = nil) {
         self.appState = appState
+        self.session = session
         setupService()
     }
 
     private func setupService() {
+        service = nil
+        serviceConfigurationID = appState.serviceConfigurationID
+        trending = []
+        upcomingMovies = []
+        upcomingTV = []
+        movieGenres = []
+        tvGenres = []
+        tvDetails = nil
+        errorMessage = nil
+        isLoading = false
+        isLoadingTrending = false
+        isLoadingUpcomingMovies = false
+        isLoadingUpcomingTV = false
+        isLoadingGenres = false
+        isLoadingTVDetails = false
         guard let serverURL = appState.jellyseerrServerURL,
               let apiKey = appState.jellyseerrAPIKey
         else {
             return
         }
 
-        jellyseerrService = JellyseerrService(serverURL: serverURL, apiKey: apiKey)
+        service = JellyseerrService(serverURL: serverURL, apiKey: apiKey, session: session)
 
         // Load permissions if not already set
         if appState.jellyseerrUserPermissions == 0 {
+            let configurationID = appState.serviceConfigurationID
+            let permissionService = service
             Task {
-                await loadUserPermissions()
+                await loadUserPermissions(service: permissionService, configurationID: configurationID)
             }
         }
     }
 
     /// Load user permissions from Jellyseerr
-    private func loadUserPermissions() async {
-        guard let service = jellyseerrService else { return }
+    func loadUserPermissions(
+        service: JellyseerrService?, configurationID: AppState.ServiceConfigurationID
+    ) async {
+        guard let service else { return }
 
         do {
             let userInfo = try await service.verifyAuth()
+            guard configurationID == appState.serviceConfigurationID else { return }
             appState.setJellyseerrPermissions(userInfo.permissions)
         } catch {
             Self.logger.debug("Failed to load Jellyseerr permissions: \(error.localizedDescription)")
@@ -87,6 +117,7 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             return
         }
 
+        let configurationID = appState.serviceConfigurationID
         isLoading = true
         errorMessage = nil
 
@@ -98,21 +129,25 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             group.addTask { await self.loadGenres() }
         }
 
+        guard configurationID == appState.serviceConfigurationID else { return }
         isLoading = false
     }
 
     /// Load trending content
     func loadTrending() async {
         guard let service = jellyseerrService else { return }
+        let configurationID = appState.serviceConfigurationID
 
         isLoadingTrending = true
 
         do {
             let response = try await service.getTrending(page: 1)
+            guard configurationID == appState.serviceConfigurationID else { return }
             trending = response.results
             trendingPage = response.page
             trendingTotalPages = response.totalPages
         } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
             Self.logger.debug("Failed to load trending: \(error.localizedDescription)")
         }
 
@@ -122,15 +157,18 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
     /// Load upcoming movies
     func loadUpcomingMovies() async {
         guard let service = jellyseerrService else { return }
+        let configurationID = appState.serviceConfigurationID
 
         isLoadingUpcomingMovies = true
 
         do {
             let response = try await service.getUpcomingMovies(page: 1)
+            guard configurationID == appState.serviceConfigurationID else { return }
             upcomingMovies = response.results
             upcomingMoviesPage = response.page
             upcomingMoviesTotalPages = response.totalPages
         } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
             Self.logger.debug("Failed to load upcoming movies: \(error.localizedDescription)")
         }
 
@@ -140,15 +178,18 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
     /// Load upcoming TV shows
     func loadUpcomingTV() async {
         guard let service = jellyseerrService else { return }
+        let configurationID = appState.serviceConfigurationID
 
         isLoadingUpcomingTV = true
 
         do {
             let response = try await service.getUpcomingTV(page: 1)
+            guard configurationID == appState.serviceConfigurationID else { return }
             upcomingTV = response.results
             upcomingTVPage = response.page
             upcomingTVTotalPages = response.totalPages
         } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
             Self.logger.debug("Failed to load upcoming TV: \(error.localizedDescription)")
         }
 
@@ -158,6 +199,7 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
     /// Load movie and TV genres
     func loadGenres() async {
         guard let service = jellyseerrService else { return }
+        let configurationID = appState.serviceConfigurationID
 
         isLoadingGenres = true
 
@@ -165,9 +207,13 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
             async let movieGenresTask = service.getMovieGenres()
             async let tvGenresTask = service.getTVGenres()
 
-            movieGenres = try await movieGenresTask
-            tvGenres = try await tvGenresTask
+            let movies = try await movieGenresTask
+            let television = try await tvGenresTask
+            guard configurationID == appState.serviceConfigurationID else { return }
+            movieGenres = movies
+            tvGenres = television
         } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
             Self.logger.debug("Failed to load genres: \(error.localizedDescription)")
         }
 
@@ -200,13 +246,17 @@ public final class DiscoverViewModel: ObservableObject, RequestOptionsProvider {
     /// Load TV details for season selection
     func loadTVDetails(tmdbId: Int) async {
         guard let service = jellyseerrService else { return }
+        let configurationID = appState.serviceConfigurationID
 
         isLoadingTVDetails = true
         tvDetails = nil
 
         do {
-            tvDetails = try await service.getTVDetails(tmdbId: tmdbId)
+            let details = try await service.getTVDetails(tmdbId: tmdbId)
+            guard configurationID == appState.serviceConfigurationID else { return }
+            tvDetails = details
         } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
             Self.logger.debug("Failed to load TV details: \(error.localizedDescription)")
         }
 

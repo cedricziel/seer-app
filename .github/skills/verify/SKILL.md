@@ -51,3 +51,5 @@ platform-specific entitlements and ensure the Mac app has App Sandbox enabled.
 Release-lane tests cover iOS default behavior, tvOS signing and IPA selection,
 macOS installer signing and PKG selection, and rejection of unknown targets. tvOS development signing fetches the certificate
 without a development profile, so TestFlight does not require a registered Apple TV.
+
+For service client changes, include `-only-testing:LibraryFeatureTests/ServiceClientLifecycleTests` and `-only-testing:LibraryFeatureTests/RequestsResponseIsolationTests` in the isolated test run. These tests cover unconfigured server switches, reconnection from another tab, retained genre state, token renewal, URL edits, verified permission saves, and stale permission or request responses.

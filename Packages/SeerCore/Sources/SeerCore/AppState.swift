@@ -96,6 +96,25 @@ public final class AppState: ObservableObject {
         return try? context.fetch(descriptor).first
     }
 
+    /// Changes whenever the active service endpoints, user, or saved credentials change.
+    public struct ServiceConfigurationID: Hashable, Sendable {
+        let serverID: UUID?
+        let jellyfinURL: URL?
+        let jellyseerrURL: URL?
+        let userID: String?
+        let credentialRevision: UUID
+    }
+
+    @Published private var credentialRevision = UUID()
+
+    public var serviceConfigurationID: ServiceConfigurationID {
+        ServiceConfigurationID(
+            serverID: activeServerID, jellyfinURL: jellyfinServerURL,
+            jellyseerrURL: jellyseerrServerURL, userID: jellyfinUserID,
+            credentialRevision: credentialRevision
+        )
+    }
+
     public var activeServerID: UUID? {
         activeServer?.id
     }
@@ -298,9 +317,13 @@ public final class AppState: ObservableObject {
     }
 
     /// Update a server configuration
-    public func updateServer(_: ServerConfiguration) {
+    public func updateServer(_ configuration: ServerConfiguration) {
         guard let context = modelContext else { return }
         try? context.save()
+        if configuration.id == activeServerID {
+            clearJellyseerrPermissions()
+            credentialRevision = UUID()
+        }
         objectWillChange.send()
     }
 
@@ -375,6 +398,9 @@ public final class AppState: ObservableObject {
             objectWillChange.send()
         }
 
+        if serverID == activeServerID {
+            credentialRevision = UUID()
+        }
         updateAuthenticationState()
     }
 
@@ -412,12 +438,16 @@ public final class AppState: ObservableObject {
     }
 
     /// Save Jellyseerr credentials for a server
-    public func saveJellyseerrCredentials(serverID: UUID, apiKey: String) {
+    public func saveJellyseerrCredentials(serverID: UUID, apiKey: String, permissions: Int? = nil) {
         KeychainManager.shared.saveCredential(apiKey, for: serverID, key: .jellyseerrAPIKey)
+        if serverID == activeServerID {
+            jellyseerrUserPermissions = permissions ?? 0
+            credentialRevision = UUID()
+        }
     }
 
     /// Save Jellyseerr credentials (updates active server)
-    public func saveJellyseerrCredentials(serverURL: URL, apiKey: String) {
+    public func saveJellyseerrCredentials(serverURL: URL, apiKey: String, permissions: Int? = nil) {
         guard let serverID = activeServerID,
               let config = activeServer
         else {
@@ -427,7 +457,7 @@ public final class AppState: ObservableObject {
         config.jellyseerrURL = serverURL
         try? modelContext?.save()
         objectWillChange.send()
-        saveJellyseerrCredentials(serverID: serverID, apiKey: apiKey)
+        saveJellyseerrCredentials(serverID: serverID, apiKey: apiKey, permissions: permissions)
     }
 
     /// Clear all stored credentials and log out
@@ -436,6 +466,7 @@ public final class AppState: ObservableObject {
         if let serverID = activeServerID {
             KeychainManager.shared.deleteServerCredentials(for: serverID)
         }
+        credentialRevision = UUID()
         isAuthenticated = false
         clearJellyseerrPermissions()
     }
@@ -445,6 +476,7 @@ public final class AppState: ObservableObject {
         for config in servers {
             KeychainManager.shared.deleteServerCredentials(for: config.id)
         }
+        credentialRevision = UUID()
         isAuthenticated = false
         clearJellyseerrPermissions()
     }

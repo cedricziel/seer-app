@@ -50,14 +50,14 @@ public actor JellyseerrService {
         }
     }
 
-    public init(serverURL: URL, apiKey: String? = nil) {
+    public init(serverURL: URL, apiKey: String? = nil, session: URLSession? = nil) {
         self.serverURL = serverURL
         self.apiKey = apiKey
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
-        session = URLSession(configuration: config)
+        self.session = session ?? URLSession(configuration: config)
 
         decoder = JSONDecoder()
         encoder = JSONEncoder()
@@ -67,7 +67,7 @@ public actor JellyseerrService {
             let apiURL = serverURL.appendingPathComponent("api/v1")
             generatedClient = Client(
                 serverURL: apiURL,
-                transport: URLSessionTransport(),
+                transport: URLSessionTransport(configuration: .init(session: self.session)),
                 middlewares: [APIKeyMiddleware(apiKey: apiKey)]
             )
         }
@@ -85,7 +85,7 @@ public actor JellyseerrService {
         let apiURL = serverURL.appendingPathComponent("api/v1")
         generatedClient = Client(
             serverURL: apiURL,
-            transport: URLSessionTransport(),
+            transport: URLSessionTransport(configuration: .init(session: session)),
             middlewares: [APIKeyMiddleware(apiKey: apiKey)]
         )
     }

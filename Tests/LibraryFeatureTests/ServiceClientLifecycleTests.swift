@@ -1,0 +1,320 @@
+import Foundation
+import JellyseerrClient
+import os
+@testable import SeerApp
+import SeerCore
+import SwiftData
+import XCTest
+
+@MainActor
+final class ServiceClientLifecycleTests: XCTestCase {
+    private var container: ModelContainer!
+    private var state: AppState!
+    private var session: URLSession!
+    private var first: ServerConfiguration!
+    private var second: ServerConfiguration!
+
+    override func setUp() async throws {
+        LifecycleRequestTrap.requests.withLock { $0 = [] }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [LifecycleRequestTrap.self]
+        session = URLSession(configuration: configuration)
+        let schema = Schema([ServerConfiguration.self])
+        container = try ModelContainer(
+            for: schema,
+            configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        )
+        first = ServerConfiguration(
+            name: "First", jellyfinURL: URL(string: "https://first.invalid")!,
+            jellyseerrURL: URL(string: "https://first.invalid")!, jellyfinUserID: "test-user", isActive: true
+        )
+        second = ServerConfiguration(name: "Second", jellyfinURL: URL(string: "https://second.invalid")!)
+        container.mainContext.insert(first)
+        container.mainContext.insert(second)
+        try container.mainContext.save()
+        state = AppState()
+        state.setModelContext(container.mainContext)
+        state.saveJellyfinCredentials(
+            serverID: first.id,
+            accessToken: "old-test-token",
+            userID: "test-user",
+            deviceID: "test"
+        )
+        state.saveJellyseerrCredentials(serverID: first.id, apiKey: "first-test-key")
+        state.setJellyseerrPermissions(1)
+        XCTAssertEqual(state.jellyfinAccessToken, "old-test-token")
+        XCTAssertEqual(state.jellyseerrAPIKey, "first-test-key")
+    }
+
+    override func tearDown() async throws {
+        LifecycleRequestTrap.completeAuth()
+        KeychainManager.shared.deleteServerCredentials(for: first.id)
+        KeychainManager.shared.deleteServerCredentials(for: second.id)
+        session.invalidateAndCancel()
+        session = nil
+        state = nil
+        container = nil
+    }
+
+    func testDiscoverClearsClientWhenSwitchingToUnconfiguredServer() async throws {
+        let model = DiscoverViewModel(appState: state, session: session)
+        state.switchServer(to: second.id)
+
+        do {
+            try await model.requestMedia(movie())
+            XCTFail("An unconfigured server must reject requests")
+        } catch let error as JellyseerrService.JellyseerrError {
+            guard case .notAuthenticated = error else { return XCTFail("Expected missing credentials, got \(error)") }
+        }
+        XCTAssertTrue(LifecycleRequestTrap.requests.withLock { $0.filter { $0.httpMethod == "POST" }.isEmpty })
+    }
+
+    func testDiscoverReconnectFromAnotherTabUsesNewServer() async throws {
+        let model = DiscoverViewModel(appState: state, session: session)
+        state.switchServer(to: second.id)
+        try state.saveJellyseerrCredentials(
+            serverURL: XCTUnwrap(URL(string: "https://second.invalid")),
+            apiKey: "second-test-key"
+        )
+
+        try? await model.requestMedia(movie())
+
+        let request = try XCTUnwrap(LifecycleRequestTrap.requests.withLock { $0.last { $0.httpMethod == "POST" } })
+        XCTAssertEqual(request.url?.host, "second.invalid")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-Api-Key"), "second-test-key")
+    }
+
+    func testRetainedGenreUsesNewServerForRequests() async throws {
+        let model = GenreBrowseViewModel(
+            genre: DiscoverGenre(id: 1, name: "Test"),
+            mediaType: .movie,
+            appState: state,
+            session: session
+        )
+        state.switchServer(to: second.id)
+        try state.saveJellyseerrCredentials(
+            serverURL: XCTUnwrap(URL(string: "https://second.invalid")),
+            apiKey: "second-test-key"
+        )
+
+        try? await model.requestMedia(movie())
+
+        let request = try XCTUnwrap(LifecycleRequestTrap.requests.withLock { $0.last { $0.httpMethod == "POST" } })
+        XCTAssertEqual(request.url?.host, "second.invalid")
+    }
+
+    func testRetainedGenreClearsPreviousResultsWhenConfigurationChanges() async throws {
+        let model = GenreBrowseViewModel(
+            genre: DiscoverGenre(id: 1, name: "Test"),
+            mediaType: .movie,
+            appState: state,
+            session: session
+        )
+        model.results = try [movie()]
+        model.currentPage = 4
+        state.switchServer(to: second.id)
+
+        await model.loadInitial()
+
+        XCTAssertTrue(model.results.isEmpty)
+        XCTAssertEqual(model.currentPage, 1)
+        XCTAssertEqual(model.errorMessage, "Jellyseerr not configured")
+    }
+
+    func testLibraryReauthenticationUsesNewTokenWithoutServerSwitch() async throws {
+        let model = LibraryViewModel(appState: state, session: session)
+        state.saveJellyfinCredentials(
+            serverID: first.id,
+            accessToken: "new-test-token",
+            userID: "test-user",
+            deviceID: "test"
+        )
+
+        await model.loadLibraries()
+
+        let request = try XCTUnwrap(LifecycleRequestTrap.requests.withLock { $0.last })
+        XCTAssertTrue(try XCTUnwrap(request.value(forHTTPHeaderField: "Authorization")).contains("new-test-token"))
+    }
+
+    func testLibraryURLChangeUsesUpdatedEndpoint() async throws {
+        let model = LibraryViewModel(appState: state, session: session)
+        first.jellyfinURL = try XCTUnwrap(URL(string: "https://updated.invalid"))
+        state.updateServer(first)
+
+        await model.loadLibraries()
+
+        XCTAssertEqual(LifecycleRequestTrap.requests.withLock { $0.last?.url?.host }, "updated.invalid")
+    }
+
+    func testRequestsReconnectBuildsClientWithoutServerSwitch() async throws {
+        first.jellyseerrURL = nil
+        state.updateServer(first)
+        let model = RequestsViewModel(appState: state, session: session)
+        try state.saveJellyseerrCredentials(
+            serverURL: XCTUnwrap(URL(string: "https://first.invalid")), apiKey: "replacement-test-key",
+            permissions: 2
+        )
+
+        await model.loadRequests()
+
+        let request = try XCTUnwrap(LifecycleRequestTrap.requests.withLock { $0.last })
+        XCTAssertEqual(request.url?.host, "first.invalid")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-Api-Key"), "replacement-test-key")
+        XCTAssertTrue(model.canManageRequests)
+    }
+
+    func testRequestsURLChangeRebuildsClientWithoutServerSwitch() async throws {
+        let model = RequestsViewModel(appState: state, session: session)
+        try state.saveJellyseerrCredentials(
+            serverURL: XCTUnwrap(URL(string: "https://updated.invalid")),
+            apiKey: "replacement-test-key"
+        )
+
+        await model.loadRequests()
+
+        XCTAssertEqual(LifecycleRequestTrap.requests.withLock { $0.last?.url?.host }, "updated.invalid")
+    }
+
+    func testConfigurationIdentityChangesOnReauthentication() {
+        let original = state.serviceConfigurationID
+
+        state.saveJellyfinCredentials(
+            serverID: first.id,
+            accessToken: "new-test-token",
+            userID: "test-user",
+            deviceID: "test"
+        )
+
+        XCTAssertNotEqual(state.serviceConfigurationID, original)
+    }
+
+    func testJellyseerrKeyRenewalChangesIdentityAndClearsPermissions() {
+        let original = state.serviceConfigurationID
+
+        state.saveJellyseerrCredentials(serverID: first.id, apiKey: "replacement-test-key")
+
+        XCTAssertNotEqual(state.serviceConfigurationID, original)
+        XCTAssertEqual(state.jellyseerrUserPermissions, 0)
+    }
+
+    func testVerifiedConnectionRetainsPermissionsAfterCredentialSave() throws {
+        try state.saveJellyseerrCredentials(
+            serverURL: XCTUnwrap(URL(string: "https://first.invalid")), apiKey: "replacement-test-key",
+            permissions: 2
+        )
+
+        XCTAssertEqual(state.jellyseerrUserPermissions, 2)
+        XCTAssertTrue(state.canManageRequests)
+    }
+
+    func testSavingNonactiveCredentialsCannotChangeActivePermissions() {
+        state.saveJellyseerrCredentials(serverID: second.id, apiKey: "second-test-key", permissions: 2)
+
+        XCTAssertEqual(state.jellyseerrUserPermissions, 1)
+    }
+
+    func testOldPermissionResponseCannotGrantPermissionsOnNewServer() async throws {
+        let model = DiscoverViewModel(appState: state, session: session)
+        let configurationID = state.serviceConfigurationID
+        let service = try JellyseerrService(
+            serverURL: XCTUnwrap(first.jellyseerrURL),
+            apiKey: "first-test-key",
+            session: session
+        )
+        LifecycleRequestTrap.authState.withLock { $0.hold = true }
+        let load = Task { await model.loadUserPermissions(service: service, configurationID: configurationID) }
+        try await LifecycleRequestTrap.waitForAuth()
+
+        state.switchServer(to: second.id)
+        LifecycleRequestTrap.completeAuth()
+        await load.value
+
+        XCTAssertEqual(state.jellyseerrUserPermissions, 0)
+    }
+
+    func testOldSearchPermissionResponseCannotGrantPermissionsOnNewServer() async throws {
+        let model = SearchViewModel(appState: state)
+        let configurationID = state.serviceConfigurationID
+        let service = try JellyseerrService(
+            serverURL: XCTUnwrap(first.jellyseerrURL),
+            apiKey: "first-test-key",
+            session: session
+        )
+        LifecycleRequestTrap.authState.withLock { $0.hold = true }
+        let load = Task { await model.loadUserPermissions(service: service, configurationID: configurationID) }
+        try await LifecycleRequestTrap.waitForAuth()
+
+        state.switchServer(to: second.id)
+        LifecycleRequestTrap.completeAuth()
+        await load.value
+
+        XCTAssertEqual(state.jellyseerrUserPermissions, 0)
+    }
+
+    private func movie() throws -> SearchResult {
+        try JSONDecoder().decode(SearchResult.self, from: Data(#"{"id":1,"mediaType":"movie","title":"Test"}"#.utf8))
+    }
+}
+
+private final class LifecycleRequestTrap: URLProtocol, @unchecked Sendable {
+    static let requests = OSAllocatedUnfairLock(initialState: [URLRequest]())
+
+    override static func canInit(with _: URLRequest) -> Bool {
+        true
+    }
+
+    override static func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    struct AuthState {
+        var hold = false
+        var pending: LifecycleRequestTrap?
+        var waiter: XCTestExpectation?
+    }
+
+    static let authState = OSAllocatedUnfairLock(initialState: AuthState())
+
+    static func waitForAuth() async throws {
+        let expectation = XCTestExpectation(description: "Authentication request reached isolated transport")
+        authState.withLock { state in
+            if state.pending != nil {
+                expectation.fulfill()
+            } else {
+                state.waiter = expectation
+            }
+        }
+        let result = await XCTWaiter.fulfillment(of: [expectation], timeout: 5)
+        guard result == .completed else { throw URLError(.timedOut) }
+    }
+
+    static func completeAuth() {
+        let pending = authState.withLock { state in
+            let pending = state.pending
+            state = AuthState()
+            return pending
+        }
+        guard let pending, let url = pending.request.url else { return }
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        let data = Data(#"{"id":1,"userType":2,"permissions":2,"createdAt":"","updatedAt":"","requestCount":0}"#.utf8)
+        pending.client?.urlProtocol(pending, didReceive: response, cacheStoragePolicy: .notAllowed)
+        pending.client?.urlProtocol(pending, didLoad: data)
+        pending.client?.urlProtocolDidFinishLoading(pending)
+    }
+
+    override func startLoading() {
+        Self.requests.withLock { $0.append(request) }
+        let held = Self.authState.withLock { state in
+            guard state.hold, request.url?.path.hasSuffix("/auth/me") == true else { return false }
+            state.pending = self
+            state.waiter?.fulfill()
+            state.waiter = nil
+            return true
+        }
+        if !held {
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+        }
+    }
+
+    override func stopLoading() {}
+}

@@ -100,11 +100,13 @@ public final class RequestsViewModel: ObservableObject {
     private var jellyseerrService: (any RequestService)?
     private var serverIdentity: () -> UUID?
     private var serviceServerID: UUID?
+    private var serviceConfigurationID: AppState.ServiceConfigurationID?
     private let serviceFactory: () -> (any RequestService)?
     private let appState: AppState
     private let autoRefreshScheduler: RefreshScheduler
     private struct Scope: Equatable {
         let serverID: UUID
+        let configurationID: AppState.ServiceConfigurationID
         let filter: RequestFilter
         let sort: RequestSort
     }
@@ -113,7 +115,10 @@ public final class RequestsViewModel: ObservableObject {
     private var visibleScope: Scope?
     private var currentScope: Scope? {
         guard let serverID = serverIdentity() else { return nil }
-        return Scope(serverID: serverID, filter: selectedFilter, sort: selectedSort)
+        return Scope(
+            serverID: serverID, configurationID: appState.serviceConfigurationID,
+            filter: selectedFilter, sort: selectedSort
+        )
     }
 
     private func invalidateLoads() {
@@ -135,13 +140,14 @@ public final class RequestsViewModel: ObservableObject {
 
     public init(
         appState: AppState,
-        autoRefreshScheduler: RefreshScheduler? = nil
+        autoRefreshScheduler: RefreshScheduler? = nil,
+        session: URLSession? = nil
     ) {
         self.appState = appState
         serverIdentity = { appState.activeServerID }
         serviceFactory = {
             guard let url = appState.jellyseerrServerURL, let key = appState.jellyseerrAPIKey else { return nil }
-            return JellyseerrService(serverURL: url, apiKey: key)
+            return JellyseerrService(serverURL: url, apiKey: key, session: session)
         }
         self.autoRefreshScheduler = autoRefreshScheduler
             ?? RefreshScheduler(interval: Self.defaultAutoRefreshInterval)
@@ -158,6 +164,7 @@ public final class RequestsViewModel: ObservableObject {
 
     private func setupService() {
         serviceServerID = serverIdentity()
+        serviceConfigurationID = appState.serviceConfigurationID
         jellyseerrService = serviceFactory()
     }
 
@@ -181,7 +188,7 @@ public final class RequestsViewModel: ObservableObject {
     // MARK: - Public Methods
 
     func loadRequests() async {
-        if serviceServerID != serverIdentity() {
+        if serviceServerID != serverIdentity() || serviceConfigurationID != appState.serviceConfigurationID {
             setupService()
             requests = []
             visibleScope = nil
@@ -312,7 +319,8 @@ public final class RequestsViewModel: ObservableObject {
 
     func loadMoreRequests() async {
         guard let service = jellyseerrService, let scope = currentScope,
-              visibleScope == scope, serviceServerID == scope.serverID, hasMoreItems, !isLoading,
+              visibleScope == scope, serviceServerID == scope.serverID,
+              serviceConfigurationID == scope.configurationID, hasMoreItems, !isLoading,
               !isLoadingMore else { return }
         generation = UUID()
         let operation = generation
@@ -370,7 +378,7 @@ public final class RequestsViewModel: ObservableObject {
     func silentRefresh() async {
         guard !isLoading, !isLoadingMore,
               let service = jellyseerrService, let scope = currentScope,
-              serviceServerID == scope.serverID else { return }
+              serviceServerID == scope.serverID, serviceConfigurationID == scope.configurationID else { return }
         generation = UUID()
         let operation = generation
         do {
@@ -403,7 +411,8 @@ public final class RequestsViewModel: ObservableObject {
 
     private func performAction(_ action: RequestAction, request: MediaRequest, identity: UUID) async throws {
         guard requestIdentity == identity, let scope = currentScope,
-              visibleScope == scope, serviceServerID == scope.serverID, requests.contains(request),
+              visibleScope == scope, serviceServerID == scope.serverID,
+              serviceConfigurationID == scope.configurationID, requests.contains(request),
               let service = jellyseerrService else { return }
         do {
             switch action {

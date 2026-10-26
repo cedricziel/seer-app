@@ -1,3 +1,4 @@
+import Foundation
 import JellyseerrClient
 import os
 import SeerCore
@@ -24,6 +25,7 @@ struct GenreBrowseView: View {
 
     var body: some View {
         GenreBrowseContentView(viewModel: viewModel, appState: appState)
+            .id(appState.serviceConfigurationID)
             .navigationTitle(genre.name)
         #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
@@ -68,10 +70,8 @@ private struct GenreBrowseContentView: View {
                 resultsGrid
             }
         }
-        .task {
-            if viewModel.results.isEmpty {
-                await viewModel.loadInitial()
-            }
+        .task(id: appState.serviceConfigurationID) {
+            await viewModel.loadInitial()
         }
         .alert("Request Submitted", isPresented: $showRequestSuccess) {
             Button("OK", role: .cancel) {}
@@ -233,26 +233,46 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
 
     private let genre: DiscoverGenre
     private let mediaType: MediaTypeBadge.MediaType
-    private var jellyseerrService: JellyseerrService?
+    private var service: JellyseerrService?
+    private var serviceConfigurationID: AppState.ServiceConfigurationID?
+    private var jellyseerrService: JellyseerrService? {
+        if serviceConfigurationID != appState.serviceConfigurationID {
+            setupService()
+        }
+        return service
+    }
+
     private let appState: AppState
+    private let session: URLSession?
 
     // MARK: - Initialization
 
-    init(genre: DiscoverGenre, mediaType: MediaTypeBadge.MediaType, appState: AppState) {
+    init(genre: DiscoverGenre, mediaType: MediaTypeBadge.MediaType, appState: AppState, session: URLSession? = nil) {
         self.genre = genre
         self.mediaType = mediaType
         self.appState = appState
+        self.session = session
         setupService()
     }
 
     private func setupService() {
+        service = nil
+        serviceConfigurationID = appState.serviceConfigurationID
+        results = []
+        currentPage = 1
+        totalPages = 1
+        tvDetails = nil
+        errorMessage = nil
+        isLoading = false
+        isLoadingMore = false
+        isLoadingTVDetails = false
         guard let serverURL = appState.jellyseerrServerURL,
               let apiKey = appState.jellyseerrAPIKey
         else {
             return
         }
 
-        jellyseerrService = JellyseerrService(serverURL: serverURL, apiKey: apiKey)
+        service = JellyseerrService(serverURL: serverURL, apiKey: apiKey, session: session)
     }
 
     // MARK: - Public Methods
@@ -262,6 +282,7 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
             errorMessage = "Jellyseerr not configured"
             return
         }
+        let configurationID = appState.serviceConfigurationID
 
         isLoading = true
         errorMessage = nil
@@ -274,9 +295,11 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
                 try await service.getTVByGenre(genreId: genre.id, page: 1)
             }
 
+            guard configurationID == appState.serviceConfigurationID else { return }
             results = response.results
             totalPages = response.totalPages
         } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
             errorMessage = error.localizedDescription
         }
 
@@ -290,6 +313,7 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
         else {
             return
         }
+        let configurationID = appState.serviceConfigurationID
 
         isLoadingMore = true
         currentPage += 1
@@ -301,8 +325,10 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
                 try await service.getTVByGenre(genreId: genre.id, page: currentPage)
             }
 
+            guard configurationID == appState.serviceConfigurationID else { return }
             results.append(contentsOf: response.results)
         } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
             currentPage -= 1
             Self.logger.debug("Failed to load more: \(error.localizedDescription)")
         }
@@ -314,13 +340,17 @@ final class GenreBrowseViewModel: ObservableObject, RequestOptionsProvider {
 
     func loadTVDetails(tmdbId: Int) async {
         guard let service = jellyseerrService else { return }
+        let configurationID = appState.serviceConfigurationID
 
         isLoadingTVDetails = true
         tvDetails = nil
 
         do {
-            tvDetails = try await service.getTVDetails(tmdbId: tmdbId)
+            let details = try await service.getTVDetails(tmdbId: tmdbId)
+            guard configurationID == appState.serviceConfigurationID else { return }
+            tvDetails = details
         } catch {
+            guard configurationID == appState.serviceConfigurationID else { return }
             Self.logger.debug("Failed to load TV details: \(error.localizedDescription)")
         }
 
