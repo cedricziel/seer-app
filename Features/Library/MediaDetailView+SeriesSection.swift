@@ -71,6 +71,7 @@ extension MediaDetailView {
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: - Caption + Download Season

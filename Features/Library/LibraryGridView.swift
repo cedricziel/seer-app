@@ -178,6 +178,7 @@ struct LibraryGridView: View {
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var gridSection: some View {
@@ -185,7 +186,10 @@ struct LibraryGridView: View {
             if viewModel.isLoading, viewModel.mediaItems.isEmpty {
                 ProgressView().frame(maxWidth: .infinity).padding()
             } else if let error = viewModel.errorMessage, viewModel.mediaItems.isEmpty {
-                SectionEmptyView(message: error, systemImage: "exclamationmark.triangle")
+                ErrorView(error: error) {
+                    Task { await viewModel.filterChanged() }
+                }
+                .padding(.vertical)
             } else if viewModel.mediaItems.isEmpty {
                 SectionEmptyView(message: "No titles match these filters", systemImage: "film.stack")
             }

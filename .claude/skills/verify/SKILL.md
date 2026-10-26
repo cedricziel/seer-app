@@ -135,3 +135,14 @@ Append `before` to run the same assertions against
 `origin/main`; loading and recovery assertions must fail before the fix. Review
 exported screenshots. The harness does not verify live service responses.
 For tvOS CloudKit releases, inspect the exported app entitlements and embedded provisioning profile. Both must include `aps-environment = production`; App Store Connect rejects CloudKit-enabled tvOS apps without it. Confirm upload validation in the release workflow.
+
+For library-grid recovery and selection accessibility, run
+[scripts/library-controls-tests.sh](scripts/library-controls-tests.sh) with an available
+iOS runtime identifier and an absolute evidence directory outside the checkout.
+Obtain a build coordinator grant first. The harness compiles the real grid and series
+section with fixture models, in-memory SwiftData, no credentials, and no network.
+It uses a disposable simulator and `-jobs 2`. It checks visible Retry, retained
+watch/type filters and sorting after recovery, and selected accessibility traits
+before and after filter or season changes. Append `before` to test `origin/main`.
+This checks view wiring and the accessibility tree, not live Jellyfin responses or
+spoken VoiceOver output. Review the exported screenshots.
