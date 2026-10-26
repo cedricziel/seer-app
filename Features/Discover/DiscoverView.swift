@@ -302,6 +302,7 @@ private struct DiscoverContentView: View {
     private func handleRequestAction(_ result: SearchResult) {
         // For TV shows, show options sheet for season selection
         if result.mediaType == .tvShow {
+            viewModel.clearTVDetails()
             requestOptionsResult = result
             showRequestOptions = true
             Task {

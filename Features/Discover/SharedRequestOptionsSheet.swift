@@ -12,6 +12,7 @@ protocol RequestOptionsProvider: ObservableObject {
 
     var hasSeasons: Bool { get }
     var availableSeasons: [TVDetails.Season] { get }
+    func loadTVDetails(tmdbId: Int) async
 }
 
 // MARK: - Shared Request Options Sheet
@@ -24,11 +25,15 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
     let onSubmit: ([Int]?, Bool) -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedSeasons: Set<Int> = []
+    @State private var seasonSelection = RequestSeasonSelection()
     @State private var request4K: Bool = false
 
     private var isTV: Bool {
         result.mediaType == .tvShow
+    }
+
+    private var hasMatchingTVDetails: Bool {
+        provider.tvDetails?.id == result.id
     }
 
     var body: some View {
@@ -53,19 +58,15 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
                     ToolbarItem(placement: .primaryAction) {
                         Button("Request") { submitRequest() }
                             .fontWeight(.semibold)
-                            .disabled(isTV && selectedSeasons.isEmpty && !provider.isLoadingTVDetails)
+                            .disabled(!canSubmit)
                     }
                 }
         }
         .onAppear {
-            if provider.hasSeasons {
-                selectedSeasons = Set(provider.availableSeasons.map(\.seasonNumber))
-            }
+            seasonSelection.update(availableSeasons: availableSeasonNumbers)
         }
-        .onChange(of: provider.hasSeasons) {
-            if provider.hasSeasons, selectedSeasons.isEmpty {
-                selectedSeasons = Set(provider.availableSeasons.map(\.seasonNumber))
-            }
+        .onChange(of: availableSeasonNumbers) {
+            seasonSelection.update(availableSeasons: availableSeasonNumbers)
         }
     }
 
@@ -111,13 +112,20 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
                     ProgressView()
                     Text("Loading seasons...").foregroundStyle(.secondary)
                 }
-            } else if provider.hasSeasons {
+            } else if hasMatchingTVDetails, !provider.availableSeasons.isEmpty {
                 selectAllButton
                 ForEach(provider.availableSeasons, id: \.seasonNumber) { season in
                     seasonButton(for: season)
                 }
             } else {
-                Text("No seasons available").foregroundStyle(.secondary)
+                if !hasMatchingTVDetails {
+                    Text("Unable to load seasons").foregroundStyle(.secondary)
+                } else {
+                    Text("No seasons available").foregroundStyle(.secondary)
+                }
+                Button("Retry") {
+                    Task { await provider.loadTVDetails(tmdbId: result.id) }
+                }
             }
         } header: {
             Text("Seasons")
@@ -128,16 +136,16 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
 
     private var selectAllButton: some View {
         Button {
-            if selectedSeasons.count == provider.availableSeasons.count {
-                selectedSeasons.removeAll()
+            if seasonSelection.selected.count == provider.availableSeasons.count {
+                seasonSelection.selected.removeAll()
             } else {
-                selectedSeasons = Set(provider.availableSeasons.map(\.seasonNumber))
+                seasonSelection.selected = Set(provider.availableSeasons.map(\.seasonNumber))
             }
         } label: {
             HStack {
                 Text("Select All")
                 Spacer()
-                if selectedSeasons.count == provider.availableSeasons.count {
+                if seasonSelection.selected.count == provider.availableSeasons.count {
                     Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
                 }
             }
@@ -158,7 +166,7 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
                     }
                 }
                 Spacer()
-                if selectedSeasons.contains(season.seasonNumber) {
+                if seasonSelection.selected.contains(season.seasonNumber) {
                     Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
                 }
             }
@@ -177,15 +185,29 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
     // MARK: - Actions
 
     private func toggleSeason(_ seasonNumber: Int) {
-        if selectedSeasons.contains(seasonNumber) {
-            selectedSeasons.remove(seasonNumber)
+        if seasonSelection.selected.contains(seasonNumber) {
+            seasonSelection.selected.remove(seasonNumber)
         } else {
-            selectedSeasons.insert(seasonNumber)
+            seasonSelection.selected.insert(seasonNumber)
         }
     }
 
+    private var availableSeasonNumbers: [Int] {
+        guard hasMatchingTVDetails else { return [] }
+        return provider.availableSeasons.map(\.seasonNumber)
+    }
+
+    private var canSubmit: Bool {
+        seasonSelection.canSubmit(
+            isTV: isTV,
+            isLoading: provider.isLoadingTVDetails,
+            availableSeasons: availableSeasonNumbers
+        )
+    }
+
     private func submitRequest() {
-        let seasons: [Int]? = isTV ? Array(selectedSeasons).sorted() : nil
+        guard canSubmit else { return }
+        let seasons: [Int]? = isTV ? seasonSelection.seasonsToSubmit(availableSeasons: availableSeasonNumbers) : nil
         onSubmit(seasons, request4K)
     }
 }
