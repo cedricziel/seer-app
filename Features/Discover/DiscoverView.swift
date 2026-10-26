@@ -52,9 +52,15 @@ private struct DiscoverContentView: View {
                 ToolbarItem(placement: .navigation) {
                     ServerSwitcherButton()
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    SettingsButton()
-                }
+                #if os(macOS)
+                    ToolbarItem(placement: .automatic) {
+                        SettingsButton()
+                    }
+                #else
+                    ToolbarItem(placement: .topBarTrailing) {
+                        SettingsButton()
+                    }
+                #endif
             }
             .alert("Request Submitted", isPresented: $showRequestSuccess) {
                 Button("OK", role: .cancel) {}

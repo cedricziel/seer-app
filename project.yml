@@ -48,6 +48,7 @@ targets:
       - path: App/SeerApp
         excludes:
           - "**/.DS_Store"
+          - "Info*.plist"
       - path: Features
         excludes:
           - "**/.DS_Store"
