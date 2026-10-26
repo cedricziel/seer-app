@@ -98,6 +98,7 @@ lane :beta do |options|
     build_options[:export_options][:installerSigningCertificate] = "Mac Installer Distribution"
   end
   artifact = build_app(**build_options)
+  validate_archive_libraries(archive: build_options.fetch(:archive_path))
 
   upload_to_testflight(
     api_key: api_key,
@@ -107,6 +108,11 @@ lane :beta do |options|
     skip_waiting_for_build_processing: true,
     changelog: options[:changelog] || "Beta build #{Time.now.strftime('%Y-%m-%d %H:%M')}"
   )
+end
+
+private_lane :validate_archive_libraries do |options|
+  checker = File.expand_path("../scripts/check_app_libraries.py", __dir__)
+  sh("python3", checker, options.fetch(:archive))
 end
 
 desc "Submit an existing TestFlight build to App Store review without rebuilding"
@@ -166,12 +172,15 @@ lane :release do |options|
     export_method: "app-store",
     output_directory: OUTPUT_DIR,
     output_name: "SeerApp.ipa",
+    archive_path: "#{OUTPUT_DIR}/SeerApp.xcarchive",
     clean: true,
     include_symbols: true,
     include_bitcode: false,
     destination: "generic/platform=iOS",
     xcargs: archive_xcargs
   )
+
+  validate_archive_libraries(archive: "#{OUTPUT_DIR}/SeerApp.xcarchive")
 
   upload_to_app_store(
     api_key: api_key,

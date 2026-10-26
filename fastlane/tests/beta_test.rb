@@ -78,6 +78,27 @@ class BetaTest < Minitest::Test
     refute action(:upload_to_testflight).key?(:ipa)
   end
 
+  def test_beta_validates_archive_libraries_before_upload
+    @runner.run(:beta, target: "macos", allow_dirty: true)
+    validation = @runner.calls.index { |name, _| name == :validate_archive_libraries }
+    upload = @runner.calls.index { |name, _| name == :upload_to_testflight }
+    refute_nil validation
+    assert_operator validation, :<, upload
+    assert_equal "build/macos/SeerApp.xcarchive", action(:validate_archive_libraries).fetch(:archive)
+  end
+
+  def test_invalid_archive_stops_testflight_upload
+    @runner.define_singleton_method(:validate_archive_libraries) { |**| raise "Library missing" }
+    assert_raises(RuntimeError) { @runner.run(:beta, allow_dirty: true) }
+    refute @runner.calls.any? { |name, _| name == :upload_to_testflight }
+  end
+
+  def test_invalid_archive_stops_app_store_upload
+    @runner.define_singleton_method(:validate_archive_libraries) { |**| raise "Library missing" }
+    assert_raises(RuntimeError) { @runner.run(:release, allow_dirty: true) }
+    refute @runner.calls.any? { |name, _| name == :upload_to_app_store }
+  end
+
   def test_unknown_target_fails_before_signing_or_building
     assert_raises(ArgumentError) { @runner.run(:beta, target: "watchos") }
     assert_empty signing

@@ -78,3 +78,11 @@ failure, pending eligibility, and stale server/configuration guards. Run
 for the isolated details flow. It uses synthetic requests and a controlled failure,
 then verifies confirmation, progress, retry, and dismissal. Append `before` for the
 base comparison. The UI harness does not contact a server.
+
+For release framework loading changes, run `python3 -m unittest scripts.test_app_libraries`
+and `ruby fastlane/tests/beta_test.rb`. Archive each platform in Release with
+`CODE_SIGNING_ALLOWED=NO` in the isolated source copy above, then run
+`python3 scripts/check_app_libraries.py /absolute/path/SeerApp.xcarchive`.
+The checker covers direct and transitive runtime dependencies and platform runpaths.
+Keep the iOS/tvOS app Frameworks path and native macOS Contents/Frameworks path distinct.
+Do not launch installed apps to verify packaging.
