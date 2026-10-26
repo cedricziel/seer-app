@@ -110,7 +110,9 @@ final class SheetTests: XCTestCase {
   app.buttons["Retry"].tap()
   XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS 'Season 1'")).firstMatch.waitForExistence(timeout: 5))
   app.buttons.matching(NSPredicate(format: "label CONTAINS 'Season 1'")).firstMatch.tap()
-  app.switches.firstMatch.tap()
+  let fourK = app.switches.firstMatch
+  fourK.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+  XCTAssertEqual(fourK.value as? String, "1")
   capture("\(sheet)-selection")
   app.buttons["Request"].tap()
   XCTAssertTrue(app.staticTexts["Submitted [2] 4K true"].waitForExistence(timeout: 5))
