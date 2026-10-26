@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.8.1](https://github.com/cedricziel/seer-app/compare/v0.8.0...v0.8.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* **discover:** recover failed content sections ([#105](https://github.com/cedricziel/seer-app/issues/105)) ([0a9d4d1](https://github.com/cedricziel/seer-app/commit/0a9d4d1d2edcfc29cf0c574cea893b4ee1395b1d))
+* **library:** recover failed grids with accessible selections ([#103](https://github.com/cedricziel/seer-app/issues/103)) ([d004e23](https://github.com/cedricziel/seer-app/commit/d004e231713aaae9345dcd396f6ab637d7d63b6a))
+* **requests:** validate TV seasons before submission ([#100](https://github.com/cedricziel/seer-app/issues/100)) ([94d8c6f](https://github.com/cedricziel/seer-app/commit/94d8c6f23d4380aa7753777118869c64d9840529))
+* **tvos:** include push entitlement required by CloudKit ([#101](https://github.com/cedricziel/seer-app/issues/101)) ([b571822](https://github.com/cedricziel/seer-app/commit/b571822a4edfc3f68379c954d5b97ba92731bfa2))
+
 ## [0.8.0](https://github.com/cedricziel/seer-app/compare/v0.7.1...v0.8.0) (2026-10-26)
 
 
