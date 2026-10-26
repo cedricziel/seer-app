@@ -21,6 +21,8 @@ final class InternalServerURLTests: XCTestCase {
         XCTAssertThrowsError(try InternalServerURL.parse("ftp://server.local")) { error in
             XCTAssertTrue(error.localizedDescription.contains("http://"))
             XCTAssertTrue(error.localizedDescription.contains("https://"))
+            XCTAssertFalse(error.localizedDescription.contains("https://ftp://"))
+            XCTAssertFalse(error.localizedDescription.contains("http://ftp://"))
         }
     }
 

@@ -5,20 +5,24 @@ public enum InternalServerURL {
     public static func parse(_ input: String) throws -> URL? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        if let advice = AuthErrorFormatter.validate(urlString: trimmed) {
-            throw ValidationError(advice: advice)
+        guard let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme)
+        else {
+            throw ValidationError.unsupportedURL
         }
-        guard let url = URL(string: trimmed) else {
-            throw ValidationError(advice: AuthErrorAdvice(message: "Enter a valid HTTP or HTTPS server URL."))
+        guard let host = url.host, !host.isEmpty else {
+            throw ValidationError.missingHost
         }
         return url
     }
 
-    private struct ValidationError: LocalizedError {
-        let advice: AuthErrorAdvice
+    private enum ValidationError: String, LocalizedError {
+        case unsupportedURL = "Use http:// or https://, for example http://192.168.1.10:8096."
+        case missingHost = "Include a host, for example http://192.168.1.10:8096."
 
         var errorDescription: String? {
-            [advice.message, advice.suggestion].compactMap(\.self).joined(separator: ". ")
+            rawValue
         }
     }
 }
