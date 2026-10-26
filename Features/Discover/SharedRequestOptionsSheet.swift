@@ -32,6 +32,10 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
         result.mediaType == .tvShow
     }
 
+    private var hasMatchingTVDetails: Bool {
+        provider.tvDetails?.id == result.id
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -108,13 +112,13 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
                     ProgressView()
                     Text("Loading seasons...").foregroundStyle(.secondary)
                 }
-            } else if !provider.availableSeasons.isEmpty {
+            } else if hasMatchingTVDetails, !provider.availableSeasons.isEmpty {
                 selectAllButton
                 ForEach(provider.availableSeasons, id: \.seasonNumber) { season in
                     seasonButton(for: season)
                 }
             } else {
-                if provider.tvDetails == nil {
+                if !hasMatchingTVDetails {
                     Text("Unable to load seasons").foregroundStyle(.secondary)
                 } else {
                     Text("No seasons available").foregroundStyle(.secondary)
@@ -189,7 +193,8 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
     }
 
     private var availableSeasonNumbers: [Int] {
-        provider.availableSeasons.map(\.seasonNumber)
+        guard hasMatchingTVDetails else { return [] }
+        return provider.availableSeasons.map(\.seasonNumber)
     }
 
     private var canSubmit: Bool {

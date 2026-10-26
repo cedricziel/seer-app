@@ -1,10 +1,18 @@
 #!/bin/sh
 set -eu
-# Usage: request-sheet-tests.sh SIMULATOR_RUNTIME_IDENTIFIER EVIDENCE_DIRECTORY [before]
+# Usage: request-sheet-tests.sh SIMULATOR_RUNTIME_IDENTIFIER EVIDENCE_DIRECTORY [before] [stale]
 repo=$(cd "$(dirname "$0")/../../../.." && pwd)
 runtime=${1:?Pass an available iOS simulator runtime identifier}
 evidence=${2:?Pass an evidence directory outside the checkout}
 mode=${3:-after}
+filter=${4:-}
+set --
+if [ "$filter" = stale ]; then
+ set -- -only-testing:SheetTests/SheetTests/testDiscoverStaleDetails \
+  -only-testing:SheetTests/SheetTests/testSearchStaleDetails
+elif [ -n "$filter" ]; then
+ echo "Unknown test filter: $filter" >&2; exit 1
+fi
 case "$evidence" in
  /*) ;;
  *) echo "Evidence directory must be absolute" >&2; exit 1 ;;
@@ -51,6 +59,11 @@ final class SearchViewModel: ObservableObject {
   isLoadingTVDetails = args.contains("loading")
   if args.contains("empty") { tvDetails = details(empty: true) }
   if args.contains("loaded") { tvDetails = details(empty: false) }
+  if args.contains("stale") {
+   tvDetails = try! JSONDecoder().decode(TVDetails.self, from: Data(
+    #"{"id":41,"name":"Old Show","seasons":[{"id":99,"seasonNumber":99,"name":"Season 99"}]}"#.utf8
+   ))
+  }
  }
  func details(empty: Bool) -> TVDetails {
   let seasons = empty ? "[]" : "[{\"id\":1,\"seasonNumber\":1,\"name\":\"Season 1\"},{\"id\":2,\"seasonNumber\":2,\"name\":\"Season 2\"}]"
@@ -131,6 +144,19 @@ final class SheetTests: XCTestCase {
   app.buttons["Request"].tap()
   XCTAssertTrue(app.staticTexts["Submitted movie 4K false"].waitForExistence(timeout: 5))
  }
+ @MainActor func checkStaleDetails(_ sheet: String) {
+  let app = XCUIApplication(); app.launchArguments = [sheet, "stale"]; app.launch()
+  XCTAssertTrue(app.buttons["Request"].waitForExistence(timeout: 10))
+  XCTAssertFalse(app.buttons["Request"].isEnabled)
+  XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label CONTAINS 'Season 99'")).firstMatch.exists)
+  capture("\(sheet)-stale-details")
+  app.buttons["Retry"].tap()
+  XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS 'Season 2'")).firstMatch.waitForExistence(timeout: 5))
+  app.buttons["Request"].tap()
+  XCTAssertTrue(app.staticTexts["Submitted [1, 2] 4K false"].waitForExistence(timeout: 5))
+ }
+ @MainActor func testDiscoverStaleDetails() { checkStaleDetails("discover") }
+ @MainActor func testSearchStaleDetails() { checkStaleDetails("search") }
  @MainActor func testDiscoverLoading() { checkLoading("discover") }
  @MainActor func testSearchLoading() { checkLoading("search") }
  @MainActor func testDiscoverRecovery() { checkRecovery("discover") }
@@ -199,7 +225,7 @@ YAML
 xcodegen generate --spec "$work/project.yml"
 sim=$(xcrun simctl create "UX004 isolated sheets" com.apple.CoreSimulator.SimDeviceType.iPhone-17 "$runtime")
 set +e
-xcodebuild test -project "$work/RequestSeasonVerification.xcodeproj" -scheme Harness \
+xcodebuild test -project "$work/RequestSeasonVerification.xcodeproj" -scheme Harness "$@" \
  -destination "platform=iOS Simulator,id=$sim" -jobs 2 -parallel-testing-enabled NO \
  -collect-test-diagnostics never -test-timeouts-enabled YES \
  -default-test-execution-time-allowance 120 -derivedDataPath "$work/DerivedData" \
