@@ -89,19 +89,21 @@ final class OfflinePlaybackProgressTests: XCTestCase {
         await model.loadMedia()
         let player = try XCTUnwrap(model.player)
         player.isMuted = true
-        let started = expectation(description: "Player started")
+        let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
         let subscription = player.publisher(for: \.timeControlStatus)
+            .receive(on: DispatchQueue.main)
             .filter { $0 == .playing }
             .first()
-            .sink { _ in started.fulfill() }
+            .sink { _ in started.continuation.yield(()) }
         defer { subscription.cancel() }
         model.play()
-        await fulfillment(of: [started], timeout: 3)
-        let saved = expectation(description: "Native pause saved")
-        backend.onSave = { saved.fulfill() }
+        try await waitForPlaybackEvent(started.stream)
+        let saved = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        backend.onSave = { saved.continuation.yield(()) }
 
         player.pause()
-        await fulfillment(of: [saved], timeout: 2)
+        try await waitForPlaybackEvent(saved.stream)
+        backend.onSave = nil
 
         let pending = try await store.pendingPlaybackProgress(serverID: "stored-server")
         XCTAssertEqual(pending.count, 1)
@@ -112,11 +114,12 @@ final class OfflinePlaybackProgressTests: XCTestCase {
         let download = try await insertDownload()
         model = makeModel()
         await model.loadMedia()
-        let saved = expectation(description: "Playback end saved")
-        backend.onSave = { saved.fulfill() }
+        let saved = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        backend.onSave = { saved.continuation.yield(()) }
 
         NotificationCenter.default.post(name: .AVPlayerItemDidPlayToEndTime, object: model.player?.currentItem)
-        await fulfillment(of: [saved], timeout: 2)
+        try await waitForPlaybackEvent(saved.stream)
+        backend.onSave = nil
 
         let stored = try await store.fetchDownload(id: download.id)
         XCTAssertEqual(stored?.isWatched, true)
@@ -131,6 +134,23 @@ final class OfflinePlaybackProgressTests: XCTestCase {
         XCTAssertNil(model.player)
         XCTAssertFalse(model.isReady)
         XCTAssertEqual(model.errorMessage, "The downloaded file is unavailable. Download this item again.")
+    }
+
+    private func waitForPlaybackEvent(_ events: AsyncStream<Void>) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                for await _ in events {
+                    return
+                }
+                throw PlaybackEventError.streamEnded
+            }
+            group.addTask {
+                try await Task.sleep(for: .seconds(5))
+                throw PlaybackEventError.timedOut
+            }
+            defer { group.cancelAll() }
+            _ = try await group.next()
+        }
     }
 
     private func insertDownload() async throws -> Download {
@@ -182,4 +202,9 @@ private final class LocalPlaybackBackend: DownloadPlaybackManaging {
         )
         onSave?()
     }
+}
+
+private enum PlaybackEventError: Error {
+    case timedOut
+    case streamEnded
 }
