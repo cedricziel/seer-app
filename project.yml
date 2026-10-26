@@ -28,6 +28,9 @@ packages:
   Kingfisher:
     url: https://github.com/onevcat/Kingfisher
     from: "8.0.0"
+  SwiftCollections:
+    url: https://github.com/apple/swift-collections
+    from: "1.7.1"
   JellyseerrAPI:
     path: Packages/JellyseerrAPI
   OpenTelemetrySwift:
@@ -60,6 +63,10 @@ targets:
         destinationFilters: [iOS, macOS]
     dependencies:
       - package: Kingfisher
+      # Shared API clients link this product dynamically; the app must carry it.
+      - package: SwiftCollections
+        product: DequeModule
+        embed: true
       - target: SeerCore
       - target: JellyfinClient
       - target: JellyseerrClient
@@ -77,6 +84,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.seer
+        "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "$(inherited) @executable_path/../Frameworks"
         MARKETING_VERSION: "0.8.1" # x-release-please-version
         CURRENT_PROJECT_VERSION: 4
         INFOPLIST_FILE: App/SeerApp/Info.plist

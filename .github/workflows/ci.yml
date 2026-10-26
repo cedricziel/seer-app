@@ -118,7 +118,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        destination: [tvOS, macOS]
+        destination: [iOS, tvOS, macOS]
     permissions:
       contents: read
     steps:
@@ -131,11 +131,14 @@ jobs:
         run: |
           touch Config/Secrets.xcconfig
           xcodegen generate
-      - name: Build native app
+      - name: Archive native app
         run: |
           xcodebuild -scheme SeerApp \
             -destination 'generic/platform=${{ matrix.destination }}' \
             -configuration Release \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -clonedSourcePackagesDirPath "$RUNNER_TEMP/SourcePackages" \
-            CODE_SIGNING_ALLOWED=NO build
+            -archivePath "$RUNNER_TEMP/SeerApp.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO archive
+      - name: Validate runtime libraries
+        run: python3 scripts/check_app_libraries.py "$RUNNER_TEMP/SeerApp.xcarchive"
