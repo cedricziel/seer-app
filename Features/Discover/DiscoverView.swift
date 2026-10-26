@@ -129,36 +129,51 @@ private struct DiscoverContentView: View {
     private var discoverContentView: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
+                if let error = viewModel.errorMessage {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(error)
+                            .foregroundStyle(.secondary)
+                        Button {
+                            Task { await viewModel.refresh() }
+                        } label: {
+                            Label("Retry", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(viewModel.isLoading)
+                    }
+                    .padding(.horizontal)
+                }
+
                 // Trending
-                if viewModel.isLoadingTrending {
+                if viewModel.isLoadingTrending, viewModel.trending.isEmpty {
                     SkeletonCardRow(title: "Trending", cardCount: 5, cardWidth: 140)
                 } else if !viewModel.trending.isEmpty {
                     trendingSection
                 }
 
                 // Upcoming Movies
-                if viewModel.isLoadingUpcomingMovies {
+                if viewModel.isLoadingUpcomingMovies, viewModel.upcomingMovies.isEmpty {
                     SkeletonCardRow(title: "Upcoming Movies", cardCount: 5, cardWidth: 140)
                 } else if !viewModel.upcomingMovies.isEmpty {
                     upcomingMoviesSection
                 }
 
                 // Upcoming TV Shows
-                if viewModel.isLoadingUpcomingTV {
+                if viewModel.isLoadingUpcomingTV, viewModel.upcomingTV.isEmpty {
                     SkeletonCardRow(title: "Upcoming TV Shows", cardCount: 5, cardWidth: 140)
                 } else if !viewModel.upcomingTV.isEmpty {
                     upcomingTVSection
                 }
 
                 // Movie Genres
-                if viewModel.isLoadingGenres {
+                if viewModel.isLoadingGenres, viewModel.movieGenres.isEmpty {
                     SkeletonCardRow(title: "Movie Genres", cardCount: 4, cardWidth: 200, aspectRatio: 16 / 9)
                 } else if !viewModel.movieGenres.isEmpty {
                     movieGenresSection
                 }
 
                 // TV Genres
-                if !viewModel.isLoadingGenres, !viewModel.tvGenres.isEmpty {
+                if !viewModel.tvGenres.isEmpty {
                     tvGenresSection
                 }
             }
