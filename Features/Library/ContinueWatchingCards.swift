@@ -2,7 +2,7 @@ import Kingfisher
 import SeerUI
 import SwiftUI
 
-/// Full-width 16:9 "up next" card for the first Continue Watching item.
+/// Full-width "up next" card for the first Continue Watching item.
 ///
 /// Takes only plain, precomputed data (no `MediaItem`, `DownloadManager` or
 /// `AppState`) so the caller stays in charge of fetching images, formatting
@@ -38,18 +38,26 @@ struct ContinueWatchingHeroCard: View {
     }
 
     var body: some View {
-        backdrop
-            .overlay(scrim)
-            .overlay(alignment: .bottomLeading) { captionBlock }
-            .overlay(alignment: .bottomTrailing) { resumeButton.padding(16) }
-            .overlay(alignment: .topLeading) { downloadedPillIfNeeded }
-            .overlay(alignment: .bottom) { progressBar }
-            .aspectRatio(16 / 9, contentMode: .fit)
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 6)
-            .opacity(isDimmed ? 0.5 : 1)
-            .modifier(OptionalContinueWatchingContextMenu(config: contextMenuConfig, actions: contextMenuActions))
+        ZStack(alignment: .bottomLeading) {
+            Color.clear.aspectRatio(16 / 9, contentMode: .fit)
+            VStack(alignment: .leading, spacing: 12) {
+                downloadedPillIfNeeded
+                captionBlock
+                HStack {
+                    Spacer(minLength: 0)
+                    resumeButton
+                }
+            }
+            .padding(16)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .background { backdrop.overlay(scrim) }
+        .overlay(alignment: .bottom) { progressBar }
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 6)
+        .opacity(isDimmed ? 0.5 : 1)
+        .modifier(OptionalContinueWatchingContextMenu(config: contextMenuConfig, actions: contextMenuActions))
     }
 
     private var backdrop: some View {
@@ -85,7 +93,6 @@ struct ContinueWatchingHeroCard: View {
                     .foregroundStyle(.white.opacity(0.85))
             }
         }
-        .padding(16)
     }
 
     private var resumeButton: some View {
@@ -94,7 +101,7 @@ struct ContinueWatchingHeroCard: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.black)
                 .padding(.horizontal, 20)
-                .frame(height: 44)
+                .frame(minHeight: 44)
                 .background(Capsule().fill(Color.white))
         }
         .buttonStyle(.plain)
@@ -110,7 +117,6 @@ struct ContinueWatchingHeroCard: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
                 .background(Capsule().fill(Color.green))
-                .padding(12)
         }
     }
 
