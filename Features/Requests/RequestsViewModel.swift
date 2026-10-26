@@ -396,6 +396,7 @@ public final class RequestsViewModel: ObservableObject {
     // MARK: - Request Actions
 
     func cancelRequest(_ request: MediaRequest, identity: UUID) async throws {
+        guard request.status == .pending else { return }
         try await performAction(.cancel, request: request, identity: identity)
     }
 
@@ -407,6 +408,13 @@ public final class RequestsViewModel: ObservableObject {
         try await performAction(.decline, request: request, identity: identity)
     }
 
+    private struct ActionKey: Hashable {
+        let identity: UUID
+        let requestID: Int
+    }
+
+    private var pendingActions: Set<ActionKey> = []
+
     private enum RequestAction { case cancel, approve, decline }
 
     private func performAction(_ action: RequestAction, request: MediaRequest, identity: UUID) async throws {
@@ -414,6 +422,9 @@ public final class RequestsViewModel: ObservableObject {
               visibleScope == scope, serviceServerID == scope.serverID,
               serviceConfigurationID == scope.configurationID, requests.contains(request),
               let service = jellyseerrService else { return }
+        let key = ActionKey(identity: identity, requestID: request.id)
+        guard pendingActions.insert(key).inserted else { return }
+        defer { pendingActions.remove(key) }
         do {
             switch action {
             case .cancel: try await service.cancelRequest(id: request.id)

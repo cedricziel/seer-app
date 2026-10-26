@@ -319,6 +319,45 @@ final class RequestsResponseIsolationTests: XCTestCase {
         XCTAssertNil(model.errorMessage)
     }
 
+    func testInFlightCancellationRejectsDuplicateAndAllowsRetryAfterFailure() async throws {
+        let (model, api) = await loadedModel()
+        let request = try XCTUnwrap(model.requests.first)
+        let identity = model.requestIdentity
+        api.holdActions = true
+        let first = Task { try await model.cancelRequest(request, identity: identity) }
+        await api.waitForAction()
+        api.holdActions = false
+        try await model.cancelRequest(request, identity: identity)
+        XCTAssertEqual(api.actions, [1])
+        api.finishAction(error: URLError(.timedOut))
+        do {
+            try await first.value
+            XCTFail("Cancellation should report the server failure")
+        } catch {
+            XCTAssertEqual((error as? URLError)?.code, .timedOut)
+        }
+        do {
+            try await model.cancelRequest(request, identity: identity)
+            XCTFail("Retry should report the fixture failure")
+        } catch {
+            XCTAssertEqual((error as? URLError)?.code, .unsupportedURL)
+        }
+        XCTAssertEqual(api.actions, [1, 1])
+    }
+
+    func testCancellationRejectsNonPendingRequest() async throws {
+        let api = DelayedRequestService()
+        let serverID = UUID()
+        let model = RequestsViewModel(appState: AppState(), service: api, serverIdentity: { serverID })
+        let load = Task { await model.loadRequests() }
+        await api.waitForCalls(1)
+        api.succeed(0, ids: [1], status: 2)
+        await load.value
+        let request = try XCTUnwrap(model.requests.first)
+        try await model.cancelRequest(request, identity: model.requestIdentity)
+        XCTAssertTrue(api.actions.isEmpty)
+    }
+
     private func loadedModel() async -> (RequestsViewModel, DelayedRequestService) {
         let api = DelayedRequestService()
         let serverID = UUID()
@@ -383,11 +422,11 @@ private final class DelayedRequestService: RequestService {
         }
     }
 
-    func succeed(_ call: Int, ids: [Int], total: Int = 40) {
+    func succeed(_ call: Int, ids: [Int], total: Int = 40, status: Int = 1) {
         let requests: [[String: Any]] = ids.map {
             [
                 "id": $0,
-                "status": 1,
+                "status": status,
                 "createdAt": "2026-01-01",
                 "updatedAt": "2026-01-01",
                 "type": "movie",

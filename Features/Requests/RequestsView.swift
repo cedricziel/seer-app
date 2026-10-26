@@ -73,6 +73,9 @@ private struct RequestsContentView: View {
                     request: request,
                     displayTitle: viewModel.displayTitle(for: request),
                     canManageRequests: viewModel.canManageRequests,
+                    onCancel: {
+                        try await viewModel.cancelRequest(request, identity: identity)
+                    },
                     onApprove: {
                         Task {
                             do {
@@ -191,14 +194,8 @@ private struct RequestsContentView: View {
                         selectedRequestDetails = request
                     },
                     onCancelRequest: {
-                        Task {
-                            do {
-                                try await viewModel.cancelRequest(request, identity: identity)
-                            } catch {
-                                actionErrorMessage = error.localizedDescription
-                                showActionError = true
-                            }
-                        }
+                        selectedRequestIdentity = identity
+                        selectedRequestDetails = request
                     },
                     onApproveRequest: {
                         Task {
@@ -443,8 +440,12 @@ struct RequestDetailsSheet: View {
     let request: MediaRequest
     var displayTitle: String
     var canManageRequests: Bool = false
+    var onCancel: (() async throws -> Void)?
     var onApprove: (() -> Void)?
     var onDecline: (() -> Void)?
+    @State private var showCancelConfirmation = false
+    @State private var isCancelling = false
+    @State private var cancellationError: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -458,7 +459,35 @@ struct RequestDetailsSheet: View {
                     LabeledContent("Requested", value: request.formattedCreatedAt)
                 }
 
-                // Admin actions for pending requests
+                if request.status == .pending, onCancel != nil {
+                    Section {
+                        Button(role: .destructive) {
+                            showCancelConfirmation = true
+                        } label: {
+                            if isCancelling {
+                                HStack {
+                                    ProgressView()
+                                    Text("Cancelling Request…")
+                                }
+                            } else {
+                                Label("Cancel Request", systemImage: "trash")
+                            }
+                        }
+                        .disabled(isCancelling)
+
+                        if let cancellationError {
+                            Text(cancellationError)
+                                .foregroundStyle(.red)
+                            Button("Retry Cancellation") {
+                                cancelRequest()
+                            }
+                            .disabled(isCancelling)
+                        }
+                    } header: {
+                        Text("Cancellation")
+                    }
+                }
+
                 if canManageRequests, request.status == .pending {
                     Section("Actions") {
                         Button {
@@ -478,7 +507,17 @@ struct RequestDetailsSheet: View {
                     }
                 }
             }
+            .disabled(isCancelling)
             .navigationTitle("Request Details")
+            .alert("Cancel Request?", isPresented: $showCancelConfirmation) {
+                Button("Cancel Request", role: .destructive) {
+                    cancelRequest()
+                }
+                Button("Keep Request", role: .cancel) {}
+            } message: {
+                Text("Cancel the request for \(displayTitle)?")
+            }
+            .interactiveDismissDisabled(isCancelling)
             #if os(iOS)
                 .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -487,8 +526,24 @@ struct RequestDetailsSheet: View {
                         Button("Done") {
                             dismiss()
                         }
+                        .disabled(isCancelling)
                     }
                 }
+        }
+    }
+
+    private func cancelRequest() {
+        guard !isCancelling, let onCancel else { return }
+        isCancelling = true
+        cancellationError = nil
+        Task { @MainActor in
+            defer { isCancelling = false }
+            do {
+                try await onCancel()
+                dismiss()
+            } catch {
+                cancellationError = "Couldn’t cancel the request. \(error.localizedDescription)"
+            }
         }
     }
 }

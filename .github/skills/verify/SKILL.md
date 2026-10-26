@@ -69,3 +69,11 @@ The ephemeral URLSession fixture covers total failure and retry, partial content
 independent genre failures, retained content after failed refresh, and stale
 responses after server or credential changes. It uses in-memory SwiftData and
 throwaway server credentials; it does not verify live Jellyseerr compatibility.
+
+For request cancellation, run `LibraryFeatureTests/RequestsResponseIsolationTests`
+through required CI or an isolated simulator. Cover duplicate actions, retry after
+failure, pending eligibility, and stale server/configuration guards. Run
+`.github/skills/verify/scripts/cancellation-tests.sh SIMULATOR_RUNTIME_IDENTIFIER /absolute/scratch/evidence`
+for the isolated details flow. It uses synthetic requests and a controlled failure,
+then verifies confirmation, progress, retry, and dismissal. Append `before` for the
+base comparison. The UI harness does not contact a server.
