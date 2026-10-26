@@ -25,7 +25,11 @@ final class JellyfinSDKTransportTests: XCTestCase {
     }
 
     func testGeneratedSearchEscapesLiteralPlusWithoutChangingBaseQueryEncoding() async throws {
-        let server = SDKStubServer(status: 200, body: #"{"Items":[]}"#, baseQuery: "proxy=a+b&encoded=a%2Bb")
+        let server = SDKStubServer(
+            status: 200,
+            body: #"{"Items":[],"TotalRecordCount":0,"StartIndex":0}"#,
+            baseQuery: "proxy=a+b&encoded=a%2Bb"
+        )
 
         _ = try await server.service().search(query: "C++")
 

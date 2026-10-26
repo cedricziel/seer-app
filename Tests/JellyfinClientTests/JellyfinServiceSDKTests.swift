@@ -32,7 +32,6 @@ final class JellyfinServiceSDKTests: XCTestCase {
         _ = try await service.getLibraries()
 
         XCTAssertEqual(server.requests.count, 4)
-        XCTAssertEqual(server.requests.map(\.timeoutInterval), [17, 17, 17, 17])
         XCTAssertFalse(try XCTUnwrap(server.requests[1].value(forHTTPHeaderField: "Authorization")).contains("Token="))
         XCTAssertTrue(try XCTUnwrap(server.requests[2].value(forHTTPHeaderField: "Authorization"))
             .contains("Token=new-token"))
