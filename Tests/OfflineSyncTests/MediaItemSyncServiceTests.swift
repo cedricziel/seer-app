@@ -236,9 +236,10 @@ private class SeriesSyncFixtureProtocol: URLProtocol, @unchecked Sendable {
             client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL))
             return
         }
-        let body = itemType == "Season"
-            ? #"{"Items":[{"Id":"season","Name":"Season","Type":"Season","SeriesId":"series"}],"TotalRecordCount":1}"#
-            : #"{"Items":[{"Id":"episode","Name":"E","Type":"Episode","SeriesId":"series"}],"TotalRecordCount":1}"#
+        let itemJSON = itemType == "Season"
+            ? #"{"Id":"season","Name":"Season","Type":"Season","SeriesId":"series"}"#
+            : #"{"Id":"episode","Name":"E","Type":"Episode","SeriesId":"series"}"#
+        let body = #"{"Items":["# + itemJSON + #"],"TotalRecordCount":1,"StartIndex":0}"#
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(body.utf8))
         client?.urlProtocolDidFinishLoading(self)
