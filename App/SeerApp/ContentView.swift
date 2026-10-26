@@ -153,6 +153,7 @@ struct MainTabView: View {
         .sheet(item: $notificationDestination) { destination in
             NotificationDestinationView(destination: destination)
                 .id(destination.id)
+                .id(appState.serviceConfigurationID)
         }
         .alert("Notification unavailable", isPresented: $showNotificationError) {
             Button("OK", role: .cancel) {}

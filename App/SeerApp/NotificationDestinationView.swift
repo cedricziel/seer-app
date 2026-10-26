@@ -9,14 +9,13 @@ struct NotificationDestinationView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
     @Environment(\.dismiss) private var dismiss
-    @State private var request: MediaRequest?
-    @State private var errorMessage: String?
+    @StateObject private var requestDetails = NotificationRequestDetails()
 
     var body: some View {
         Group {
             switch destination {
             case let .request(_, requestID):
-                if let request {
+                if let request = requestDetails.request {
                     RequestDetailsSheet(
                         request: request,
                         displayTitle: request.media.displayTitle ?? "Request #\(requestID)"
@@ -24,7 +23,7 @@ struct NotificationDestinationView: View {
                 } else {
                     NavigationStack {
                         Group {
-                            if let errorMessage {
+                            if let errorMessage = requestDetails.errorMessage {
                                 ContentUnavailableView(
                                     "Request unavailable",
                                     systemImage: "exclamationmark.circle",
@@ -73,22 +72,19 @@ struct NotificationDestinationView: View {
 
     private func loadRequest() async {
         guard appState.activeServerID == destination.serverID, appState.isAuthenticated else { return }
-        guard case let .request(serverID, requestID) = destination else {
+        guard case let .request(_, requestID) = destination else {
             await downloadManager?.refresh()
             return
         }
         guard let url = appState.jellyseerrServerURL, let apiKey = appState.jellyseerrAPIKey else {
-            errorMessage = "Jellyseerr is not configured for this server."
+            requestDetails.clear(error: "Jellyseerr is not configured for this server.")
             return
         }
-        do {
-            let service = JellyseerrService(serverURL: url, apiKey: apiKey)
-            let loaded = try await service.getRequest(id: requestID)
-            guard !Task.isCancelled, appState.activeServerID == serverID, appState.isAuthenticated else { return }
-            request = loaded
-        } catch {
-            guard !Task.isCancelled else { return }
-            errorMessage = error.localizedDescription
-        }
+        let service = JellyseerrService(serverURL: url, apiKey: apiKey)
+        await requestDetails.load(
+            configuration: appState.serviceConfigurationID,
+            currentConfiguration: { appState.serviceConfigurationID },
+            fetch: { try await service.getRequest(id: requestID) }
+        )
     }
 }
