@@ -70,29 +70,37 @@ final class MockBackgroundSessionDelegate: BackgroundSessionDelegate, @unchecked
 /// Tests for BackgroundSessionManager, particularly the synchronous file move fix
 final class BackgroundSessionManagerTests: XCTestCase {
     var mockDelegate: MockBackgroundSessionDelegate!
+    private var manager: BackgroundSessionManager!
+    private var directory: URL!
 
     override func setUp() async throws {
         try await super.setUp()
         mockDelegate = MockBackgroundSessionDelegate()
+        directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        manager = BackgroundSessionManager(session: URLSession(configuration: .ephemeral), pendingDirectory: directory)
     }
 
     override func tearDown() async throws {
+        manager.session.invalidateAndCancel()
+        try FileManager.default.removeItem(at: directory)
+        manager = nil
         mockDelegate = nil
         try await super.tearDown()
     }
 
     // MARK: - Task Registration Tests
 
-    func testDownloadIDForTask_returnsNilForUnregisteredTask() {
-        let sut = BackgroundSessionManager.shared
+    func testDownloadIDForTask_returnsNilForUnregisteredTask() throws {
+        let sut = try XCTUnwrap(manager)
 
         let downloadID = sut.downloadID(forTask: 99999)
 
         XCTAssertNil(downloadID)
     }
 
-    func testRegisterTask_storesDownloadIDCorrectly() {
-        let sut = BackgroundSessionManager.shared
+    func testRegisterTask_storesDownloadIDCorrectly() throws {
+        let sut = try XCTUnwrap(manager)
         let testDownloadID = UUID()
         let testTaskID = 12345
 
@@ -105,8 +113,8 @@ final class BackgroundSessionManagerTests: XCTestCase {
         sut.unregisterTask(testTaskID)
     }
 
-    func testUnregisterTask_removesDownloadID() {
-        let sut = BackgroundSessionManager.shared
+    func testUnregisterTask_removesDownloadID() throws {
+        let sut = try XCTUnwrap(manager)
         let testDownloadID = UUID()
         let testTaskID = 12346
 
@@ -245,8 +253,8 @@ final class BackgroundSessionManagerTests: XCTestCase {
 
     // MARK: - Delegate Configuration Tests
 
-    func testDelegate_canBeSetAndRetrieved() {
-        let sut = BackgroundSessionManager.shared
+    func testDelegate_canBeSetAndRetrieved() throws {
+        let sut = try XCTUnwrap(manager)
 
         sut.delegate = mockDelegate
         XCTAssertNotNil(sut.delegate)
@@ -257,8 +265,8 @@ final class BackgroundSessionManagerTests: XCTestCase {
 
     // MARK: - Background Completion Handler Tests
 
-    func testBackgroundCompletionHandler_canBeSet() {
-        let sut = BackgroundSessionManager.shared
+    func testBackgroundCompletionHandler_canBeSet() throws {
+        let sut = try XCTUnwrap(manager)
         var handlerCalled = false
 
         sut.setBackgroundCompletionHandler {

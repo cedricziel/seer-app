@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Verify Seer changes with isolated search-model tests, native builds, hosted unit tests, and OpenAPI regeneration before a PR.
+description: Verify Seer changes with isolated search and offline-download tests, native builds, hosted unit tests, and OpenAPI regeneration before a PR.
 ---
 
 # Verify Seer
@@ -11,6 +11,7 @@ For PiP restoration changes, run `.claude/skills/verify/scripts/pip-tests.sh SIM
 
 1. Check `git status --short`. Preserve unrelated changes and peer worktrees.
 2. Run [scripts/search-tests.sh](scripts/search-tests.sh) for library-search changes. It compiles the real search model, Jellyfin media types, and regression tests in a disposable macOS Swift package. It does not launch the app or access credentials, preferences, or CloudKit. Requires macOS and the Xcode Swift toolchain. This checks model behavior, not SwiftUI integration.
+   For offline downloads, run [scripts/offline-tests.sh](scripts/offline-tests.sh). It checks request cellular policies, HTTP response handling, stored playback destinations, and progress persistence and synchronization using real sources, temporary files, and in-memory SwiftData. Sessions are injected and never start real transfers. Native player integration remains in `LibraryFeatureTests/OfflinePlaybackProgressTests` and requires the isolated simulator procedure below.
 3. Run [scripts/request-tests.sh](scripts/request-tests.sh) for request-loading changes. It compiles the real request view model, API models, scheduler, and SwiftData cache model in a disposable macOS package. The [AppState fixture](fixtures/RequestDependencies.swift) and [API fixture](fixtures/RequestService.swift) prevent credentials, preferences, CloudKit, and network access. Continuation-controlled tests cover stale server/filter/sort responses, refresh/pagination ownership, and actions on obsolete rows.
 4. Use the versions and checksums in `scripts/swift-tools.lock`. Run `./scripts/swift-tools swiftlint lint --strict --no-cache` and `./scripts/swift-tools swiftformat --lint . --cache ignore`. Compare failures with the baseline. Format only changed files.
 5. Run `openspec validate library-search-settings --strict` when changing that spec. For other changes, validate their change name.
@@ -48,6 +49,8 @@ Check these journeys on an isolated simulator:
 - Returning from details preserves loaded search pages.
 - Every tab opens Settings; Servers, Downloads, Privacy & Diagnostics, and Send Feedback are reachable and dismiss back correctly.
 - Library and Requests retain Refresh in their menus.
+- Downloads opens completed movies and episodes with their stored server identity, including when another server is active and Library data is absent. Incomplete records have no Play action.
+- Downloaded playback resumes locally, saves on native pause and dismissal, marks completion watched, and retains progress for retry after reconnect. WiFi-only requests must disallow cellular for fresh, resumed, and recovered tasks; use test destinations for any transfer checks.
 - Check iPhone portrait/landscape, iPad regular and split-view 1/3, 1/2, 2/3, tvOS focus, VoiceOver, AX5, and Reduce Motion.
 
 Record feature snapshots on the same iOS runtime as CI, currently iOS 26.5. iOS 27 renders navigation controls and text differently even at the same snapshot dimensions. Review reference, failure, and difference attachments before replacing a baseline; keep comparison thresholds unchanged. If the standalone snapshot artifact is absent, export the suite's attachments from the xcresult bundle without `--only-failures`, which can omit the PNG attachments.

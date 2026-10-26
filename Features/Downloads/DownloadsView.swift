@@ -1,4 +1,5 @@
 import DownloadClient
+import SeerCore
 import SeerUI
 import SwiftUI
 
@@ -6,7 +7,9 @@ import SwiftUI
 struct DownloadsView: View {
     @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
 
-    @State private var selectedDownload: Download?
+    @EnvironmentObject private var appState: AppState
+
+    @State private var selectedDownload: DownloadPlaybackDestination?
 
     var body: some View {
         NavigationStack {
@@ -23,6 +26,25 @@ struct DownloadsView: View {
                     SettingsButton()
                 }
             }
+        }
+        .playerCover(item: $selectedDownload) { destination in
+            #if os(tvOS)
+                TVPlayerView(
+                    item: destination.item,
+                    appState: appState,
+                    startPositionTicks: destination.startPositionTicks,
+                    downloadServerID: destination.serverID,
+                    onDismiss: { selectedDownload = nil }
+                )
+            #else
+                VideoPlayerView(
+                    item: destination.item,
+                    appState: appState,
+                    startPositionTicks: destination.startPositionTicks,
+                    downloadServerID: destination.serverID,
+                    onPiPStart: { selectedDownload = nil }
+                )
+            #endif
         }
     }
 
@@ -105,7 +127,7 @@ struct DownloadsView: View {
             if !movies.isEmpty {
                 Section("Movies") {
                     ForEach(movies, id: \.id) { download in
-                        DownloadRow(download: download, manager: manager)
+                        playableDownloadRow(download, manager: manager)
                     }
                     .onDelete { indexSet in
                         deleteDownloads(at: indexSet, from: movies, manager: manager)
@@ -119,7 +141,7 @@ struct DownloadsView: View {
                     if let seriesEpisodes = grouped[seriesName] {
                         Section(seriesName) {
                             ForEach(seriesEpisodes, id: \.id) { download in
-                                DownloadRow(download: download, manager: manager)
+                                playableDownloadRow(download, manager: manager)
                             }
                             .onDelete { indexSet in
                                 deleteDownloads(at: indexSet, from: seriesEpisodes, manager: manager)
@@ -128,6 +150,17 @@ struct DownloadsView: View {
                     }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private func playableDownloadRow(_ download: Download, manager: DownloadManager) -> some View {
+        if let destination = DownloadPlaybackDestination(download: download) {
+            DownloadRow(download: download, manager: manager, onPlay: {
+                selectedDownload = destination
+            })
+        } else {
+            DownloadRow(download: download, manager: manager)
         }
     }
 
@@ -241,11 +274,28 @@ struct DownloadRow: View {
 
             Spacer()
 
-            CompactDownloadButton(
-                state: buttonState,
-                onDownload: handleDownloadAction,
-                onCancel: handleCancelAction
-            )
+            if download.state == .completed, let onPlay {
+                Button(action: onPlay) {
+                    Label("Play", systemImage: "play.fill")
+                        .labelStyle(.iconOnly)
+                    #if os(iOS)
+                        .frame(minWidth: 44, minHeight: 44)
+                    #endif
+                }
+                #if os(iOS)
+                .buttonStyle(.borderless)
+                #else
+                .buttonStyle(.bordered)
+                #endif
+                .accessibilityLabel("Play \(download.displayTitle)")
+                .accessibilityIdentifier("downloads.play.\(download.id.uuidString)")
+            } else {
+                CompactDownloadButton(
+                    state: buttonState,
+                    onDownload: handleDownloadAction,
+                    onCancel: handleCancelAction
+                )
+            }
         }
         .padding(.vertical, 4)
         #if !os(tvOS)

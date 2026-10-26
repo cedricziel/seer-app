@@ -1,4 +1,5 @@
 import DownloadClient
+import JellyfinClient
 import Kingfisher
 import NotificationClient
 import OfflineSync
@@ -135,15 +136,23 @@ struct SeerApp: App {
                 .onChange(of: appState.jellyfinServerURL) { _, _ in
                     downloadManager?.configure(from: appState)
                 }
-                .onChange(of: appState.appIntentsIndexingEnabled) { _, _ in
-                    #if !os(tvOS)
-                        spotlightIndexer?.reconcile()
-                    #endif
+                .onChange(of: networkMonitor.isConnected) { _, isConnected in
+                    if isConnected {
+                        syncDownloadedPlaybackProgress()
+                    }
                 }
+            #if !os(tvOS)
+                .onChange(of: appState.appIntentsIndexingEnabled) { _, _ in
+                    spotlightIndexer?.reconcile()
+                }
+            #endif
                 .onOpenURL { url in
                     flowmarkRouter.route(url)
                 }
                 .onChange(of: scenePhase) { _, phase in
+                    if phase == .active {
+                        syncDownloadedPlaybackProgress()
+                    }
                     // BGTaskScheduler only runs tasks that have been submitted;
                     // registering the handlers alone never schedules a first run.
                     #if os(iOS)
@@ -162,10 +171,37 @@ struct SeerApp: App {
     private func configureServicesCredentials() {
         // Configure download manager
         downloadManager?.configure(from: appState)
+        syncDownloadedPlaybackProgress()
 
         // (Re)bind the request status poller to the active server
         if let service = requestNotificationService {
             ensureRequestStatusPoller(notificationService: service)
+        }
+    }
+
+    @MainActor
+    private func syncDownloadedPlaybackProgress() {
+        guard networkMonitor.isConnected,
+              let manager = downloadManager,
+              let serverID = appState.activeServerKey,
+              let serverURL = appState.jellyfinServerURL,
+              let accessToken = appState.jellyfinAccessToken,
+              let userID = appState.jellyfinUserID,
+              let deviceID = appState.jellyfinDeviceID
+        else { return }
+
+        let service = JellyfinService(
+            serverURL: serverURL, accessToken: accessToken, userID: userID, deviceID: deviceID
+        )
+        Task {
+            await manager.syncPlaybackProgress(serverID: serverID) { progress in
+                try await service.reportPlaybackProgress(
+                    itemId: progress.itemID, positionTicks: progress.positionTicks, isPaused: true
+                )
+                if progress.isWatched {
+                    try await service.markAsPlayed(itemId: progress.itemID)
+                }
+            }
         }
     }
 
@@ -203,8 +239,7 @@ struct SeerApp: App {
 
     @MainActor
     private func setupServices() async {
-        // Wire up Spotlight indexing — gated behind the per-device
-        // privacy flag (`appIntentsIndexingEnabled`, default off).
+        syncDownloadedPlaybackProgress()
         #if !os(tvOS)
             let indexer = SpotlightIndexer(
                 appState: appState,
@@ -212,7 +247,6 @@ struct SeerApp: App {
             )
             spotlightIndexer = indexer
             indexer.reconcile()
-
         #endif
 
         // Notification manager was created in `init`; wire the rest here

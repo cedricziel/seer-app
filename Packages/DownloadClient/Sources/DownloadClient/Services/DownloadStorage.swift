@@ -31,11 +31,20 @@ public actor DownloadStorage {
         }
     }
 
+    static var defaultSearchPathDirectory: FileManager.SearchPathDirectory {
+        #if os(tvOS)
+            .cachesDirectory
+        #else
+            .documentDirectory
+        #endif
+    }
+
     public init() throws {
-        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+        guard let baseDirectory = FileManager.default.urls(for: Self.defaultSearchPathDirectory, in: .userDomainMask)
+            .first else {
             throw StorageError.storageUnavailable
         }
-        downloadsDirectory = documentsPath.appendingPathComponent("Downloads", isDirectory: true)
+        downloadsDirectory = baseDirectory.appendingPathComponent("Downloads", isDirectory: true)
 
         // Create downloads directory if needed
         if !FileManager.default.fileExists(atPath: downloadsDirectory.path) {

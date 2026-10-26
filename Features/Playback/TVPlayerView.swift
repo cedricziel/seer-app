@@ -1,4 +1,5 @@
 import AVKit
+import DownloadClient
 import JellyfinClient
 import PlaybackClient
 import SeerCore
@@ -7,6 +8,8 @@ import SwiftUI
 #if os(tvOS)
     /// Native tvOS video player using AVPlayerViewController for Siri Remote support
     public struct TVPlayerView: UIViewControllerRepresentable {
+        @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
+
         private let item: MediaItem
         private let appState: AppState
         private let startPositionTicks: Int64
@@ -18,6 +21,7 @@ import SwiftUI
             item: MediaItem,
             appState: AppState,
             startPositionTicks: Int64 = 0,
+            downloadServerID: String? = nil,
             onDismiss: @escaping () -> Void
         ) {
             self.item = item
@@ -27,7 +31,8 @@ import SwiftUI
             _viewModel = State(wrappedValue: VideoPlayerViewModel(
                 item: item,
                 appState: appState,
-                startPositionTicks: startPositionTicks
+                startPositionTicks: startPositionTicks,
+                downloadServerID: downloadServerID
             ))
         }
 
@@ -35,12 +40,13 @@ import SwiftUI
             let controller = AVPlayerViewController()
             controller.delegate = context.coordinator
 
+            viewModel.downloadManager = downloadManager
             Task {
                 await viewModel.loadMedia(startPositionTicks: startPositionTicks)
                 if let player = viewModel.player {
                     await MainActor.run {
                         controller.player = player
-                        player.play()
+                        viewModel.play()
                     }
                 }
             }
@@ -88,17 +94,20 @@ import SwiftUI
         let item: MediaItem
         let appState: AppState
         let startPositionTicks: Int64
+        let downloadServerID: String?
         let onDismiss: () -> Void
 
         public init(
             item: MediaItem,
             appState: AppState,
             startPositionTicks: Int64 = 0,
+            downloadServerID: String? = nil,
             onDismiss: @escaping () -> Void
         ) {
             self.item = item
             self.appState = appState
             self.startPositionTicks = startPositionTicks
+            self.downloadServerID = downloadServerID
             self.onDismiss = onDismiss
         }
 
@@ -106,7 +115,8 @@ import SwiftUI
             VideoPlayerView(
                 item: item,
                 appState: appState,
-                startPositionTicks: startPositionTicks
+                startPositionTicks: startPositionTicks,
+                downloadServerID: downloadServerID
             )
         }
     }
