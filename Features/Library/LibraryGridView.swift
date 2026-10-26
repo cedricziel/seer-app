@@ -1,7 +1,9 @@
 import JellyfinClient
+import OfflineSync
 import PlaybackClient
 import SeerCore
 import SeerUI
+import SwiftData
 import SwiftUI
 
 /// Navigation value for the pushed library grid screen. `.library` shows a
@@ -40,6 +42,8 @@ struct LibraryGridView: View {
     /// pushes. The caller decides — this view's own `horizontalSizeClass`
     /// is compact inside a split view column and cannot be used for that.
     let selectedItem: Binding<MediaItem?>?
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @StateObject private var viewModel: LibraryViewModel
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
@@ -72,7 +76,11 @@ struct LibraryGridView: View {
         #if !os(tvOS)
             .navigationBarTitleDisplayMode(.large)
         #endif
-            .task { await enterDestination() }
+            .task {
+                await viewModel.enterDestination(
+                    destination, modelContext: modelContext, networkMonitor: networkMonitor
+                )
+            }
             .fullScreenCover(item: $selectedItemForPlayback) { item in
                 VideoPlayerView(
                     item: item,
@@ -81,27 +89,6 @@ struct LibraryGridView: View {
                     onPiPStart: { selectedItemForPlayback = nil }
                 )
             }
-    }
-
-    private func enterDestination() async {
-        switch destination {
-        case let .library(library):
-            // This screen's filter bar exposes Unwatched/Favorites for
-            // library mode, not the media-type capsules — reset any
-            // leftover media-type filter left behind by `.recentlyAdded` on
-            // this view model's own previous entry so it can't silently
-            // restrict this fetch.
-            viewModel.isRecentlyAddedFeed = false
-            viewModel.selectedMediaType = .all
-            await viewModel.selectLibrary(library)
-        case .recentlyAdded:
-            // Mirror that reset in the other direction: this mode exposes
-            // All/Movies/TV Shows, not Unwatched/Favorites, so clear any
-            // watch-status filter left behind by library mode.
-            viewModel.isRecentlyAddedFeed = true
-            viewModel.watchStatusFilter = .all
-            await viewModel.selectLibrary(nil)
-        }
     }
 
     @ViewBuilder
@@ -154,9 +141,12 @@ struct LibraryGridView: View {
                 } label: {
                     HStack {
                         Text(option.rawValue)
-                        if viewModel.sortOption == option { Image(systemName: "checkmark") }
+                        if viewModel.sortOption == option {
+                            Image(systemName: "checkmark")
+                        }
                     }
                 }
+                .disabled(viewModel.isOffline && option == .dateAdded)
             }
         } label: {
             HStack(spacing: 4) {

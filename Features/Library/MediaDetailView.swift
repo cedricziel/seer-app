@@ -1,9 +1,11 @@
 import DownloadClient
 import JellyfinClient
 import JellyseerrClient
+import OfflineSync
 import PlaybackClient
 import SeerCore
 import SeerUI
+import SwiftData
 import SwiftUI
 
 /// Indicates whether a media item came from the library or search results
@@ -17,6 +19,8 @@ struct MediaDetailView: View {
     let item: MediaItem
     let source: MediaItemSource
     @ObservedObject var viewModel: LibraryViewModel
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @EnvironmentObject var appState: AppState
 
     @Environment(DownloadManager.self) var downloadManager: DownloadManager?
@@ -86,6 +90,7 @@ struct MediaDetailView: View {
             // Load series details
             guard item.type == .series, source == .library else { return }
             seriesViewModel = SeriesDetailViewModel(series: item, appState: appState)
+            seriesViewModel?.setupOfflineSync(modelContext: modelContext, networkMonitor: networkMonitor)
             await seriesViewModel?.loadSeasons()
         }
         .alert("Request Submitted", isPresented: $showRequestSuccess) {
@@ -340,5 +345,6 @@ struct MediaDetailView: View {
             viewModel: LibraryViewModel(appState: AppState())
         )
         .environmentObject(AppState())
+        .environmentObject(NetworkMonitor(isConnected: false))
     }
 }

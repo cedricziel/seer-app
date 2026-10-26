@@ -104,6 +104,7 @@ public final class LibraryViewModel: ObservableObject {
     private var jellyfinService: JellyfinService?
     private var serverURL: URL?
     private let appState: AppState
+    private let session: URLSession?
     private var currentPage: Int = 0
     private let pageSize: Int = 50
     private var hasMoreItems: Bool = true
@@ -116,8 +117,9 @@ public final class LibraryViewModel: ObservableObject {
     private weak var networkMonitor: NetworkMonitor?
     private let dataConverter = CachedDataConverter()
 
-    public init(appState: AppState) {
+    public init(appState: AppState, session: URLSession? = nil) {
         self.appState = appState
+        self.session = session
         setupService()
     }
 
@@ -141,7 +143,7 @@ public final class LibraryViewModel: ObservableObject {
         self.serverURL = serverURL
         jellyfinService = JellyfinService(
             serverURL: serverURL, accessToken: accessToken,
-            userID: userID, deviceID: appState.jellyfinDeviceID
+            userID: userID, deviceID: appState.jellyfinDeviceID, session: session
         )
     }
 
@@ -168,6 +170,31 @@ public final class LibraryViewModel: ObservableObject {
         errorMessage = nil
         currentPage = 0
         hasMoreItems = true
+    }
+
+    var isOffline: Bool {
+        networkMonitor?.isConnected == false
+    }
+
+    func loadHome(modelContext: ModelContext, networkMonitor: NetworkMonitor) async {
+        setupOfflineSync(modelContext: modelContext, networkMonitor: networkMonitor)
+        await loadInitialData()
+    }
+
+    func enterDestination(
+        _ destination: LibraryGridDestination, modelContext: ModelContext, networkMonitor: NetworkMonitor
+    ) async {
+        setupOfflineSync(modelContext: modelContext, networkMonitor: networkMonitor)
+        switch destination {
+        case let .library(library):
+            isRecentlyAddedFeed = false
+            selectedMediaType = .all
+            await selectLibrary(library)
+        case .recentlyAdded:
+            isRecentlyAddedFeed = true
+            watchStatusFilter = .all
+            await selectLibrary(nil)
+        }
     }
 
     func loadInitialData() async {
@@ -275,14 +302,30 @@ public final class LibraryViewModel: ObservableObject {
         guard let id = serverConfigurationID, let sync = mediaItemSyncService else { return }
         do {
             var items = try sync.getCachedItems(for: selectedLibrary?.id, serverConfigurationID: id)
-            if let types = selectedMediaType.cachedMediaTypes {
+            if let types = effectiveIncludeItemTypes?.map(\.rawValue) {
                 items = items.filter { types.contains($0.mediaType) }
             }
+            switch watchStatusFilter {
+            case .all: break
+            case .unwatched: items = items.filter { !$0.isPlayed }
+            case .favorites: items = items.filter(\.isFavorite)
+            }
+            sortCachedItems(&items)
             if !items.isEmpty {
                 mediaItems = items.map { dataConverter.convertToMediaItem($0) }
                 isShowingCachedData = true
             }
         } catch { Self.logger.debug("Failed to load cached library items: \(error.localizedDescription)") }
+    }
+
+    private func sortCachedItems(_ items: inout [CachedMediaItem]) {
+        if isOffline, sortOption == .dateAdded { sortOption = .name }
+        switch sortOption {
+        case .dateAdded: break
+        case .name: items.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        case .year: items.sort { ($0.year ?? Int.min) > ($1.year ?? Int.min) }
+        case .rating: items.sort { ($0.communityRating ?? -.infinity) > ($1.communityRating ?? -.infinity) }
+        }
     }
 
     func loadMediaItems() async {
@@ -303,7 +346,11 @@ public final class LibraryViewModel: ObservableObject {
             totalItemCount = selectedLibrary != nil ? response.totalRecordCount : nil
             isShowingCachedData = false
             if let cfg = appState.activeServer, let lib = selectedLibrary, let ctx = modelContext {
-                let desc = FetchDescriptor<CachedLibrary>(predicate: #Predicate { $0.id == lib.id })
+                let libraryID = lib.id
+                let serverID = cfg.id
+                let desc = FetchDescriptor<CachedLibrary>(predicate: #Predicate {
+                    $0.id == libraryID && $0.serverConfigurationID == serverID
+                })
                 if let cachedLib = try? ctx.fetch(desc).first {
                     try? await mediaItemSyncService?.syncLibraryItems(
                         library: cachedLib, serverConfig: cfg, service: service
@@ -397,6 +444,14 @@ public final class LibraryViewModel: ObservableObject {
 
     /// Fetch full item details including format information (MediaSources)
     func getItemDetails(id: String) async -> MediaItem? {
+        if networkMonitor?.isConnected == false {
+            guard let serverConfigurationID, let modelContext else { return nil }
+            let descriptor = FetchDescriptor<CachedMediaItem>(predicate: #Predicate {
+                $0.id == id && $0.serverConfigurationID == serverConfigurationID
+            })
+            guard let cached = try? modelContext.fetch(descriptor).first else { return nil }
+            return dataConverter.convertToMediaItem(cached)
+        }
         guard let service = jellyfinService else { return nil }
         do {
             return try await service.getItem(id: id)

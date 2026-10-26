@@ -444,6 +444,7 @@ targets:
       - target: SeerCore
       - target: JellyfinClient
       - target: JellyseerrClient
+      - target: OfflineSync
       - target: SeerUI
       - package: SnapshotTesting
         product: SnapshotTesting

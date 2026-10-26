@@ -44,7 +44,7 @@ final class SeriesDetailViewModel {
 
     // MARK: - Initialization
 
-    init(series: MediaItem, appState: AppState) {
+    init(series: MediaItem, appState: AppState, session: URLSession? = nil) {
         self.series = series
         self.appState = appState
 
@@ -61,7 +61,8 @@ final class SeriesDetailViewModel {
             serverURL: serverURL,
             accessToken: accessToken,
             userID: userID,
-            deviceID: appState.jellyfinDeviceID
+            deviceID: appState.jellyfinDeviceID,
+            session: session
         )
     }
 
@@ -134,10 +135,12 @@ final class SeriesDetailViewModel {
 
     /// Loads cached seasons from SwiftData
     private func loadCachedSeasons() async {
-        guard let mediaItemSyncService else { return }
+        guard let mediaItemSyncService, let serverConfigurationID else { return }
 
         do {
-            let cachedSeasons = try mediaItemSyncService.getCachedSeasons(seriesId: series.id)
+            let cachedSeasons = try mediaItemSyncService.getCachedSeasons(
+                seriesId: series.id, serverConfigurationID: serverConfigurationID
+            )
             if !cachedSeasons.isEmpty {
                 seasons = cachedSeasons.map { convertCachedToMediaItem($0) }
                 isShowingCachedData = true
@@ -171,10 +174,12 @@ final class SeriesDetailViewModel {
 
     /// Loads cached episodes from SwiftData
     private func loadCachedEpisodes(for season: MediaItem) async {
-        guard let mediaItemSyncService else { return }
+        guard let mediaItemSyncService, let serverConfigurationID else { return }
 
         do {
-            let cachedEpisodes = try mediaItemSyncService.getCachedEpisodes(seasonId: season.id)
+            let cachedEpisodes = try mediaItemSyncService.getCachedEpisodes(
+                seasonId: season.id, serverConfigurationID: serverConfigurationID
+            )
             if !cachedEpisodes.isEmpty {
                 episodesBySeason[season.id] = cachedEpisodes.map { convertCachedToMediaItem($0) }
             }

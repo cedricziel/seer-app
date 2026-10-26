@@ -1,8 +1,10 @@
 import DownloadClient
 import JellyfinClient
+import OfflineSync
 import PlaybackClient
 import SeerCore
 import SeerUI
+import SwiftData
 import SwiftUI
 
 /// Main library browsing view
@@ -19,6 +21,8 @@ struct LibraryView: View {
 private struct LibraryContentView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var onboardingManager: OnboardingManager
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @StateObject private var viewModel: LibraryViewModel
     @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
     /// Read at this level — *outside* the `NavigationSplitView` below — on
@@ -62,7 +66,7 @@ private struct LibraryContentView: View {
 
     var body: some View {
         rootContainer
-            .task { await viewModel.loadInitialData() }
+            .task { await viewModel.loadHome(modelContext: modelContext, networkMonitor: networkMonitor) }
             .onDisappear { viewModel.cancelAllTasks() }
             .onChange(of: appState.activeServerID) {
                 path = NavigationPath()
@@ -486,5 +490,6 @@ private struct LibraryContentView: View {
 #Preview {
     LibraryView()
         .environmentObject(AppState())
+        .environmentObject(NetworkMonitor(isConnected: false))
         .environmentObject(OnboardingManager())
 }
