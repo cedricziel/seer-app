@@ -1,5 +1,4 @@
 import Foundation
-import JellyfinAPI
 @testable import JellyfinClient
 import XCTest
 
@@ -11,9 +10,7 @@ final class JellyfinSDKTransportTests: XCTestCase {
           "Items": []
         }
         """#)
-        let transport = server.transport(token: "TOKEN-1")
-
-        _ = try await transport.data(for: Paths.getUserViews(parameters: .init(userID: "user-1")))
+        _ = try await server.service().getLibraries()
 
         let request = try XCTUnwrap(server.requests.first)
         XCTAssertEqual(request.url?.path, "/jellyfin/UserViews")
@@ -28,21 +25,23 @@ final class JellyfinSDKTransportTests: XCTestCase {
     }
 
     func testGeneratedSearchEscapesLiteralPlusWithoutChangingBaseQueryEncoding() async throws {
-        let server = SDKStubServer(status: 200, body: "{}", baseQuery: "proxy=a+b&encoded=a%2Bb")
+        let server = SDKStubServer(status: 200, body: #"{"Items":[]}"#, baseQuery: "proxy=a+b&encoded=a%2Bb")
 
-        _ = try await server.transport().data(for: Paths.getItems(parameters: .init(searchTerm: "C++")))
+        _ = try await server.service().search(query: "C++")
 
         let url = try XCTUnwrap(server.requests.first?.url)
-        XCTAssertEqual(
-            URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQuery,
-            "proxy=a+b&encoded=a%2Bb&searchTerm=C%2B%2B"
-        )
+        let query = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedQuery)
+        XCTAssertTrue(query.hasPrefix("proxy=a+b&encoded=a%2Bb&"))
+        XCTAssertEqual(query.split(separator: "&").filter { $0.hasPrefix("searchTerm=") }, ["searchTerm=C%2B%2B"])
     }
 
     func testFailureKeepsStatusAndBodyForDomainErrorMapping() async throws {
         let server = SDKStubServer(status: 401, body: "Session expired")
 
-        let (data, response) = try await server.transport(token: "expired").data(for: Paths.getPublicSystemInfo)
+        let (data, response) = try await server.transport(token: "expired").playbackInfo(
+            itemID: "item-1",
+            body: [String: String]()
+        )
 
         XCTAssertEqual(response.statusCode, 401)
         XCTAssertEqual(String(data: data, encoding: .utf8), "Session expired")
@@ -62,7 +61,7 @@ final class JellyfinSDKTransportTests: XCTestCase {
         """#
         let server = SDKStubServer(status: 200, body: payload)
 
-        let (data, _) = try await server.transport().data(for: Paths.getItems())
+        let (data, _) = try await server.transport().playbackInfo(itemID: "item-1", body: [String: String]())
 
         XCTAssertEqual(data, Data(payload.utf8))
     }

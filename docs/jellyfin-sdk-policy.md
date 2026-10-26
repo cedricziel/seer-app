@@ -37,7 +37,11 @@ release notes must reflect this policy; do not continue advertising 10.8+ suppor
 ## SDK boundary
 
 Generated SDK requests and its transport handle covered Jellyfin REST operations.
-`JellyfinService` remains the app-facing interface. App-owned Codable models remain
+`JellyfinService` remains the app-facing interface. Only the `JellyfinClient`
+framework links the SDK product; tests exercise the app boundary. Sharing that
+product directly with the test target makes Xcode promote it to a dynamic library,
+exposing missing NIO link dependencies in the upstream discovery implementation.
+App-owned Codable models remain
 the boundary for views, offline caches, and persisted data; replacing them with
 SDK DTOs requires a separate persistence and decoding review.
 

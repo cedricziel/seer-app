@@ -359,7 +359,6 @@ targets:
           - "**/.DS_Store"
     dependencies:
       - target: JellyfinClient
-      - package: JellyfinAPI
       - target: SeerCore
     settings:
       base:
