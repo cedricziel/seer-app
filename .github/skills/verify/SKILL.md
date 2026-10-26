@@ -60,3 +60,5 @@ macOS installer signing and PKG selection, and rejection of unknown targets. tvO
 without a development profile, so TestFlight does not require a registered Apple TV.
 
 For service client changes, include `-only-testing:LibraryFeatureTests/ServiceClientLifecycleTests` and `-only-testing:LibraryFeatureTests/RequestsResponseIsolationTests` in the isolated test run. These tests cover unconfigured server switches, reconnection from another tab, retained genre state, token renewal, URL edits, verified permission saves, and stale permission or request responses.
+
+For tvOS CloudKit releases, inspect the exported app entitlements and embedded provisioning profile. Both must include `aps-environment = production`; App Store Connect rejects CloudKit-enabled tvOS apps without it. Confirm upload validation in the release workflow.
