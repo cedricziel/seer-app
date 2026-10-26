@@ -66,7 +66,6 @@ targets:
       # Shared API clients link this product dynamically; the app must carry it.
       - package: SwiftCollections
         product: DequeModule
-        embed: true
       - target: SeerCore
       - target: JellyfinClient
       - target: JellyseerrClient
