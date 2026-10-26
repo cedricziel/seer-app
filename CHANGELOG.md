@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.2](https://github.com/cedricziel/seer-app/compare/v0.8.1...v0.8.2) (2026-10-26)
+
+
+### Bug Fixes
+
+* **notifications:** open server-scoped notification destinations ([#94](https://github.com/cedricziel/seer-app/issues/94)) ([3626bf1](https://github.com/cedricziel/seer-app/commit/3626bf105fe03fa919e0f9f9b38220d4d88c3cdc))
+* **release:** resolve packaged frameworks on iOS and macOS ([#111](https://github.com/cedricziel/seer-app/issues/111)) ([35c52c9](https://github.com/cedricziel/seer-app/commit/35c52c9dbe0d2e5ed60b730bea02f25b73821af2))
+* **requests:** expose confirmed cancellation in request details ([#108](https://github.com/cedricziel/seer-app/issues/108)) ([b540dbd](https://github.com/cedricziel/seer-app/commit/b540dbd771962bab79542eabb49f5ec3b6556858))
+
 ## [0.8.1](https://github.com/cedricziel/seer-app/compare/v0.8.0...v0.8.1) (2026-10-26)
 
 
