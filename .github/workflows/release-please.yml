@@ -43,7 +43,11 @@ jobs:
           manifest-file: .release-please-manifest.json
 
   testflight:
-    name: Upload to TestFlight
+    name: Upload ${{ matrix.target }} to TestFlight
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ios, tvos, macos]
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: macos-26
@@ -110,20 +114,28 @@ jobs:
           FASTLANE_XCODEBUILD_SETTINGS_RETRIES:  "5"
         run: |
           bundle exec fastlane beta \
+            target:${{ matrix.target }} \
             allow_dirty:true \
             changelog:"Release ${{ needs.release-please.outputs.tag_name }}"
 
-      - name: Upload IPA artifact
+      - name: Upload build artifact
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: SeerApp-${{ needs.release-please.outputs.tag_name }}
-          path: build/*.ipa
+          name: SeerApp-${{ matrix.target }}-${{ needs.release-please.outputs.tag_name }}
+          path: |
+            build/${{ matrix.target }}/*.ipa
+            build/${{ matrix.target }}/*.pkg
+            build/${{ matrix.target }}/*.dSYM.zip
           if-no-files-found: ignore
           retention-days: 30
 
   app-store:
-    name: Submit to App Store
+    name: Submit ${{ matrix.target }} to App Store
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ios, tvos, macos]
     # Triggered when a human flips a release from prerelease to "latest" on
     # the GitHub release page. Doesn't depend on the release-please job
     # outputs (different workflow run); reads the tag from the release event.
@@ -142,9 +154,13 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: true
 
-      - name: Compute build number from the tagged commit
+      - name: Compute version and build number from the release
         id: build
-        run: echo "number=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          echo "number=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
 
       - name: Submit existing TestFlight build to App Store
         env:
@@ -157,6 +173,8 @@ jobs:
           RELEASE_NOTES:   ${{ github.event.release.body }}
         run: |
           bundle exec fastlane submit_to_app_store \
+            target:${{ matrix.target }} \
+            version:${{ steps.build.outputs.version }} \
             build:${{ steps.build.outputs.number }} \
             submit:true \
             auto_release:false

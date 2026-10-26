@@ -4,15 +4,23 @@ import UserNotifications
 public enum NotificationPermissions {
     /// Current authorization status
     public static func currentStatus() async -> UNAuthorizationStatus {
-        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        #if os(tvOS)
+            .denied
+        #else
+            await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        #endif
     }
 
     /// Request notification permissions
     /// - Returns: Whether authorization was granted
     @discardableResult
     public static func requestAuthorization() async throws -> Bool {
-        let center = UNUserNotificationCenter.current()
-        return try await center.requestAuthorization(options: [.alert, .sound, .badge])
+        #if os(tvOS)
+            return false
+        #else
+            let center = UNUserNotificationCenter.current()
+            return try await center.requestAuthorization(options: [.alert, .sound, .badge])
+        #endif
     }
 
     /// Check if notifications are authorized

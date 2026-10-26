@@ -33,3 +33,19 @@ For server URL resolution changes, run [the isolated resolver tests](../../../.c
 For shared Swift tooling changes, run `python3 -m unittest scripts/test_swift_tools.py`.
 
 For internal URL settings, run `SeerCoreTests/InternalServerURLTests` through required CI or an isolated test scheme. Cover blank input clearing the setting, HTTP/HTTPS hosts, unsupported schemes, and hostless input. Run `.claude/skills/verify/scripts/internal-url-settings-tests.sh SIMULATOR_RUNTIME_IDENTIFIER /absolute/scratch/evidence` for the isolated form flow. It covers denied, restricted, and unrequested location access, manual network entry, invalid Save retaining input with inline advice, and a corrected URL saving successfully. Append `before` to capture current main for comparison. The harness substitutes in-memory server and permission fixtures and does not verify system Settings or live SSID detection.
+For shared Swift tooling changes, run `python3 -m unittest scripts/test_swift_tools.py`.
+For release pipeline changes, run `ruby fastlane/tests/beta_test.rb` and
+`ruby -c fastlane/Fastfile`. Validate the workflow with `actionlint`. Its existing
+SC2016 warning comes from the literal xcconfig URL escaping expression.
+
+Build the `SeerApp` scheme in Release with each destination:
+`generic/platform=iOS`, `generic/platform=tvOS`, and `generic/platform=macOS`.
+Keep build output and package checkouts in temporary directories outside the
+working tree. Use an isolated source copy with an empty `Config/Secrets.xcconfig`
+for unsigned builds. Never run signing bootstrap or upload lanes during local
+verification. macOS must use the native SDK, with Catalyst disabled. Inspect
+platform-specific entitlements and ensure the Mac app has App Sandbox enabled.
+
+Release-lane tests cover iOS default behavior, tvOS signing and IPA selection,
+macOS installer signing and PKG selection, and rejection of unknown targets. tvOS development signing fetches the certificate
+without a development profile, so TestFlight does not require a registered Apple TV.

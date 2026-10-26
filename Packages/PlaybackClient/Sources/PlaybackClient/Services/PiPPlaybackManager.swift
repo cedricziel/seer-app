@@ -24,8 +24,10 @@ public final class PiPPlaybackManager {
     /// Item currently playing in PiP
     public private(set) var pipItem: MediaItem?
 
-    /// The AVPlayerViewController that entered PiP - MUST be preserved for restoration
-    public private(set) var pipController: AVPlayerViewController?
+    // The AVPlayerViewController that entered PiP - MUST be preserved for restoration
+    #if canImport(UIKit)
+        public private(set) var pipController: AVPlayerViewController?
+    #endif
 
     /// Whether PiP is currently active
     public private(set) var isPiPActive: Bool = false
@@ -40,9 +42,11 @@ public final class PiPPlaybackManager {
     /// Stores the restore completion handler until presentation completes
     private var restoreCompletionHandler: ((Bool) -> Void)?
 
-    /// The delegate for the PiP controller - kept alive to handle restoration
-    /// This MUST be stored because AVPlayerViewController.delegate is weak
-    private var pipDelegate: (any AVPlayerViewControllerDelegate)?
+    // The delegate for the PiP controller - kept alive to handle restoration
+    // This MUST be stored because AVPlayerViewController.delegate is weak
+    #if canImport(UIKit)
+        private var pipDelegate: (any AVPlayerViewControllerDelegate)?
+    #endif
 
     /// Invoked when the user closes the PiP window outside of a restoration
     /// (the "X" button). Lets the owning view model stop playback and
@@ -154,34 +158,37 @@ public final class PiPPlaybackManager {
         #endif
     }
 
-    /// Call when PiP starts - takes ownership of player and controller
-    /// - Parameters:
-    ///   - player: The AVPlayer being used
-    ///   - item: The media item being played
-    ///   - controller: The AVPlayerViewController - MUST be preserved for restoration
-    /// Call when PiP starts - takes ownership of player, controller, AND delegate
-    /// - Parameters:
-    ///   - player: The AVPlayer being used
-    ///   - item: The media item being played
-    ///   - controller: The AVPlayerViewController - MUST be preserved for restoration
-    ///   - delegate: The AVPlayerViewControllerDelegate - MUST be stored to survive view deallocation
-    ///   - onClosed: Called if the PiP window is closed without restoring the UI
-    public func pipDidStart(
-        player: AVPlayer,
-        item: MediaItem,
-        controller: AVPlayerViewController,
-        delegate: any AVPlayerViewControllerDelegate,
-        onClosed: (@MainActor () -> Void)? = nil
-    ) {
-        print("[PiPManager] pipDidStart - storing delegate to prevent deallocation")
-        pipPlayer = player
-        pipItem = item
-        pipController = controller
-        pipDelegate = delegate // CRITICAL: Keep delegate alive!
-        onPiPClosed = onClosed
-        isPiPActive = true
-        isRestoring = false
-    }
+    // Call when PiP starts - takes ownership of player and controller
+    // - Parameters:
+    //   - player: The AVPlayer being used
+    //   - item: The media item being played
+    //   - controller: The AVPlayerViewController - MUST be preserved for restoration
+    // Call when PiP starts - takes ownership of player, controller, AND delegate
+    // - Parameters:
+    //   - player: The AVPlayer being used
+    //   - item: The media item being played
+    //   - controller: The AVPlayerViewController - MUST be preserved for restoration
+    //   - delegate: The AVPlayerViewControllerDelegate - MUST be stored to survive view deallocation
+    //   - onClosed: Called if the PiP window is closed without restoring the UI
+    #if canImport(UIKit)
+        public func pipDidStart(
+            player: AVPlayer,
+            item: MediaItem,
+            controller: AVPlayerViewController,
+            delegate: any AVPlayerViewControllerDelegate,
+            onClosed: (@MainActor () -> Void)? = nil
+        ) {
+            print("[PiPManager] pipDidStart - storing delegate to prevent deallocation")
+            pipPlayer = player
+            pipItem = item
+            pipController = controller
+            pipDelegate = delegate // CRITICAL: Keep delegate alive!
+            onPiPClosed = onClosed
+            isPiPActive = true
+            isRestoring = false
+        }
+
+    #endif
 
     /// Call when PiP stops normally (not during restoration)
     public func pipDidStop() {
@@ -214,25 +221,24 @@ public final class PiPPlaybackManager {
     /// This method presents the SAME AVPlayerViewController via UIKit.
     /// - Parameter completion: Completion handler to call when the controller is presented
     public func requestRestoreUI(completion: @escaping (Bool) -> Void) {
-        print("[PiPManager] requestRestoreUI - hasController: \(pipController != nil)")
-        beginRestoration()
-        restoreCompletionHandler = completion
-
-        guard let controller = pipController else {
-            print("[PiPManager] ERROR: No controller to restore!")
-            completion(false)
-            finishRestoration(success: false)
-            return
-        }
-
-        // Ensure audio session is active before presenting
-        reactivateAudioSession()
-
         #if canImport(UIKit)
+            print("[PiPManager] requestRestoreUI - hasController: \(pipController != nil)")
+            beginRestoration()
+            restoreCompletionHandler = completion
+
+            guard let controller = pipController else {
+                print("[PiPManager] ERROR: No controller to restore!")
+                completion(false)
+                finishRestoration(success: false)
+                return
+            }
+
+            // Ensure audio session is active before presenting
+            reactivateAudioSession()
+
             presentController(controller, completion: completion)
         #else
             completion(false)
-            finishRestoration(success: false)
         #endif
     }
 
@@ -300,8 +306,10 @@ public final class PiPPlaybackManager {
         clearNowPlayingInfo()
         pipPlayer = nil
         pipItem = nil
-        pipController = nil
-        pipDelegate = nil // Release delegate
+        #if canImport(UIKit)
+            pipController = nil
+            pipDelegate = nil
+        #endif
         onPiPClosed = nil
         artworkURL = nil
         isPiPActive = false

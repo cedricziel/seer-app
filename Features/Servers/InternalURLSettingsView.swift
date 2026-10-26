@@ -27,9 +27,11 @@ struct InternalURLSettingsView: View {
         Form {
             Section {
                 TextField("Internal URL", text: $internalURLString)
+                #if os(iOS)
                     .textContentType(.URL)
                     .keyboardType(.URL)
                     .autocapitalization(.none)
+                #endif
                     .autocorrectionDisabled()
                     .onChange(of: internalURLString) {
                         if urlValidationError != nil {
@@ -134,31 +136,33 @@ struct InternalURLSettingsView: View {
             }
         }
         .navigationTitle("Internal URL")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Save") {
-                    saveChanges()
+        #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+        #endif
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    Button("Save") {
+                        saveChanges()
+                    }
+                    .fontWeight(.semibold)
                 }
-                .fontWeight(.semibold)
             }
-        }
-        .alert("Add Network", isPresented: $showingAddNetworkAlert) {
-            TextField("WiFi Network Name", text: $newSSID)
-            Button("Cancel", role: .cancel) {
-                newSSID = ""
+            .alert("Add Network", isPresented: $showingAddNetworkAlert) {
+                TextField("WiFi Network Name", text: $newSSID)
+                Button("Cancel", role: .cancel) {
+                    newSSID = ""
+                }
+                Button("Add") {
+                    addNetwork(newSSID)
+                    newSSID = ""
+                }
+            } message: {
+                Text("Enter the name (SSID) of your home WiFi network.")
             }
-            Button("Add") {
-                addNetwork(newSSID)
-                newSSID = ""
-            }
-        } message: {
-            Text("Enter the name (SSID) of your home WiFi network.")
-        }
     }
 
     private func openLocationSettings() {
-        #if canImport(UIKit)
+        #if os(iOS)
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 openURL(url)
             }

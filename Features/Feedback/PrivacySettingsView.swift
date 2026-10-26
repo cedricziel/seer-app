@@ -9,12 +9,16 @@ struct PrivacySettingsView: View {
     var body: some View {
         List {
             diagnosticsSection
-            spotlightIndexSection
+            #if !os(tvOS)
+                spotlightIndexSection
+            #endif
             dataCollectionInfoSection
             privacyLinksSection
         }
         .navigationTitle("Privacy")
-        .navigationBarTitleDisplayMode(.inline)
+        #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 
     private var spotlightIndexSection: some View {
@@ -140,11 +144,17 @@ struct PrivacySettingsView: View {
                 Label("Privacy Policy", systemImage: "doc.text")
             }
 
-            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
-                Link(destination: settingsURL) {
-                    Label("System Privacy Settings", systemImage: "gear")
+            #if os(macOS)
+                if let settingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy") {
+                    Link("System Privacy Settings", destination: settingsURL)
                 }
-            }
+            #elseif os(iOS)
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    Link(destination: settingsURL) {
+                        Label("System Privacy Settings", systemImage: "gear")
+                    }
+                }
+            #endif
         } header: {
             Text("More Information")
         }

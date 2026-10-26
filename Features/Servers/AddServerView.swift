@@ -71,7 +71,9 @@ struct AddServerView: View {
             }
             .navigationTitle("Add Server")
             #if !os(tvOS)
-                .navigationBarTitleDisplayMode(.inline)
+                #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                #endif
             #endif
                 .toolbar {
                     // `.cancellationAction` (rather than `.topBarLeading`, which
@@ -86,7 +88,11 @@ struct AddServerView: View {
                 }
                 .alert("Error", isPresented: .init(
                     get: { errorMessage != nil },
-                    set: { if !$0 { errorMessage = nil } }
+                    set: {
+                        if !$0 {
+                            errorMessage = nil
+                        }
+                    }
                 )) {
                     Button("OK") {
                         errorMessage = nil
@@ -291,15 +297,21 @@ private struct JellyfinAuthStepView: View {
                 TextField("Server URL", text: $jellyfinURL)
                     .textContentType(.URL)
                     .autocorrectionDisabled()
+                #if os(iOS)
                     .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
+                #endif
+                #if os(iOS)
+                .keyboardType(.URL)
+                #endif
             }
 
             Section("Credentials") {
                 TextField("Username", text: $jellyfinUsername)
                     .textContentType(.username)
                     .autocorrectionDisabled()
+                #if os(iOS)
                     .textInputAutocapitalization(.never)
+                #endif
 
                 SecureField("Password", text: $jellyfinPassword)
                     .textContentType(.password)
@@ -368,15 +380,21 @@ private struct JellyseerrAuthStepView: View {
                 TextField("Jellyseerr URL", text: $jellyseerrURL)
                     .textContentType(.URL)
                     .autocorrectionDisabled()
+                #if os(iOS)
                     .textInputAutocapitalization(.never)
-                    .keyboardType(.URL)
+                #endif
+                #if os(iOS)
+                .keyboardType(.URL)
+                #endif
             }
 
             Section("API Key") {
                 SecureField("API Key", text: $jellyseerrAPIKey)
                     .textContentType(.password)
                     .autocorrectionDisabled()
+                #if os(iOS)
                     .textInputAutocapitalization(.never)
+                #endif
 
                 Text("You can find your API key in Jellyseerr Settings > General")
                     .font(.caption)

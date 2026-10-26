@@ -51,15 +51,15 @@ private struct RequestsContentView: View {
             }
             .navigationTitle("Requests")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .navigation) {
                     ServerSwitcherButton()
                 }
 
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     filterMenu
                 }
 
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     SettingsButton()
                 }
             }
@@ -377,7 +377,7 @@ struct RequestRowView: View {
 
     private var posterPlaceholder: some View {
         RoundedRectangle(cornerRadius: 6)
-            .fill(Color(.systemGray5))
+            .fill(Color.mediaPlaceholder)
             .frame(width: 50, height: 75)
             .overlay {
                 Image(systemName: request.type == .movie ? "film" : "tv")
@@ -485,14 +485,16 @@ struct RequestDetailsSheet: View {
                 }
             }
             .navigationTitle("Request Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+            #endif
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Done") {
+                            dismiss()
+                        }
                     }
                 }
-            }
         }
     }
 }

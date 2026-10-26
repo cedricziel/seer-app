@@ -7,7 +7,11 @@ import SwiftData
 import SwiftUI
 
 struct SeerApp: App {
-    @UIApplicationDelegateAdaptor(SeerAppDelegate.self) private var appDelegate
+    #if os(macOS)
+        @NSApplicationDelegateAdaptor(SeerAppDelegate.self) private var appDelegate
+    #else
+        @UIApplicationDelegateAdaptor(SeerAppDelegate.self) private var appDelegate
+    #endif
     @Environment(\.scenePhase) private var scenePhase
 
     @StateObject private var appState: AppState
@@ -19,7 +23,9 @@ struct SeerApp: App {
     @State private var downloadNotificationService: DownloadNotificationService?
     @State private var requestNotificationService: RequestNotificationService?
     @State private var requestStatusPoller: RequestStatusPoller?
-    @State private var spotlightIndexer: SpotlightIndexer?
+    #if !os(tvOS)
+        @State private var spotlightIndexer: SpotlightIndexer?
+    #endif
 
     let modelContainer: ModelContainer
     let downloadModelContainer: ModelContainer
@@ -107,6 +113,9 @@ struct SeerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+            #if os(macOS)
+                .frame(minWidth: 800, minHeight: 600)
+            #endif
                 .environmentObject(appState)
                 .environmentObject(offlineSyncService)
                 .environmentObject(networkMonitor)
@@ -127,7 +136,9 @@ struct SeerApp: App {
                     downloadManager?.configure(from: appState)
                 }
                 .onChange(of: appState.appIntentsIndexingEnabled) { _, _ in
-                    spotlightIndexer?.reconcile()
+                    #if !os(tvOS)
+                        spotlightIndexer?.reconcile()
+                    #endif
                 }
                 .onOpenURL { url in
                     flowmarkRouter.route(url)
@@ -135,10 +146,12 @@ struct SeerApp: App {
                 .onChange(of: scenePhase) { _, phase in
                     // BGTaskScheduler only runs tasks that have been submitted;
                     // registering the handlers alone never schedules a first run.
-                    if phase == .background {
-                        appDelegate.scheduleRequestPollTask()
-                        appDelegate.scheduleAutoDownloadTask()
-                    }
+                    #if os(iOS)
+                        if phase == .background {
+                            appDelegate.scheduleRequestPollTask()
+                            appDelegate.scheduleAutoDownloadTask()
+                        }
+                    #endif
                 }
                 .environment(downloadManager)
                 .environment(notificationManager)
@@ -192,12 +205,15 @@ struct SeerApp: App {
     private func setupServices() async {
         // Wire up Spotlight indexing — gated behind the per-device
         // privacy flag (`appIntentsIndexingEnabled`, default off).
-        let indexer = SpotlightIndexer(
-            appState: appState,
-            modelContainer: modelContainer
-        )
-        spotlightIndexer = indexer
-        indexer.reconcile()
+        #if !os(tvOS)
+            let indexer = SpotlightIndexer(
+                appState: appState,
+                modelContainer: modelContainer
+            )
+            spotlightIndexer = indexer
+            indexer.reconcile()
+
+        #endif
 
         // Notification manager was created in `init`; wire the rest here
         guard let notifManager = notificationManager else { return }

@@ -59,7 +59,8 @@ import SwiftUI
             Coordinator(onDismiss: onDismiss, viewModel: viewModel)
         }
 
-        public class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        @MainActor
+        public class Coordinator: NSObject, @preconcurrency AVPlayerViewControllerDelegate {
             let onDismiss: () -> Void
             let viewModel: VideoPlayerViewModel
 
@@ -73,9 +74,7 @@ import SwiftUI
             }
 
             public func playerViewControllerWillBeginDismissalTransition(_: AVPlayerViewController) {
-                Task { @MainActor in
-                    viewModel.stop()
-                }
+                viewModel.stop()
             }
 
             public func playerViewControllerDidEndDismissalTransition(_: AVPlayerViewController) {

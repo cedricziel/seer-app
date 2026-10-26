@@ -1,7 +1,11 @@
 import CoreLocation
 import Foundation
 import Network
-import SystemConfiguration.CaptiveNetwork
+#if os(iOS)
+    import SystemConfiguration.CaptiveNetwork
+#elseif os(macOS)
+    import CoreWLAN
+#endif
 
 /// Monitors the current WiFi network SSID
 @MainActor
@@ -29,7 +33,11 @@ public final class WiFiSSIDMonitor: ObservableObject, WiFiNetworkStatus {
         locationDelegate = LocationDelegate { [weak self] status in
             Task { @MainActor [weak self] in
                 self?.locationAuthorizationStatus = status
-                self?.hasLocationPermission = status == .authorizedWhenInUse || status == .authorizedAlways
+                #if os(macOS)
+                    self?.hasLocationPermission = status == .authorizedAlways
+                #else
+                    self?.hasLocationPermission = status == .authorizedWhenInUse || status == .authorizedAlways
+                #endif
                 self?.updateSSID()
             }
         }
@@ -43,10 +51,13 @@ public final class WiFiSSIDMonitor: ObservableObject, WiFiNetworkStatus {
         setupNetworkMonitoring()
     }
 
-    /// Request location permission (required to read WiFi SSID)
-    /// Requests "Always" authorization to enable background network detection
+    /// Requests location permission where the platform supports Wi-Fi SSID access.
     public func requestLocationPermission() {
-        locationManager.requestAlwaysAuthorization()
+        #if os(iOS)
+            locationManager.requestAlwaysAuthorization()
+        #elseif os(macOS)
+            locationManager.requestWhenInUseAuthorization()
+        #endif
     }
 
     /// Manually refresh the current SSID
@@ -86,18 +97,24 @@ public final class WiFiSSIDMonitor: ObservableObject, WiFiNetworkStatus {
     }
 
     private func fetchCurrentSSID() -> String? {
-        guard let interfaces = CNCopySupportedInterfaces() as? [String] else {
-            return nil
-        }
-
-        for interface in interfaces {
-            if let info = CNCopyCurrentNetworkInfo(interface as CFString) as NSDictionary?,
-               let ssid = info[kCNNetworkInfoKeySSID as String] as? String {
-                return ssid
+        #if os(iOS)
+            guard let interfaces = CNCopySupportedInterfaces() as? [String] else {
+                return nil
             }
-        }
 
-        return nil
+            for interface in interfaces {
+                if let info = CNCopyCurrentNetworkInfo(interface as CFString) as NSDictionary?,
+                   let ssid = info[kCNNetworkInfoKeySSID as String] as? String {
+                    return ssid
+                }
+            }
+
+            return nil
+        #elseif os(macOS)
+            return CWWiFiClient.shared().interface()?.ssid()
+        #else
+            return nil
+        #endif
     }
 
     deinit {

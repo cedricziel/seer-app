@@ -227,3 +227,25 @@ Currently kept-empty in this repo (manage in ASC web UI):
   on the certificates repo.
 - **`Code signing is required`** — ensure `sync_signing` ran before
   `build_app`. Both `beta` and `release` already do this.
+
+## Build TestFlight releases for each platform
+
+`beta`, `sync_signing`, and `bootstrap_signing` accept `target:ios`, `target:tvos`,
+or `target:macos`. The default is `ios`. macOS builds use the native macOS SDK.
+
+```sh
+bundle exec fastlane beta target:macos
+bundle exec fastlane sync_signing target:tvos type:appstore
+bundle exec fastlane bootstrap_signing target:macos
+```
+
+See [release signing prerequisites](releases.md#prepare-signing-for-new-platforms)
+before the first tvOS or macOS upload. `submit_to_app_store` also accepts `target` and `version` to promote the matching
+TestFlight build without rebuilding. The legacy `build` and `release` lanes remain
+iOS-only.
+
+Run the release-lane regression tests without Apple credentials or uploads:
+
+```sh
+ruby fastlane/tests/beta_test.rb
+```

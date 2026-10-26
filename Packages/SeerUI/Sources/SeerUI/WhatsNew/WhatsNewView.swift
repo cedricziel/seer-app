@@ -41,7 +41,7 @@ public struct WhatsNewView: View {
                     .padding(.bottom, 32)
             }
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button {
                         onContinue()
                         dismiss()

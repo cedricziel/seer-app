@@ -35,21 +35,27 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
         NavigationStack {
             List {
                 titleSection
-                if isTV { seasonSelectionSection }
-                if canRequest4K { fourKSection }
+                if isTV {
+                    seasonSelectionSection
+                }
+                if canRequest4K {
+                    fourKSection
+                }
             }
             .navigationTitle("Request Options")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+            #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { dismiss() }
+                    }
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Request") { submitRequest() }
+                            .fontWeight(.semibold)
+                            .disabled(isTV && selectedSeasons.isEmpty && !provider.isLoadingTVDetails)
+                    }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Request") { submitRequest() }
-                        .fontWeight(.semibold)
-                        .disabled(isTV && selectedSeasons.isEmpty && !provider.isLoadingTVDetails)
-                }
-            }
         }
         .onAppear {
             if provider.hasSeasons {
@@ -81,7 +87,7 @@ struct SharedRequestOptionsSheet<Provider: RequestOptionsProvider>: View {
             AsyncImage(url: URL(string: "https://image.tmdb.org/t/p/w92\(posterPath)")) { image in
                 image.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
-                RoundedRectangle(cornerRadius: 6).fill(Color(.systemGray5))
+                RoundedRectangle(cornerRadius: 6).fill(Color.mediaPlaceholder)
             }
             .frame(width: 60, height: 90)
             .clipShape(RoundedRectangle(cornerRadius: 6))

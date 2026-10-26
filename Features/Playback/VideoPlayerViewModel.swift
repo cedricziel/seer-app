@@ -88,9 +88,13 @@ public final class VideoPlayerViewModel {
             updateNowPlayingInfo(player: existingPlayer)
             if let currentItem = existingPlayer.currentItem {
                 let dur = currentItem.duration.seconds
-                if dur.isFinite { duration = dur }
+                if dur.isFinite {
+                    duration = dur
+                }
                 let time = existingPlayer.currentTime().seconds
-                if time.isFinite { currentTime = time }
+                if time.isFinite {
+                    currentTime = time
+                }
             }
         }
 
@@ -390,7 +394,7 @@ public final class VideoPlayerViewModel {
     // MARK: - Private Methods
 
     private func setupAudioSession() {
-        #if os(iOS)
+        #if os(iOS) || os(tvOS)
             do {
                 try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
                 try AVAudioSession.sharedInstance().setActive(true)
@@ -502,7 +506,9 @@ public final class VideoPlayerViewModel {
         case .readyToPlay:
             print("🎬 [VideoPlayer] AVPlayerItem ready to play")
             isBuffering = false
-            if let dur = player?.currentItem?.duration.seconds, dur.isFinite { duration = dur }
+            if let dur = player?.currentItem?.duration.seconds, dur.isFinite {
+                duration = dur
+            }
         case .failed:
             handlePlaybackFailure()
         case .unknown:

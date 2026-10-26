@@ -5,7 +5,9 @@ import os
 import PlaybackClient
 import SeerCore
 import SwiftUI
-import UIKit
+#if canImport(UIKit)
+    import UIKit
+#endif
 
 private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerView")
 

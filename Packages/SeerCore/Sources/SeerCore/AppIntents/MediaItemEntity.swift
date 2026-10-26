@@ -1,5 +1,7 @@
 import AppIntents
-import CoreSpotlight
+#if !os(tvOS)
+    import CoreSpotlight
+#endif
 import Foundation
 
 /// AppEntity representing a media item (movie, episode, series) that the
@@ -10,10 +12,10 @@ import Foundation
 /// remain bound to their original server. Unbound catalog entities cannot
 /// be used for Jellyfin mutations.
 ///
-/// Conforms to `IndexedEntity` so the system can include this entity in
+/// On iOS and macOS, conforms to `IndexedEntity` so the system can include this entity in
 /// the on-device semantic index when the user opts in via the
 /// `appIntentsIndexingEnabled` privacy flag.
-public struct MediaItemEntity: AppEntity, IndexedEntity, Equatable {
+public struct MediaItemEntity: AppEntity, Equatable {
     public static let typeDisplayRepresentation = TypeDisplayRepresentation(
         name: "Media Item"
     )
@@ -47,18 +49,22 @@ public struct MediaItemEntity: AppEntity, IndexedEntity, Equatable {
         }
         return DisplayRepresentation(title: "\(title)")
     }
-
-    /// Spotlight attributes — kept intentionally minimal: title, year,
-    /// type, identifier. No posters, no plot summaries, no watched
-    /// state. Matches the `app-intents-foundation` spec's "what is
-    /// indexed" footer text.
-    public var attributeSet: CSSearchableItemAttributeSet {
-        let set = CSSearchableItemAttributeSet(contentType: .item)
-        set.title = title
-        if let year {
-            set.contentDescription = "\(year)"
-        }
-        set.identifier = id
-        return set
-    }
 }
+
+#if !os(tvOS)
+    extension MediaItemEntity: IndexedEntity {
+        /// Spotlight attributes — kept intentionally minimal: title, year,
+        /// type, identifier. No posters, no plot summaries, no watched
+        /// state. Matches the `app-intents-foundation` spec's "what is
+        /// indexed" footer text.
+        public var attributeSet: CSSearchableItemAttributeSet {
+            let set = CSSearchableItemAttributeSet(contentType: .item)
+            set.title = title
+            if let year {
+                set.contentDescription = "\(year)"
+            }
+            set.identifier = id
+            return set
+        }
+    }
+#endif

@@ -31,7 +31,7 @@ struct ServerSwitcherButton: View {
     NavigationStack {
         Text("Content")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     ServerSwitcherButton()
                 }
             }

@@ -31,7 +31,7 @@ struct RequestOptionsSheet: View {
                                     .aspectRatio(contentMode: .fill)
                             } placeholder: {
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color(.systemGray5))
+                                    .fill(Color.mediaPlaceholder)
                             }
                             .frame(width: 60, height: 90)
                             .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -122,22 +122,24 @@ struct RequestOptionsSheet: View {
                 }
             }
             .navigationTitle("Request Options")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+            #if os(iOS)
+                .navigationBarTitleDisplayMode(.inline)
+            #endif
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
                     }
-                }
 
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Request") {
-                        submitRequest()
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Request") {
+                            submitRequest()
+                        }
+                        .fontWeight(.semibold)
+                        .disabled(isTV && selectedSeasons.isEmpty && !viewModel.isLoadingTVDetails)
                     }
-                    .fontWeight(.semibold)
-                    .disabled(isTV && selectedSeasons.isEmpty && !viewModel.isLoadingTVDetails)
                 }
-            }
         }
         .onAppear {
             // Pre-select all seasons by default

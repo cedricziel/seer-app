@@ -26,7 +26,7 @@ before_all do |lane, options|
   # setup_ci creates a temp keychain, imports certs, and bless the private
   # key for non-interactive use.
   setup_ci if is_ci
-  ensure_xcode_project_generated
+  ensure_xcode_project_generated if %i[test build beta release screenshots].include?(lane.to_sym)
 end
 
 # ---------------------------------------------------------------------------
@@ -67,49 +67,59 @@ lane :build do
   )
 end
 
-desc "Push a new beta build to TestFlight"
+desc "Push an iOS, tvOS, or native macOS beta to TestFlight (target:ios|tvos|macos)"
 lane :beta do |options|
+  target, config = release_target(options)
   api_key = load_app_store_connect_api_key
   ensure_git_status_clean unless options[:allow_dirty]
 
-  # xcodebuild archive resolves dev profiles for some intermediate build
-  # phases even when configuration:Release. Sync both so the keychain has
-  # everything available; final signing still uses the appstore profile.
-  sync_code_signing(type: "development", readonly: is_ci, api_key: api_key)
-  sync_code_signing(type: "appstore",    readonly: is_ci, api_key: api_key)
+  # Archives can resolve development profiles for intermediate build phases.
+  sync_target_signing(target, "development", api_key)
+  sync_target_signing(target, "appstore", api_key)
 
-  build_app(
+  build_options = {
     project: PROJECT,
     scheme: SCHEME,
     configuration: "Release",
     export_method: "app-store",
-    output_directory: OUTPUT_DIR,
-    output_name: "SeerApp.ipa",
+    sdk: config.fetch(:sdk),
+    output_directory: "#{OUTPUT_DIR}/#{target}",
+    output_name: "SeerApp.#{config.fetch(:extension)}",
+    archive_path: "#{OUTPUT_DIR}/#{target}/SeerApp.xcarchive",
     clean: true,
     include_symbols: true,
     include_bitcode: false,
-    destination: "generic/platform=iOS",
+    destination: "generic/platform=#{config.fetch(:destination)}",
     xcargs: archive_xcargs
-  )
+  }
+  profile_name = ["match AppStore", APP_IDENTIFIER, (target unless target == "ios")].compact.join(" ")
+  build_options[:export_options] = { provisioningProfiles: { APP_IDENTIFIER => profile_name } }
+  if target == "macos"
+    build_options[:export_options][:installerSigningCertificate] = "Mac Installer Distribution"
+  end
+  artifact = build_app(**build_options)
 
   upload_to_testflight(
     api_key: api_key,
     app_identifier: APP_IDENTIFIER,
+    app_platform: config.fetch(:app_platform),
+    config.fetch(:extension).to_sym => artifact,
     skip_waiting_for_build_processing: true,
     changelog: options[:changelog] || "Beta build #{Time.now.strftime('%Y-%m-%d %H:%M')}"
   )
-  # dSYMs are bundled in the IPA via build_app's include_symbols:true and
-  # App Store Connect extracts them automatically — no separate upload step.
 end
 
 desc "Submit an existing TestFlight build to App Store review without rebuilding"
 lane :submit_to_app_store do |options|
+  _, config = release_target(options)
   api_key = load_app_store_connect_api_key
   stage_release_notes!(options[:release_notes] || ENV["RELEASE_NOTES"])
 
   upload_to_app_store(
     api_key: api_key,
     app_identifier: APP_IDENTIFIER,
+    platform: config.fetch(:app_platform),
+    app_version: options[:version],
     skip_binary_upload: true,
     submit_for_review: options[:submit] != false,
     automatic_release: options[:auto_release] == true,
@@ -215,16 +225,18 @@ end
 
 desc "Sync signing certificates and provisioning profiles via match"
 lane :sync_signing do |options|
+  target, = release_target(options)
   type = options[:type] || "development"
   api_key = load_app_store_connect_api_key
-  match(type: type, readonly: options[:readonly] != false, api_key: api_key)
+  sync_target_signing(target, type, api_key, readonly: options[:readonly] != false)
 end
 
-desc "Bootstrap signing — creates new certs/profiles. Run once per environment."
-lane :bootstrap_signing do
+desc "Bootstrap signing for target:ios|tvos|macos (creates certificates and profiles)"
+lane :bootstrap_signing do |options|
+  target, = release_target(options)
   api_key = load_app_store_connect_api_key
-  match(type: "development", readonly: false, api_key: api_key)
-  match(type: "appstore",    readonly: false, api_key: api_key)
+  sync_target_signing(target, "development", api_key, readonly: false)
+  sync_target_signing(target, "appstore", api_key, readonly: false)
 end
 
 desc "Download dSYMs from App Store Connect (e.g. after a bitcode rebuild on Apple's side)"
@@ -305,4 +317,24 @@ end
 
 error do |lane, exception|
   UI.error("Lane #{lane} failed: #{exception.message}")
+end
+
+def release_target(options)
+  target = options[:target] || "ios"
+  configs = {
+    "ios" => { destination: "iOS", sdk: "iphoneos", app_platform: "ios", extension: "ipa" },
+    "tvos" => { destination: "tvOS", sdk: "appletvos", app_platform: "appletvos", extension: "ipa" },
+    "macos" => { destination: "macOS", sdk: "macosx", app_platform: "osx", extension: "pkg" }
+  }
+  [target, configs.fetch(target) { raise ArgumentError, "Unknown release target: #{target}" }]
+end
+
+def sync_target_signing(target, type, api_key, readonly: is_ci)
+  options = { platform: target, type: type, readonly: readonly, api_key: api_key, generate_apple_certs: true }
+  # Release archives need the development certificate, not a registered Apple TV.
+  options[:skip_provisioning_profiles] = true if target == "tvos" && type == "development"
+  if target == "macos" && type == "appstore"
+    options[:additional_cert_types] = ["mac_installer_distribution"]
+  end
+  sync_code_signing(**options)
 end

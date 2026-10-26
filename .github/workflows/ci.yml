@@ -55,6 +55,9 @@ jobs:
           ruby-version: '3.3'
           bundler-cache: true
 
+      - name: Test release lanes
+        run: ruby fastlane/tests/beta_test.rb
+
       - name: Provide Secrets.xcconfig
         env:
           OTLP_ENDPOINT:    ${{ secrets.OTLP_ENDPOINT }}
@@ -107,3 +110,32 @@ jobs:
             ~/Library/Developer/Xcode/DerivedData/**/Logs/Test/*.xcresult
           if-no-files-found: ignore
           retention-days: 7
+
+  platform-build:
+    name: Build ${{ matrix.destination }}
+    runs-on: macos-26
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        destination: [tvOS, macOS]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate unsigned project
+        run: |
+          touch Config/Secrets.xcconfig
+          xcodegen generate
+      - name: Build native app
+        run: |
+          xcodebuild -scheme SeerApp \
+            -destination 'generic/platform=${{ matrix.destination }}' \
+            -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/SourcePackages" \
+            CODE_SIGNING_ALLOWED=NO build

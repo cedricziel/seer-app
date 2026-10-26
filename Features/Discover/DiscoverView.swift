@@ -49,12 +49,18 @@ private struct DiscoverContentView: View {
             }
             .navigationTitle("Discover")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .navigation) {
                     ServerSwitcherButton()
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    SettingsButton()
-                }
+                #if os(macOS)
+                    ToolbarItem(placement: .automatic) {
+                        SettingsButton()
+                    }
+                #else
+                    ToolbarItem(placement: .topBarTrailing) {
+                        SettingsButton()
+                    }
+                #endif
             }
             .alert("Request Submitted", isPresented: $showRequestSuccess) {
                 Button("OK", role: .cancel) {}
@@ -272,7 +278,7 @@ private struct DiscoverContentView: View {
                     .clipped()
             } else {
                 Rectangle()
-                    .fill(Color(.systemGray5))
+                    .fill(Color.mediaPlaceholder)
                     .frame(width: 200, height: 112)
             }
 

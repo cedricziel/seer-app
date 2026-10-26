@@ -85,7 +85,9 @@ struct ServerManagementView: View {
             }
             .navigationTitle("Manage Servers")
             #if !os(tvOS)
-                .navigationBarTitleDisplayMode(.inline)
+                #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                #endif
             #endif
                 .toolbar {
                     // `.cancellationAction` / `.primaryAction` (rather than

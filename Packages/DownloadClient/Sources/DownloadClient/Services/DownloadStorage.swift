@@ -179,9 +179,14 @@ public actor DownloadStorage {
 
     /// Get available storage space
     public func availableStorageSpace() throws -> Int64 {
-        let resourceValues = try downloadsDirectory
-            .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        return resourceValues.volumeAvailableCapacityForImportantUsage ?? 0
+        #if os(tvOS)
+            let resourceValues = try downloadsDirectory.resourceValues(forKeys: [.volumeAvailableCapacityKey])
+            return Int64(resourceValues.volumeAvailableCapacity ?? 0)
+        #else
+            let resourceValues = try downloadsDirectory
+                .resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
+            return resourceValues.volumeAvailableCapacityForImportantUsage ?? 0
+        #endif
     }
 
     /// Check if there's enough space for a download

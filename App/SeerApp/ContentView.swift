@@ -47,7 +47,7 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut, value: appState.isAuthenticated)
-        .fullScreenCover(isPresented: $showPiPRestorePlayer) {
+        .playerCover(isPresented: $showPiPRestorePlayer) {
             let pipManager = PiPPlaybackManager.shared
             if let item = pipManager.pipItem,
                let player = pipManager.pipPlayer {

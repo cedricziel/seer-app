@@ -45,14 +45,56 @@ Build number is derived from git history — never written back to
 ## TestFlight (pre-release path)
 
 Triggered automatically when release-please's PR is merged to `main`. The
-`testflight` job in `release-please.yml`:
+`testflight` matrix in `release-please.yml` builds iOS, tvOS, and native macOS
+independently. A failure on one platform does not cancel the others. Each job:
 
 1. Checks out the tag release-please just created.
 2. Resolves signing via `match` against `cedricziel/certificates`.
 3. Builds with `CURRENT_PROJECT_VERSION = git rev-list --count HEAD`.
 4. Uploads to TestFlight using the App Store Connect API key.
 5. Uploads dSYMs.
-6. Posts the IPA as a workflow artifact for 30 days.
+6. Posts its IPA or macOS PKG and dSYM archive as workflow artifacts for 30 days.
+
+All platforms use the same bundle ID, marketing version, and commit-count build
+number. macOS uses the macOS SDK with SwiftUI and AppKit, with Mac Catalyst and
+Designed for iPad on Mac disabled. The Mac archive includes Apple silicon and
+Intel architectures under the standard Release build settings.
+
+### Prepare signing for new platforms
+
+Add tvOS and macOS to the existing app record in App Store Connect before the
+first upload. Enable the required iCloud capabilities for the app identifier on
+each platform. Use the existing App Store Connect credentials and match repository.
+
+Run these commands locally with signing-write access before the first release:
+
+```sh
+bundle exec fastlane bootstrap_signing target:tvos
+bundle exec fastlane bootstrap_signing target:macos
+```
+
+The macOS command also provisions a Mac Installer Distribution certificate for
+PKG signing. CI fetches profiles and certificates with `readonly: true`. Expected
+profile names are `match AppStore com.cedricziel.seer tvos`,
+`match Development com.cedricziel.seer macos`, and
+`match AppStore com.cedricziel.seer macos`. tvOS fetches the development certificate
+without a development profile, so releasing does not require a registered Apple TV.
+The Wi-Fi information entitlement applies only to iOS. macOS enables App Sandbox
+and outbound network access.
+
+To upload a single platform manually:
+
+```sh
+bundle exec fastlane beta target:ios
+bundle exec fastlane beta target:tvos
+bundle exec fastlane beta target:macos
+```
+
+Omitting `target` retains the existing iOS behavior. Platform artifacts are written
+to `build/ios`, `build/tvos`, or `build/macos`. The App Store graduation matrix submits all three existing TestFlight builds
+without rebuilding. Each job uses the release tag version and commit-count build
+number. Prepare platform screenshots and required review metadata in App Store
+Connect before graduating a release.
 
 ## App Store (graduation path)
 
@@ -63,8 +105,9 @@ Store is one click in the GitHub UI:
 1. Open the release on GitHub (e.g. `vX.Y.Z`).
 2. Click **Edit**, uncheck "Set as a pre-release", check "Set as the latest
    release", click **Update release**.
-3. GitHub fires `release: released`. `app-store.yml` runs and calls
-   `fastlane submit_to_app_store` with the build number computed from the
+3. GitHub fires `release: released`. the `app-store` matrix in `release-please.yml` runs and calls
+   `fastlane submit_to_app_store target:<platform>` with the version from the
+   release tag and build number computed from the
    tagged commit. `skip_binary_upload: true` means the **existing**
    TestFlight build is added to the App Store version and submitted for
    review — no rebuild, no re-upload.

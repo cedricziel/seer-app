@@ -1,5 +1,7 @@
 import Foundation
-import MetricKit
+#if !os(tvOS)
+    import MetricKit
+#endif
 import OpenTelemetryApi
 import OpenTelemetryProtocolExporterCommon
 import OpenTelemetryProtocolExporterHttp
@@ -11,7 +13,7 @@ import SignPostIntegration
 /// OpenTelemetry-based telemetry service that collects and reports performance metrics and crash data.
 /// Diagnostics preferences gate collection and export; users can opt out in Settings.
 @MainActor
-public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unchecked Sendable {
+public final class TelemetryService: NSObject, @unchecked Sendable {
     /// Reads an existing diagnostics ID without creating one when reporting is disabled.
     public var installationID: String? {
         InstallationIDStore().existingID()
@@ -56,14 +58,18 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
 
     override private init() {
         super.init()
-        MXMetricManager.shared.add(self)
-        Self.logger.info("TelemetryService initialized and subscribed to MetricKit")
+        #if !os(tvOS)
+            MXMetricManager.shared.add(self)
+        #endif
+        Self.logger.info("TelemetryService initialized")
 
         initializeIfConsented()
     }
 
     deinit {
-        MXMetricManager.shared.remove(self)
+        #if !os(tvOS)
+            MXMetricManager.shared.remove(self)
+        #endif
     }
 
     // MARK: - OTEL Initialization
@@ -295,80 +301,84 @@ public final class TelemetryService: NSObject, MXMetricManagerSubscriber, @unche
         span.end()
     }
 
-    // MARK: - MXMetricManagerSubscriber
+    #if !os(tvOS)
 
-    /// Called when MetricKit delivers daily metric payloads containing performance data.
-    public nonisolated func didReceive(_ payloads: [MXMetricPayload]) {
-        guard !payloads.isEmpty else { return }
+        // MARK: - MXMetricManagerSubscriber
 
-        let count = payloads.count
-        let jsonDataList = payloads.map { $0.jsonRepresentation() }
+        /// Called when MetricKit delivers daily metric payloads containing performance data.
+        public nonisolated func didReceive(_ payloads: [MXMetricPayload]) {
+            guard !payloads.isEmpty else { return }
 
-        Task { @MainActor in
-            guard DiagnosticsConsent.shared.performanceMetricsEnabled else {
-                Self.logger.debug(
-                    "Received \(count) metric payload(s) but performance metrics disabled - discarding"
-                )
-                return
-            }
+            let count = payloads.count
+            let jsonDataList = payloads.map { $0.jsonRepresentation() }
 
-            Self.logger.info("Received \(count) metric payload(s)")
-
-            for jsonData in jsonDataList {
-                if isInitialized {
-                    addBreadcrumb(
-                        category: "metrics",
-                        message: "MetricKit payload received",
-                        level: .info,
-                        data: ["payloadSize": jsonData.count]
+            Task { @MainActor in
+                guard DiagnosticsConsent.shared.performanceMetricsEnabled else {
+                    Self.logger.debug(
+                        "Received \(count) metric payload(s) but performance metrics disabled - discarding"
                     )
+                    return
+                }
 
-                    if let metrics = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
-                        recordMetricsFromPayload(metrics)
+                Self.logger.info("Received \(count) metric payload(s)")
+
+                for jsonData in jsonDataList {
+                    if isInitialized {
+                        addBreadcrumb(
+                            category: "metrics",
+                            message: "MetricKit payload received",
+                            level: .info,
+                            data: ["payloadSize": jsonData.count]
+                        )
+
+                        if let metrics = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                            recordMetricsFromPayload(metrics)
+                        }
                     }
-                }
 
-                if let jsonString = String(data: jsonData, encoding: .utf8) {
-                    Self.logger.debug("Metric payload JSON: \(jsonString)")
-                }
-            }
-        }
-    }
-
-    /// Called when MetricKit delivers diagnostic payloads containing crash reports.
-    public nonisolated func didReceive(_ payloads: [MXDiagnosticPayload]) {
-        guard !payloads.isEmpty else { return }
-
-        let count = payloads.count
-        let jsonDataList = payloads.map { $0.jsonRepresentation() }
-
-        Task { @MainActor in
-            guard DiagnosticsConsent.shared.crashReportsEnabled else {
-                Self.logger.debug(
-                    "Received \(count) diagnostic payload(s) but crash reports disabled - discarding"
-                )
-                return
-            }
-
-            Self.logger.warning("Received \(count) diagnostic payload(s)")
-
-            for jsonData in jsonDataList {
-                if isInitialized {
                     if let jsonString = String(data: jsonData, encoding: .utf8) {
-                        otelLogger?.logRecordBuilder()
-                            .setSeverity(.error)
-                            .setBody(.string("MetricKit Diagnostic Report"))
-                            .setAttributes(["diagnostic.payload": .string(jsonString)])
-                            .emit()
+                        Self.logger.debug("Metric payload JSON: \(jsonString)")
                     }
-                }
-
-                if let jsonString = String(data: jsonData, encoding: .utf8) {
-                    Self.logger.warning("Diagnostic payload JSON: \(jsonString)")
                 }
             }
         }
-    }
+
+        /// Called when MetricKit delivers diagnostic payloads containing crash reports.
+        public nonisolated func didReceive(_ payloads: [MXDiagnosticPayload]) {
+            guard !payloads.isEmpty else { return }
+
+            let count = payloads.count
+            let jsonDataList = payloads.map { $0.jsonRepresentation() }
+
+            Task { @MainActor in
+                guard DiagnosticsConsent.shared.crashReportsEnabled else {
+                    Self.logger.debug(
+                        "Received \(count) diagnostic payload(s) but crash reports disabled - discarding"
+                    )
+                    return
+                }
+
+                Self.logger.warning("Received \(count) diagnostic payload(s)")
+
+                for jsonData in jsonDataList {
+                    if isInitialized {
+                        if let jsonString = String(data: jsonData, encoding: .utf8) {
+                            otelLogger?.logRecordBuilder()
+                                .setSeverity(.error)
+                                .setBody(.string("MetricKit Diagnostic Report"))
+                                .setAttributes(["diagnostic.payload": .string(jsonString)])
+                                .emit()
+                        }
+                    }
+
+                    if let jsonString = String(data: jsonData, encoding: .utf8) {
+                        Self.logger.warning("Diagnostic payload JSON: \(jsonString)")
+                    }
+                }
+            }
+        }
+
+    #endif
 
     // MARK: - Private Helpers
 
@@ -462,3 +472,7 @@ extension Bundle {
         infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
     }
 }
+
+#if !os(tvOS)
+    extension TelemetryService: MXMetricManagerSubscriber {}
+#endif

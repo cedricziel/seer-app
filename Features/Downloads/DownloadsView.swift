@@ -19,7 +19,7 @@ struct DownloadsView: View {
             }
             .navigationTitle("Downloads")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     SettingsButton()
                 }
             }
@@ -248,18 +248,20 @@ struct DownloadRow: View {
             )
         }
         .padding(.vertical, 4)
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-                Task {
-                    try? await manager.deleteDownload(download.id)
+        #if !os(tvOS)
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) {
+                    Task {
+                        try? await manager.deleteDownload(download.id)
+                    }
+                } label: {
+                    Label("Delete", systemImage: "trash")
                 }
-            } label: {
-                Label("Delete", systemImage: "trash")
             }
-        }
-        .contextMenu {
-            downloadContextMenu
-        }
+        #endif
+            .contextMenu {
+                downloadContextMenu
+            }
     }
 
     @ViewBuilder

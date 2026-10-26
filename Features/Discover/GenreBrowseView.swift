@@ -25,7 +25,9 @@ struct GenreBrowseView: View {
     var body: some View {
         GenreBrowseContentView(viewModel: viewModel, appState: appState)
             .navigationTitle(genre.name)
+        #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+        #endif
     }
 }
 
@@ -33,7 +35,11 @@ struct GenreBrowseView: View {
 private struct GenreBrowseContentView: View {
     @ObservedObject var viewModel: GenreBrowseViewModel
     @ObservedObject var appState: AppState
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #if os(macOS)
+        private let horizontalSizeClass: MediaSizeClass? = .regular
+    #else
+        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
 
     @State private var selectedResult: SearchResult?
     @State private var isRequestingMedia: Bool = false
@@ -74,7 +80,11 @@ private struct GenreBrowseContentView: View {
         }
         .alert("Request Failed", isPresented: .init(
             get: { requestError != nil },
-            set: { if !$0 { requestError = nil } }
+            set: {
+                if !$0 {
+                    requestError = nil
+                }
+            }
         )) {
             Button("OK", role: .cancel) {}
         } message: {

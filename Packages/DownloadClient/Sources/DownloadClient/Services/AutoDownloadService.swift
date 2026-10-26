@@ -1,4 +1,6 @@
-import BackgroundTasks
+#if os(iOS)
+    import BackgroundTasks
+#endif
 import Foundation
 import JellyfinClient
 import SeerCore
@@ -44,35 +46,38 @@ public actor AutoDownloadService {
 
     // MARK: - Background Task Registration
 
-    /// Register background task with the system
-    @MainActor
-    public static func registerBackgroundTask() {
-        BGTaskScheduler.shared.register(
-            forTaskWithIdentifier: taskIdentifier,
-            using: nil
-        ) { task in
-            guard let task = task as? BGProcessingTask else { return }
-            Task {
-                // This would be called by the app delegate with proper service instance
-                task.setTaskCompleted(success: true)
+    #if os(iOS)
+        /// Register background task with the system
+        @MainActor
+        public static func registerBackgroundTask() {
+            BGTaskScheduler.shared.register(
+                forTaskWithIdentifier: taskIdentifier,
+                using: nil
+            ) { task in
+                guard let task = task as? BGProcessingTask else { return }
+                Task {
+                    // This would be called by the app delegate with proper service instance
+                    task.setTaskCompleted(success: true)
+                }
             }
         }
-    }
 
-    /// Schedule background task
-    @MainActor
-    public static func scheduleBackgroundTask() {
-        let request = BGProcessingTaskRequest(identifier: taskIdentifier)
-        request.requiresNetworkConnectivity = true
-        request.requiresExternalPower = false
-        request.earliestBeginDate = Date(timeIntervalSinceNow: processingInterval)
+        /// Schedule background task
+        @MainActor
+        public static func scheduleBackgroundTask() {
+            let request = BGProcessingTaskRequest(identifier: taskIdentifier)
+            request.requiresNetworkConnectivity = true
+            request.requiresExternalPower = false
+            request.earliestBeginDate = Date(timeIntervalSinceNow: processingInterval)
 
-        do {
-            try BGTaskScheduler.shared.submit(request)
-        } catch {
-            print("Failed to schedule auto-download task: \(error)")
+            do {
+                try BGTaskScheduler.shared.submit(request)
+            } catch {
+                print("Failed to schedule auto-download task: \(error)")
+            }
         }
-    }
+
+    #endif
 
     // MARK: - Rule Processing
 
