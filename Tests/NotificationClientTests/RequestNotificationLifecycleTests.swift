@@ -26,36 +26,39 @@ final class RequestNotificationLifecycleTests: XCTestCase {
         XCTAssertTrue(center.pendingRequests.isEmpty)
     }
 
-    func testLogoutDuringSchedulingAuthorizationCheckPreventsDelivery() async throws {
-        let center = InMemoryNotificationCenter(status: .authorized)
-        let service = try makeService(center: center)
-        var checks = 0
-        center.onAuthorizationCheck = {
-            checks += 1
-            if checks == 2 { service.retire() }
+    #if !os(tvOS)
+        func testLogoutDuringSchedulingAuthorizationCheckPreventsDelivery() async throws {
+            let center = InMemoryNotificationCenter(status: .authorized)
+            let service = try makeService(center: center)
+            var checks = 0
+            center.onAuthorizationCheck = {
+                checks += 1
+                if checks == 2 { service.retire() }
+            }
+
+            await service.notifyRequestStatusChanged(.approved(requestID: 7, title: "Movie"), serverID: "A")
+
+            XCTAssertEqual(checks, 2)
+            XCTAssertTrue(center.pendingRequests.isEmpty)
         }
 
-        await service.notifyRequestStatusChanged(.approved(requestID: 7, title: "Movie"), serverID: "A")
+        func testServerChangeDuringAuthorizationPreventsDeliveryBeforeRetirement() async throws {
+            let center = InMemoryNotificationCenter(status: .authorized)
+            var sessionActive = true
+            let service = try makeService(center: center, isSessionActive: { sessionActive })
+            var checks = 0
+            center.onAuthorizationCheck = {
+                checks += 1
+                if checks == 2 { sessionActive = false }
+            }
 
-        XCTAssertEqual(checks, 2)
-        XCTAssertTrue(center.pendingRequests.isEmpty)
-    }
+            await service.notifyRequestStatusChanged(.approved(requestID: 7, title: "Movie"), serverID: "A")
 
-    func testServerChangeDuringAuthorizationPreventsDeliveryBeforeRetirement() async throws {
-        let center = InMemoryNotificationCenter(status: .authorized)
-        var sessionActive = true
-        let service = try makeService(center: center, isSessionActive: { sessionActive })
-        var checks = 0
-        center.onAuthorizationCheck = {
-            checks += 1
-            if checks == 2 { sessionActive = false }
+            XCTAssertEqual(checks, 2)
+            XCTAssertTrue(center.pendingRequests.isEmpty)
         }
 
-        await service.notifyRequestStatusChanged(.approved(requestID: 7, title: "Movie"), serverID: "A")
-
-        XCTAssertEqual(checks, 2)
-        XCTAssertTrue(center.pendingRequests.isEmpty)
-    }
+    #endif
 
     func testMissingAuthenticatedServerDoesNotNotify() async throws {
         let center = InMemoryNotificationCenter(status: .notDetermined)
