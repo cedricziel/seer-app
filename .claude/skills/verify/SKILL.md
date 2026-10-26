@@ -122,3 +122,13 @@ platform-specific entitlements and ensure the Mac app has App Sandbox enabled.
 Release-lane tests cover iOS default behavior, tvOS signing and IPA selection,
 macOS installer signing and PKG selection, and rejection of unknown targets. tvOS development signing fetches the certificate
 without a development profile, so TestFlight does not require a registered Apple TV.
+
+For TV request options, run [the selection regressions](scripts/request-season-tests.sh)
+and [the sheet harness](scripts/request-sheet-tests.sh) with the CI iOS runtime
+identifier and an absolute evidence directory outside the checkout. Obtain a build
+coordinator grant before compilation. The sheet harness compiles both real sheets
+with in-memory details providers, no service credentials or network, on a disposable
+simulator. It covers loading submission, failed and empty details, retry, selected
+seasons, 4K, and movie submission. Append `before` to run the same assertions against
+`origin/main`; loading and recovery assertions must fail before the fix. Review
+exported screenshots. The harness does not verify live service responses.
