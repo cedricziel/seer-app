@@ -1,8 +1,8 @@
 # UX review backlog
 
 Reviewed against `a517623` on 2026-10-25. Confirmed items below come from the
-current SwiftUI implementation. The layout item needs a render before it becomes
-an implementation task.
+current SwiftUI implementation. UX009 was confirmed with isolated compact and AX5
+renders on 2026-10-26.
 
 ## Delivery rules
 
@@ -36,7 +36,7 @@ an active PR. UX001 replaces the archived sign-in task after PR 75 merged.
 | UX006 | P2 | Complete, [PR #98](https://github.com/cedricziel/seer-app/pull/98) | Denied location permission still shows "Grant Location Permission", which cannot recover the denial. | Network settings | Offer Open Settings after denial, explain why access is useful, and preserve manual configuration. |
 | UX007 | P2 | Complete, [PR #98](https://github.com/cedricziel/seer-app/pull/98) | Internal URL settings accept unsupported schemes and hostless addresses, then dismiss as if saved successfully. | Network settings | Accept HTTP/HTTPS with a host; keep actionable validation beside the field and test invalid inputs. |
 | UX008 | P2 | Complete, [PR #103](https://github.com/cedricziel/seer-app/pull/103), chat `01a17635-2d2c-7fd0-8d71-b598f1905ec9` | Custom filter and season buttons expose selection only through color. | Library accessibility | Expose the selected trait or value and verify the active choice with VoiceOver. |
-| UX009 | P3 | Validate | Continue Watching text may overlap Resume at compact widths or large text sizes. | Library layout | Render a long title and subtitle at compact width and AX5. If overlap occurs, reserve button space or stack the content. |
+| UX009 | P3 | Active, [PR #113](https://github.com/cedricziel/seer-app/pull/113), chat `01a17732-7688-7ec0-a8ae-3a9ca7ee45a7` | Continue Watching text overlaps Resume at compact width and AX5. | Library layout | Render a long title and subtitle at compact width and AX5. If overlap occurs, reserve button space or stack the content. |
 | UX010 | P2 | Queued | Download actions can fail silently, while failed rows hide the stored reason. | Downloads | Show enqueue errors immediately and expose an actionable failure reason with Retry. Recheck after the active download PRs merge. |
 
 ## Evidence
@@ -69,7 +69,13 @@ an active PR. UX001 replaces the archived sign-in task after PR 75 merged.
 - UX006 and UX007: [InternalURLSettingsView](../Features/Servers/InternalURLSettingsView.swift)
   permission controls and save validation.
 - UX009: [ContinueWatchingCards](../Features/Library/ContinueWatchingCards.swift)
-  caption and Resume overlays. This is a source-backed risk, not confirmed clipping.
+  caption and Resume overlays. An isolated 320-point iOS 27 render with long text
+  confirmed title/subtitle overlap at standard size and subtitle overlap plus
+  top clipping at AX5. The baseline ran three UI tests: two failed on three
+  overlap assertions; offline disabling passed. With stacked content and a
+  content-sized card, all four UI regressions passed, including Resume taps and
+  downloaded badge separation. Both fixed screenshots were inspected. Image
+  loading, context menus, and live playback are outside this isolated fixture.
 - UX010: [media detail download actions](../Features/Library/MediaDetailView+Downloads.swift)
   discard enqueue/action errors; [DownloadRow](../Features/Downloads/DownloadsView.swift)
   displays the failed state without its stored error reason.

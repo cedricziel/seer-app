@@ -170,3 +170,11 @@ and `ruby fastlane/tests/beta_test.rb`. Archive each platform in Release with
 The checker covers direct and transitive runtime dependencies and platform runpaths.
 Keep the iOS/tvOS app Frameworks path and native macOS Contents/Frameworks path distinct.
 Do not launch installed apps to verify packaging.
+
+For Continue Watching card layout, run
+`.github/skills/verify/scripts/continue-watching-tests.sh SIMULATOR_RUNTIME_IDENTIFIER /absolute/scratch/evidence`.
+It renders the real card source at 320 points with long text at standard size and
+AX5, checks text and Resume bounds, and verifies resume taps, offline disabling,
+and downloaded badge separation. Append `before` to compare `origin/main`.
+The disposable iOS fixture substitutes a plain image placeholder and context menu
+types. It does not exercise image loading, context menus, or live playback.
