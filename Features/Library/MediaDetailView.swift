@@ -96,7 +96,7 @@ struct MediaDetailView: View {
                 seriesViewModel?.setupOfflineSync(modelContext: modelContext, networkMonitor: networkMonitor)
                 await seriesViewModel?.loadSeasons()
             }
-            .downloadErrorAlert(downloadFeedback)
+            .downloadErrorAlert(downloadFeedback, isActive: !showEpisodeDetail)
             .alert("Request Submitted", isPresented: $showRequestSuccess) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -161,6 +161,7 @@ struct MediaDetailView: View {
                     Task { await downloadEpisode(episode) }
                 }
             )
+            .downloadErrorAlert(downloadFeedback)
         }
     }
 
