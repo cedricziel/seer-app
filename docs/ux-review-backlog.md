@@ -36,7 +36,7 @@ an active PR. UX001 replaces the archived sign-in task after PR 75 merged.
 | UX006 | P2 | Complete, [PR #98](https://github.com/cedricziel/seer-app/pull/98) | Denied location permission still shows "Grant Location Permission", which cannot recover the denial. | Network settings | Offer Open Settings after denial, explain why access is useful, and preserve manual configuration. |
 | UX007 | P2 | Complete, [PR #98](https://github.com/cedricziel/seer-app/pull/98) | Internal URL settings accept unsupported schemes and hostless addresses, then dismiss as if saved successfully. | Network settings | Accept HTTP/HTTPS with a host; keep actionable validation beside the field and test invalid inputs. |
 | UX008 | P2 | Complete, [PR #103](https://github.com/cedricziel/seer-app/pull/103), chat `01a17635-2d2c-7fd0-8d71-b598f1905ec9` | Custom filter and season buttons expose selection only through color. | Library accessibility | Expose the selected trait or value and verify the active choice with VoiceOver. |
-| UX009 | P3 | Active, [PR #113](https://github.com/cedricziel/seer-app/pull/113), chat `01a17732-7688-7ec0-a8ae-3a9ca7ee45a7` | Continue Watching text overlaps Resume at compact width and AX5. | Library layout | Render a long title and subtitle at compact width and AX5. If overlap occurs, reserve button space or stack the content. |
+| UX009 | P3 | Complete, [PR #113](https://github.com/cedricziel/seer-app/pull/113), chat `01a17732-7688-7ec0-a8ae-3a9ca7ee45a7` | Continue Watching text overlaps Resume at compact width and AX5. | Library layout | Render a long title and subtitle at compact width and AX5. If overlap occurs, reserve button space or stack the content. |
 | UX010 | P2 | Complete, [PR #109](https://github.com/cedricziel/seer-app/pull/109), chat `01a176fa-7236-7623-9fd2-0662586b6244` | Download actions can fail silently, while failed rows hide the stored reason. | Downloads | Show enqueue errors immediately and expose an actionable failure reason with Retry. |
 
 ## Evidence
@@ -76,6 +76,9 @@ an active PR. UX001 replaces the archived sign-in task after PR 75 merged.
   content-sized card, all four UI regressions passed, including Resume taps and
   downloaded badge separation. Both fixed screenshots were inspected. Image
   loading, context menus, and live playback are outside this isolated fixture.
+  [PR #113](https://github.com/cedricziel/seer-app/pull/113) merged at `50cf0d1`
+  on 2026-10-26 after independent exact-head review, lint, iOS tests, and
+  iOS/tvOS/macOS archive checks passed.
 - UX010: [media detail download actions](../Features/Library/MediaDetailView+Downloads.swift)
   and [DownloadRow](../Features/Downloads/DownloadsView.swift) present action errors.
   Failed rows show the stored reason or a fallback and a visible Retry button.
