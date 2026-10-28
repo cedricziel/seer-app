@@ -180,3 +180,7 @@ The disposable iOS fixture substitutes a plain image placeholder and context men
 types. It does not exercise image loading, context menus, or live playback.
 
 For SwiftUI download alert presentation checks, run [scripts/download-feedback-tests.sh](scripts/download-feedback-tests.sh) with an installed iOS runtime identifier and an absolute scratch evidence directory. The disposable app compiles the real row, download models, buttons, feedback, and alert modifier with inert manager/poster fixtures. It verifies stored failure text, visible Retry and retry errors, and immediate errors inside an episode sheet without credentials or network access. Pass `before` to reproduce the baseline row and parent-only sheet alert. This checks presentation, not live transfers.
+
+Archive validation tests also cover Fastlane running from its own directory.
+Manual Release Please dispatch builds the selected workflow revision and retains
+the archive library check before each TestFlight upload.

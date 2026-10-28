@@ -94,3 +94,7 @@ AX5, checks text and Resume bounds, and verifies resume taps, offline disabling,
 and downloaded badge separation. Append `before` to compare `origin/main`.
 The disposable iOS fixture substitutes a plain image placeholder and context menu
 types. It does not exercise image loading, context menus, or live playback.
+
+Archive validation tests also cover Fastlane running from its own directory.
+Manual Release Please dispatch builds the selected workflow revision and retains
+the archive library check before each TestFlight upload.

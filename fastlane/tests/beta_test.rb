@@ -87,6 +87,15 @@ class BetaTest < Minitest::Test
     assert_equal "build/macos/SeerApp.xcarchive", action(:validate_archive_libraries).fetch(:archive)
   end
 
+  def test_archive_validation_resolves_paths_from_repository_root
+    command = nil
+    @runner.define_singleton_method(:sh) { |*args| command = args }
+    Dir.chdir(File.expand_path("..", __dir__)) do
+      @runner.run(:validate_archive_libraries, archive: "build/ios/SeerApp.xcarchive")
+    end
+    assert_equal File.expand_path("../../build/ios/SeerApp.xcarchive", __dir__), command.last
+  end
+
   def test_invalid_archive_stops_testflight_upload
     @runner.define_singleton_method(:validate_archive_libraries) { |**| raise "Library missing" }
     assert_raises(RuntimeError) { @runner.run(:beta, allow_dirty: true) }
