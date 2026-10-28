@@ -112,7 +112,8 @@ end
 
 private_lane :validate_archive_libraries do |options|
   checker = File.expand_path("../scripts/check_app_libraries.py", __dir__)
-  sh("python3", checker, options.fetch(:archive))
+  archive = File.expand_path(options.fetch(:archive), File.expand_path("..", __dir__))
+  sh("python3", checker, archive)
 end
 
 desc "Submit an existing TestFlight build to App Store review without rebuilding"
