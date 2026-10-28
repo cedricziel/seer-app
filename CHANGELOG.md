@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.3](https://github.com/cedricziel/seer-app/compare/v0.8.2...v0.8.3) (2026-10-28)
+
+
+### Bug Fixes
+
+* **downloads:** expose action errors and failed download recovery ([#109](https://github.com/cedricziel/seer-app/issues/109)) ([4e93997](https://github.com/cedricziel/seer-app/commit/4e93997820fbbc937ace4d3278b46c17baa2eb56))
+* **library:** separate Continue Watching text from Resume ([#113](https://github.com/cedricziel/seer-app/issues/113)) ([50cf0d1](https://github.com/cedricziel/seer-app/commit/50cf0d18e1d72cd6feabdcb1e3dcfd595722f7d6))
+* **release:** resolve archive checks from the repository root ([#117](https://github.com/cedricziel/seer-app/issues/117)) ([ff38a73](https://github.com/cedricziel/seer-app/commit/ff38a73fd87912db8b62ea4d9880451dca86f4ed))
+
 ## [0.8.2](https://github.com/cedricziel/seer-app/compare/v0.8.1...v0.8.2) (2026-10-26)
 
 
