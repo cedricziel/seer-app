@@ -37,7 +37,7 @@ an active PR. UX001 replaces the archived sign-in task after PR 75 merged.
 | UX007 | P2 | Complete, [PR #98](https://github.com/cedricziel/seer-app/pull/98) | Internal URL settings accept unsupported schemes and hostless addresses, then dismiss as if saved successfully. | Network settings | Accept HTTP/HTTPS with a host; keep actionable validation beside the field and test invalid inputs. |
 | UX008 | P2 | Complete, [PR #103](https://github.com/cedricziel/seer-app/pull/103), chat `01a17635-2d2c-7fd0-8d71-b598f1905ec9` | Custom filter and season buttons expose selection only through color. | Library accessibility | Expose the selected trait or value and verify the active choice with VoiceOver. |
 | UX009 | P3 | Active, [PR #113](https://github.com/cedricziel/seer-app/pull/113), chat `01a17732-7688-7ec0-a8ae-3a9ca7ee45a7` | Continue Watching text overlaps Resume at compact width and AX5. | Library layout | Render a long title and subtitle at compact width and AX5. If overlap occurs, reserve button space or stack the content. |
-| UX010 | P2 | Queued | Download actions can fail silently, while failed rows hide the stored reason. | Downloads | Show enqueue errors immediately and expose an actionable failure reason with Retry. Recheck after the active download PRs merge. |
+| UX010 | P2 | In progress | Download actions can fail silently, while failed rows hide the stored reason. | Downloads | Show enqueue errors immediately and expose an actionable failure reason with Retry. Active chat: `01a176fa-7236-7623-9fd2-0662586b6244`, [PR #109](https://github.com/cedricziel/seer-app/pull/109). Revalidated after the download PRs merged; scoped error feedback and Retry are in review. |
 
 ## Evidence
 

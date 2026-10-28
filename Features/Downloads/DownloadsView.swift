@@ -9,6 +9,7 @@ struct DownloadsView: View {
 
     @EnvironmentObject private var appState: AppState
 
+    @State private var downloadFeedback = DownloadActionFeedback()
     @State private var selectedDownload: DownloadPlaybackDestination?
 
     var body: some View {
@@ -27,6 +28,7 @@ struct DownloadsView: View {
                 }
             }
         }
+        .downloadErrorAlert(downloadFeedback)
         .playerCover(item: $selectedDownload) { destination in
             #if os(tvOS)
                 TVPlayerView(
@@ -201,7 +203,9 @@ struct DownloadsView: View {
     private func deleteDownloads(at indexSet: IndexSet, from downloads: [Download], manager: DownloadManager) {
         Task {
             for index in indexSet {
-                try? await manager.deleteDownload(downloads[index].id)
+                await downloadFeedback.perform {
+                    try await manager.deleteDownload(downloads[index].id)
+                }
             }
         }
     }
@@ -213,6 +217,8 @@ struct DownloadRow: View {
     let manager: DownloadManager
     var onPlay: (() -> Void)?
     var onShowInLibrary: (() -> Void)?
+
+    @State private var downloadFeedback = DownloadActionFeedback()
 
     var body: some View {
         HStack(spacing: 12) {
@@ -266,6 +272,13 @@ struct DownloadRow: View {
                     }
                 }
 
+                if download.state == .failed {
+                    Text(failureReason)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 if download.state == .downloading {
                     ProgressView(value: download.progress)
                         .tint(.accentColor)
@@ -289,6 +302,9 @@ struct DownloadRow: View {
                 #endif
                 .accessibilityLabel("Play \(download.displayTitle)")
                 .accessibilityIdentifier("downloads.play.\(download.id.uuidString)")
+            } else if download.state == .failed {
+                Button("Retry", systemImage: "arrow.clockwise", action: handleDownloadAction)
+                    .accessibilityLabel("Retry download for \(download.displayTitle)")
             } else {
                 CompactDownloadButton(
                     state: buttonState,
@@ -298,11 +314,14 @@ struct DownloadRow: View {
             }
         }
         .padding(.vertical, 4)
+        .downloadErrorAlert(downloadFeedback)
         #if !os(tvOS)
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 Button(role: .destructive) {
                     Task {
-                        try? await manager.deleteDownload(download.id)
+                        await downloadFeedback.perform {
+                            try await manager.deleteDownload(download.id)
+                        }
                     }
                 } label: {
                     Label("Delete", systemImage: "trash")
@@ -329,7 +348,9 @@ struct DownloadRow: View {
         if download.state == .downloading {
             Button {
                 Task {
-                    try? await manager.pauseDownload(download.id)
+                    await downloadFeedback.perform {
+                        try await manager.pauseDownload(download.id)
+                    }
                 }
             } label: {
                 Label("Pause", systemImage: "pause.fill")
@@ -340,7 +361,9 @@ struct DownloadRow: View {
         if download.state == .paused {
             Button {
                 Task {
-                    try? await manager.resumeDownload(download.id)
+                    await downloadFeedback.perform {
+                        try await manager.resumeDownload(download.id)
+                    }
                 }
             } label: {
                 Label("Resume", systemImage: "play.fill")
@@ -351,7 +374,9 @@ struct DownloadRow: View {
         if download.state == .failed {
             Button {
                 Task {
-                    try? await manager.resumeDownload(download.id)
+                    await downloadFeedback.perform {
+                        try await manager.resumeDownload(download.id)
+                    }
                 }
             } label: {
                 Label("Retry", systemImage: "arrow.clockwise")
@@ -363,7 +388,9 @@ struct DownloadRow: View {
             .state == .waitingForWiFi {
             Button(role: .destructive) {
                 Task {
-                    try? await manager.deleteDownload(download.id)
+                    await downloadFeedback.perform {
+                        try await manager.deleteDownload(download.id)
+                    }
                 }
             } label: {
                 Label("Cancel", systemImage: "xmark.circle")
@@ -386,11 +413,19 @@ struct DownloadRow: View {
 
         Button(role: .destructive) {
             Task {
-                try? await manager.deleteDownload(download.id)
+                await downloadFeedback.perform {
+                    try await manager.deleteDownload(download.id)
+                }
             }
         } label: {
             Label("Delete", systemImage: "trash")
         }
+    }
+
+    private var failureReason: String {
+        guard let reason = download.errorMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !reason.isEmpty else { return "The download could not finish. Try again." }
+        return reason
     }
 
     private var buttonState: DownloadButtonState {
@@ -427,7 +462,9 @@ struct DownloadRow: View {
         Task {
             switch download.state {
             case .paused, .failed:
-                try? await manager.resumeDownload(download.id)
+                await downloadFeedback.perform {
+                    try await manager.resumeDownload(download.id)
+                }
             default:
                 break
             }
@@ -437,7 +474,9 @@ struct DownloadRow: View {
     private func handleCancelAction() {
         Task {
             if download.state == .downloading {
-                try? await manager.pauseDownload(download.id)
+                await downloadFeedback.perform {
+                    try await manager.pauseDownload(download.id)
+                }
             }
         }
     }
