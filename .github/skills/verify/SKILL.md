@@ -25,6 +25,14 @@ For telemetry changes, check that CI and TestFlight workflows inject `OTLP_ENDPO
 
 For Now Playing artwork ownership changes, run `PlaybackClientTests/PiPArtworkOwnershipTests` on an isolated simulator or through required CI. The injected loader controls delayed completions without network access. Cover closing playback, switching items that share an artwork URL, replacement metadata without artwork, and preserving the latest playback time when current artwork arrives.
 
+For interactive simulator walkthroughs, build the isolated source copy with
+`CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER=`.
+Xcode generates simulator entitlement metadata and signs nested libraries. An unsigned
+build can compile successfully but crash when CloudKit initializes. Manually signing
+only the app bundle is not a substitute for the Xcode signing pass. If replacement
+installation stalls, uninstall and reinstall only on the disposable device, before
+entering test credentials. Preserve the unsigned Release packaging checks below.
+
 Report static checks and simulator results separately from telemetry ingestion verification.
 
 For notification permission or logout changes, run [the isolated notification tests](scripts/notification-tests.sh).
