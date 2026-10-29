@@ -93,12 +93,15 @@ public final class LibraryViewModel: ObservableObject {
         }
     }
 
-    /// Item types to request from the server for the current selection. See
-    /// `isRecentlyAddedFeed`'s documentation for why `.all` is special-cased
-    /// when no library is selected.
     private var effectiveIncludeItemTypes: [MediaItem.MediaType]? {
-        guard selectedLibrary == nil, isRecentlyAddedFeed else { return selectedMediaType.jellyfinTypes }
-        return selectedMediaType.jellyfinTypes ?? [.movie, .series]
+        if let selectedTypes = selectedMediaType.jellyfinTypes {
+            return selectedTypes
+        }
+        switch selectedLibrary?.collectionType {
+        case .tvshows: return [.series]
+        case .movies: return [.movie]
+        default: return isRecentlyAddedFeed ? [.movie, .series] : nil
+        }
     }
 
     private var service: JellyfinService?

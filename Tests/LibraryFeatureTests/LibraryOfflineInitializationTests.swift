@@ -103,6 +103,28 @@ final class LibraryOfflineInitializationTests: XCTestCase {
         XCTAssertNil(model.errorMessage)
     }
 
+    func testTVLibraryRootShowsSeriesWithoutSeasonsOrEpisodes() async throws {
+        let context = container.mainContext
+        context.insert(CachedMediaItem(
+            id: "show", serverConfigurationID: server.id, name: "A show", mediaType: "Series", libraryId: "tv"
+        ))
+        context.insert(CachedMediaItem(
+            id: "season", serverConfigurationID: server.id, name: "Season 1", mediaType: "Season", libraryId: "tv"
+        ))
+        context.insert(CachedMediaItem(
+            id: "episode", serverConfigurationID: server.id, name: "Episode 1", mediaType: "Episode", libraryId: "tv"
+        ))
+        try context.save()
+        let model = LibraryViewModel(appState: appState, session: session)
+        let library = try JSONDecoder().decode(
+            Library.self, from: Data(#"{"Id":"tv","Name":"TV","CollectionType":"tvshows"}"#.utf8)
+        )
+
+        await model.enterDestination(.library(library), modelContext: context, networkMonitor: monitor)
+
+        XCTAssertEqual(model.mediaItems.map(\.id), ["show"])
+    }
+
     func testOfflineGridHonorsFavoritesAndYearSort() async throws {
         let context = container.mainContext
         context.insert(CachedMediaItem(
