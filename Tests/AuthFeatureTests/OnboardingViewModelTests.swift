@@ -488,6 +488,34 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertEqual(added.jellyfinUserID, "new-user")
     }
 
+    func testManualValidationIgnoresASecondSubmissionWhileFetching() async {
+        let started = expectation(description: "First validation started")
+        let secondFinished = expectation(description: "Repeated submission returned")
+        let transport = PendingInfoTransport(started: started)
+        let model = OnboardingViewModel(
+            appState: appState,
+            onboardingManager: onboardingManager,
+            serverInfoFetcher: ServerInfoFetcher(transport: transport),
+            quickConnectTransportFactory: { _ in ScriptedQuickConnectTransport(isEnabledResult: .success(false)) }
+        )
+        model.tapManualEntry()
+        model.manualURL = "https://fixture.invalid"
+        let first = Task { await model.validateManualURLAndAdvance() }
+        await fulfillment(of: [started], timeout: 5)
+
+        let second = Task {
+            await model.validateManualURLAndAdvance()
+            secondFinished.fulfill()
+        }
+        await fulfillment(of: [secondFinished], timeout: 5)
+        transport.finish()
+        await first.value
+        await second.value
+
+        XCTAssertEqual(transport.requestCount, 1)
+        XCTAssertFalse(model.isValidatingManualURL)
+    }
+
     // MARK: - Model construction helpers
 
     private func makeModel(
@@ -715,5 +743,52 @@ private final class SuspendedQuickConnectTransport: QuickConnectTransport {
 
     func authenticate(serverURL _: URL, secret _: String) async throws -> AuthResponse {
         throw QuickConnectSession.QuickConnectError.invalidResponse
+    }
+}
+
+private final class PendingInfoTransport: ServerInfoTransport {
+    private struct State {
+        var continuations: [CheckedContinuation<Data, Error>] = []
+        var requestCount = 0
+        var finished = false
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+    private let started: XCTestExpectation
+
+    init(started: XCTestExpectation) {
+        self.started = started
+    }
+
+    var requestCount: Int {
+        state.withLock { $0.requestCount }
+    }
+
+    func fetchPublicInfo(from _: URL) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            let requestCount: Int? = state.withLock {
+                guard !$0.finished else { return nil }
+                $0.requestCount += 1
+                $0.continuations.append(continuation)
+                return $0.requestCount
+            }
+            if requestCount == nil {
+                continuation.resume(throwing: URLError(.cannotConnectToHost))
+            } else if requestCount == 1 {
+                started.fulfill()
+            }
+        }
+    }
+
+    func finish() {
+        let continuations = state.withLock {
+            $0.finished = true
+            let pending = $0.continuations
+            $0.continuations = []
+            return pending
+        }
+        for continuation in continuations {
+            continuation.resume(throwing: URLError(.cannotConnectToHost))
+        }
     }
 }

@@ -191,7 +191,8 @@ final class OnboardingViewModel: ObservableObject {
     // MARK: - Manual entry
 
     func validateManualURLAndAdvance() async {
-        let trimmed = manualURL.trimmingCharacters(in: .whitespaces)
+        guard !isValidatingManualURL else { return }
+        let trimmed = manualURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let parsed = URL(string: trimmed),
               let scheme = parsed.scheme?.lowercased(),
               scheme == "http" || scheme == "https",

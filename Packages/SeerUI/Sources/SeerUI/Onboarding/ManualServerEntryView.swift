@@ -30,6 +30,11 @@ public struct ManualServerEntryView: View {
             }
             actionSection
         }
+        #if os(macOS)
+        .formStyle(.grouped)
+        .frame(maxWidth: 640)
+        .frame(maxWidth: .infinity)
+        #endif
         .navigationTitle("Add Server")
         .modifier(InlineNavigationTitleIfAvailable())
     }
@@ -44,8 +49,8 @@ public struct ManualServerEntryView: View {
                 Text("Connect to Jellyfin")
                     .font(.headline)
                 Text(
-                    "Enter your Jellyfin server's URL. We'll learn your "
-                        + "internal address automatically once you're signed in."
+                    "Enter your Jellyfin server's address, such as "
+                        + "https://jellyfin.example.com or http://192.168.1.10:8096."
                 )
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -57,7 +62,9 @@ public struct ManualServerEntryView: View {
 
     private var serverSection: some View {
         Section("Server URL") {
-            TextField("https://jellyfin.example.com", text: $url)
+            TextField("Server URL", text: $url, prompt: Text("https://jellyfin.example.com"))
+                .labelsHidden()
+                .onSubmit(continueIfEnabled)
                 .textContentType(.URL)
                 .autocorrectionDisabled()
                 .modifier(URLKeyboardIfAvailable())
@@ -80,9 +87,18 @@ public struct ManualServerEntryView: View {
         }
     }
 
+    private var canContinue: Bool {
+        !url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isValidating
+    }
+
+    private func continueIfEnabled() {
+        guard canContinue else { return }
+        onContinue()
+    }
+
     private var actionSection: some View {
         Section {
-            Button(action: onContinue) {
+            Button(action: continueIfEnabled) {
                 HStack {
                     if isValidating {
                         ProgressView()
@@ -93,7 +109,7 @@ public struct ManualServerEntryView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .disabled(url.trimmingCharacters(in: .whitespaces).isEmpty || isValidating)
+            .disabled(!canContinue)
             .accessibilityIdentifier("manual.continue")
         }
     }
