@@ -85,7 +85,7 @@ public struct JellyseerrConnectSheet: View {
                     errorBanner(error)
                 }
             }
-            .navigationTitle("Connect Jellyseerr")
+            .navigationTitle("Jellyseerr")
             .modifier(InlineNavigationTitleIfAvailable())
             .toolbar { toolbarContent }
         }
@@ -103,7 +103,7 @@ public struct JellyseerrConnectSheet: View {
                 Text("Browse and request media")
                     .font(.headline)
                 Text(
-                    "Connect Jellyseerr to discover trending titles and ask "
+                    "Jellyseerr is optional. Connect it to discover trending titles and ask "
                         + "your server admin to add them to the library."
                 )
                 .font(.subheadline)
