@@ -234,7 +234,8 @@ private struct LibraryContentView: View {
         VStack(spacing: 12) {
             OnboardingTipView(
                 title: "Welcome to Your Library",
-                description: "Browse your Jellyfin library here. Discover and Requests use the optional Jellyseerr service, which you can connect separately."
+                description: "Browse your Jellyfin library here. "
+                    + "Discover and Requests use the optional Jellyseerr service, which you can connect separately."
             )
             .padding(.horizontal)
 
