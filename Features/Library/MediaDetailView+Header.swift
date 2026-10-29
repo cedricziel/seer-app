@@ -101,7 +101,8 @@ extension MediaDetailView {
 
     /// "YEAR · DURATION" line, e.g. "2024 · 2 hr 8 min".
     private func metadataLine(color: Color = .secondary) -> some View {
-        let parts = [item.year.map(String.init), item.formattedDurationLong].compactMap(\.self)
+        let duration = (item.runTimeTicks ?? 0) > 0 ? item.formattedDurationLong : nil
+        let parts = [item.year.map(String.init), duration].compactMap(\.self)
         return Text(parts.joined(separator: " · "))
             .font(.subheadline)
             .foregroundStyle(color)
@@ -130,6 +131,9 @@ extension MediaDetailView {
                 }
                 .font(.subheadline)
                 .foregroundStyle(textColor)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Community rating")
+                .accessibilityValue("\(String(format: "%.1f", rating)) out of 10")
             }
 
             if displayItem.userData?.played == true {
@@ -151,30 +155,43 @@ extension MediaDetailView {
 
     var playButton: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 12) {
-                Button {
-                    showPlayer = true
-                } label: {
-                    HStack {
-                        Image(systemName: "play.fill")
-                        Text(hasProgress ? "Resume" : "Play")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    primaryPlayButton
+                    if downloadManager != nil {
+                        downloadButton
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+                .fixedSize(horizontal: true, vertical: false)
 
-                // Download button
-                if downloadManager != nil {
-                    downloadButton
+                VStack(spacing: 12) {
+                    primaryPlayButton
+                    if downloadManager != nil {
+                        downloadButton
+                    }
                 }
             }
 
             if hasProgress {
                 progressCaption
             }
+        }
+    }
+
+    private var primaryPlayButton: some View {
+        Button {
+            showPlayer = true
+        } label: {
+            HStack {
+                Image(systemName: "play.fill")
+                Text(hasProgress ? "Resume" : "Play")
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
+            .background(Color.accentColor)
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 
@@ -217,7 +234,6 @@ extension MediaDetailView {
                 Task { await deleteDownload() }
             }
         )
-        .frame(width: 130)
         .task {
             await updateDownloadState()
         }
