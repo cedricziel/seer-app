@@ -80,10 +80,6 @@ final class WelcomeViewSnapshotTests: XCTestCase {
     }
 
     func testWelcomeView_iPadRegular_TwoThirdsSplit() {
-        // Simulates the user putting the app in a 2/3 split on iPad — the
-        // available width (~796pt on iPad Pro 11 landscape) is still in the
-        // regular horizontal size class, so the welcome screen should keep
-        // its side-by-side layout.
         let view = WelcomeView(
             primarySuggestion: WelcomeView.Suggestion(
                 id: "synced-1",
