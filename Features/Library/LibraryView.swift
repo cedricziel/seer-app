@@ -27,26 +27,8 @@ private struct LibraryContentView: View {
     @EnvironmentObject private var networkMonitor: NetworkMonitor
     @StateObject private var viewModel: LibraryViewModel
     @Environment(DownloadManager.self) private var downloadManager: DownloadManager?
-    // Read at this level — *outside* the `NavigationSplitView` below — on
-    // purpose. The split view hands its sidebar column a compact
-    // horizontal size class regardless of device, so any view inside the
-    // column cannot tell "iPhone" from "iPad content column" on its own.
-    // `isSplitLayout` is derived here once and passed down explicitly.
-    #if os(macOS)
-        private let horizontalSizeClass: MediaSizeClass? = .regular
-    #else
-        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    #endif
     @State private var selectedItemForPlayback: MediaItem?
     @State private var path = NavigationPath()
-    /// Detail-column selection when the split view shows both columns
-    /// (iPad / Mac Designed for iPad). On compact width the split view is
-    /// collapsed and navigation pushes `MediaDetailView` onto `path`
-    /// instead, so this stays `nil` there. Cleared whenever a grid screen
-    /// is pushed so the detail pane never shows an item from a previous
-    /// library.
-    @State private var selectedItem: MediaItem?
-
     #if os(tvOS)
         private let recentlyAddedCardWidth: CGFloat = 196
     #else
@@ -59,31 +41,18 @@ private struct LibraryContentView: View {
         _viewModel = StateObject(wrappedValue: LibraryViewModel(appState: appState))
     }
 
-    /// Whether the split view currently shows its detail column alongside
-    /// the home content, so item taps should *select* into that column
-    /// rather than push. Always `false` on tvOS, which uses a plain stack.
-    private var isSplitLayout: Bool {
-        #if os(tvOS)
-            return false
-        #else
-            return horizontalSizeClass == .regular
-        #endif
-    }
-
     var body: some View {
         rootContainer
             .task { await viewModel.loadHome(modelContext: modelContext, networkMonitor: networkMonitor) }
             .task(id: [router.pendingMedia?.id, appState.activeServerID]) {
                 await router.consumePendingMedia(resolve: resolveRoute) { item in
                     path = NavigationPath()
-                    selectedItem = nil
                     showDetails(for: item)
                 }
             }
             .onDisappear { viewModel.cancelAllTasks() }
             .onChange(of: appState.activeServerID) {
                 path = NavigationPath()
-                selectedItem = nil
                 viewModel.serverChanged()
                 Task { await viewModel.refresh() }
             }
@@ -123,38 +92,8 @@ private struct LibraryContentView: View {
         return item
     }
 
-    // MARK: - Navigation containers
-
-    /// One container per platform, kept stable across size-class changes:
-    ///
-    /// - tvOS: a plain `NavigationStack`.
-    /// - iOS / iPadOS / Mac (Designed for iPad): a two-column
-    ///   `NavigationSplitView`. On regular width the home content (with its
-    ///   own `NavigationStack` for the grid and detail pushes) sits in the
-    ///   leading column and `LibraryDetailColumn` in the trailing one; on
-    ///   compact width the split view collapses to that leading stack by
-    ///   itself, so iPhone and iPad Split View / Slide Over never swap
-    ///   containers mid-session.
-    @ViewBuilder
     private var rootContainer: some View {
-        #if os(tvOS)
-            homeStack
-        #else
-            NavigationSplitView(columnVisibility: .constant(.all)) {
-                homeStack
-                    // Keep the content column within a sidebar-style width
-                    // range so the detail column always has room, including
-                    // on the narrowest current iPad (mini, 744pt portrait).
-                    .navigationSplitViewColumnWidth(min: 320, ideal: 420, max: 600)
-                    // The home content is the primary surface, not a
-                    // collapsible sidebar; the tab sidebar already provides
-                    // that role on iPad.
-                    .toolbar(removing: .sidebarToggle)
-            } detail: {
-                LibraryDetailColumn(selectedItem: selectedItem, viewModel: viewModel)
-            }
-            .navigationSplitViewStyle(.balanced)
-        #endif
+        homeStack
     }
 
     private var homeStack: some View {
@@ -189,8 +128,7 @@ private struct LibraryContentView: View {
         .navigationDestination(for: LibraryGridDestination.self) { destination in
             LibraryGridView(
                 destination: destination,
-                appState: appState,
-                selectedItem: isSplitLayout ? $selectedItem : nil
+                appState: appState
             )
         }
     }
@@ -248,10 +186,7 @@ private struct LibraryContentView: View {
         }
     }
 
-    /// Pushes a grid screen and drops any detail-column selection, so the
-    /// detail pane doesn't keep showing an item from the previous context.
     private func openGrid(_ destination: LibraryGridDestination) {
-        selectedItem = nil
         path.append(destination)
     }
 
@@ -442,20 +377,12 @@ private struct LibraryContentView: View {
                 downloadedBadge
             }
         }
-        return Group {
-            if isSplitLayout {
-                // Split layout shows the detail in the trailing column
-                // instead of pushing onto `path`.
-                Button { selectedItem = item } label: { card }
-            } else {
-                NavigationLink(value: item) { card }
-            }
-        }
-        .buttonStyle(.plain)
-        .mediaContextMenu(
-            config: contextMenuConfig(for: item, canPlay: item.isPlayable, showDetails: false),
-            actions: contextMenuActions(for: item, canPlay: item.isPlayable)
-        )
+        return NavigationLink(value: item) { card }
+            .buttonStyle(.plain)
+            .mediaContextMenu(
+                config: contextMenuConfig(for: item, canPlay: item.isPlayable, showDetails: false),
+                actions: contextMenuActions(for: item, canPlay: item.isPlayable)
+            )
     }
 
     private func latestItemSubtitle(for item: MediaItem, downloaded: Bool) -> String? {
@@ -514,15 +441,8 @@ private struct LibraryContentView: View {
         )
     }
 
-    /// Opens `MediaDetailView` for an item whose primary tap does something
-    /// else (Continue Watching cards resume playback): into the detail
-    /// column when the split view shows one, otherwise pushed onto `path`.
     private func showDetails(for item: MediaItem) {
-        if isSplitLayout {
-            selectedItem = item
-        } else {
-            path.append(item)
-        }
+        path.append(item)
     }
 }
 
