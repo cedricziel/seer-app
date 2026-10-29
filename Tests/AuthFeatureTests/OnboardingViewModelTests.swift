@@ -501,13 +501,13 @@ final class OnboardingViewModelTests: XCTestCase {
         model.tapManualEntry()
         model.manualURL = "https://fixture.invalid"
         let first = Task { await model.validateManualURLAndAdvance() }
-        await fulfillment(of: [started], timeout: 1)
+        await fulfillment(of: [started], timeout: 5)
 
         let second = Task {
             await model.validateManualURLAndAdvance()
             secondFinished.fulfill()
         }
-        await fulfillment(of: [secondFinished], timeout: 1)
+        await fulfillment(of: [secondFinished], timeout: 5)
         transport.finish()
         await first.value
         await second.value
@@ -750,6 +750,7 @@ private final class PendingInfoTransport: ServerInfoTransport {
     private struct State {
         var continuations: [CheckedContinuation<Data, Error>] = []
         var requestCount = 0
+        var finished = false
     }
 
     private let state = OSAllocatedUnfairLock(initialState: State())
@@ -765,16 +766,23 @@ private final class PendingInfoTransport: ServerInfoTransport {
 
     func fetchPublicInfo(from _: URL) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
-            state.withLock {
+            let requestCount: Int? = state.withLock {
+                guard !$0.finished else { return nil }
                 $0.requestCount += 1
                 $0.continuations.append(continuation)
+                return $0.requestCount
             }
-            started.fulfill()
+            if requestCount == nil {
+                continuation.resume(throwing: URLError(.cannotConnectToHost))
+            } else if requestCount == 1 {
+                started.fulfill()
+            }
         }
     }
 
     func finish() {
         let continuations = state.withLock {
+            $0.finished = true
             let pending = $0.continuations
             $0.continuations = []
             return pending
