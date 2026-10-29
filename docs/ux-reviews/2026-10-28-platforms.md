@@ -129,7 +129,7 @@ observation, not a claim that the primary action is missing or inoperable.
 
 ## Mac
 
-Pending the iPad review. Prepared a separate temporary source copy with bundle
+The iPad review is complete with the limitations above. Prepared a separate temporary source copy with bundle
 identity `test.seer.uxreview.01a18445`, local SwiftData without CloudKit, a unique
 non-synchronizing Keychain service, and no production URL-scheme registration.
 The UI sources are unchanged. CloudKit and account-status behavior are excluded
@@ -173,7 +173,7 @@ internal-address terminology without context. Evidence: [Mac Add Server](2026-10
 
 ## tvOS
 
-Mac review recorded with limitations. Disposable Apple TV simulator: `95D25DDB-AFF8-4B8A-8BA5-96B577043D54`, Seer-UX-tvOS-01a18445, tvOS 27.0, Apple TV 4K third generation. The signed arm64 Debug build passed, original exec `51243` exit 0. Installed and launched successfully on the disposable TV, PID 58116. Welcome and server entry review started.
+tvOS onboarding reviewed with limitations. Disposable Apple TV simulator: `95D25DDB-AFF8-4B8A-8BA5-96B577043D54`, Seer-UX-tvOS-01a18445, tvOS 27.0, Apple TV 4K third generation. The signed arm64 Debug build passed, original exec `51243` exit 0. Installed and launched successfully on the disposable TV, PID 58116. Welcome and server entry review started.
 
 
 ### tvOS checks prompted by source
@@ -220,3 +220,18 @@ The user could not select a colon in the simulator keyboard and explicitly
 requested skipping tvOS for now. Track URL-entry operability as a simulator
 walkthrough blocker requiring a clean physical-remote or simulator reproduction.
 Authenticated TV browsing and playback remain untested.
+
+## Tracked follow-up
+
+- [Restore usable library browsing on iPad and native Mac](https://github.com/cedricziel/seer-app/issues/118), IP03, MC04.
+- [Give native Mac Settings a usable sheet size](https://github.com/cedricziel/seer-app/issues/119), MC07.
+- [Repair server entry layout and keyboard submission](https://github.com/cedricziel/seer-app/issues/120), R02, MC01, MC02.
+- [Copy Quick Connect codes on native macOS](https://github.com/cedricziel/seer-app/issues/121), MC03.
+- [Fix welcome branding and adaptive platform layout](https://github.com/cedricziel/seer-app/issues/122), R01, IP01, TV01.
+- [Keep series and seasons out of the TV library root](https://github.com/cedricziel/seer-app/issues/123), IP02.
+- [Keep media detail actions readable across window sizes](https://github.com/cedricziel/seer-app/issues/124), R06, IP05, MC06, IP04.
+- [Diagnose authenticated HLS failures and align codec capabilities](https://github.com/cedricziel/seer-app/issues/125), IP06, MC05.
+- [Present actionable playback errors without overlapping controls](https://github.com/cedricziel/seer-app/issues/126), IP06, IP07, MC05.
+- [Label ratings and download storage controls accessibly](https://github.com/cedricziel/seer-app/issues/127), R07, R08.
+- [Clarify empty downloads and optional service setup](https://github.com/cedricziel/seer-app/issues/128), R03, R04, R05.
+- [Verify colon entry with the tvOS server URL keyboard](https://github.com/cedricziel/seer-app/issues/129), TV onboarding blocker.
