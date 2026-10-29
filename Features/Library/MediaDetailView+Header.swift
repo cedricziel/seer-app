@@ -185,7 +185,7 @@ extension MediaDetailView {
             HStack {
                 Image(systemName: "play.fill")
                 Text(hasProgress ? "Resume" : "Play")
-                    .fixedSize(horizontal: true, vertical: false)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity)
             .padding()

@@ -41,7 +41,7 @@ public struct DownloadButton: View {
             HStack {
                 stateIcon
                 Text(stateText)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity)
             .padding()
