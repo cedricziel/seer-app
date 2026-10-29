@@ -32,7 +32,7 @@
         public var body: some View {
             ZStack {
                 Color.black
-                MacPlayerView(player: viewModel.player)
+                MacPlayerView(player: viewModel.player, showsControls: viewModel.errorMessage == nil)
                 if viewModel.isBuffering, viewModel.player == nil {
                     ProgressView("Loading video")
                 }
@@ -65,16 +65,18 @@
 
     private struct MacPlayerView: NSViewRepresentable {
         let player: AVPlayer?
+        let showsControls: Bool
 
         func makeNSView(context _: Context) -> AVPlayerView {
             let view = AVPlayerView()
-            view.controlsStyle = .floating
+            view.controlsStyle = showsControls ? .floating : .none
             view.showsFullScreenToggleButton = true
             return view
         }
 
         func updateNSView(_ view: AVPlayerView, context _: Context) {
             view.player = player
+            view.controlsStyle = showsControls ? .floating : .none
         }
     }
 

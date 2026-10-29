@@ -53,6 +53,7 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
 
                 AVPlayerViewControllerRepresentable(
                     player: viewModel.player,
+                    showsControls: viewModel.errorMessage == nil,
                     item: item,
                     onDismiss: { dismiss() },
                     onPiPStart: { onPiPStart?() },
@@ -148,6 +149,7 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
 
     struct AVPlayerViewControllerRepresentable: UIViewControllerRepresentable {
         let player: AVPlayer?
+        let showsControls: Bool
         let item: MediaItem
         let onDismiss: () -> Void
         let onPiPStart: () -> Void
@@ -156,6 +158,7 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
         func makeUIViewController(context: Context) -> AVPlayerViewController {
             let controller = AVPlayerViewController()
             controller.delegate = context.coordinator
+            controller.showsPlaybackControls = showsControls
             controller.allowsPictureInPicturePlayback = true
             controller.canStartPictureInPictureAutomaticallyFromInline = true
             // Pre-warm the context menu to reduce delay when clicking three dots
@@ -214,6 +217,8 @@ private let logger = Logger(subsystem: "com.seer.app", category: "VideoPlayerVie
         }
 
         func updateUIViewController(_ controller: AVPlayerViewController, context _: Context) {
+            controller.showsPlaybackControls = showsControls
+            controller.contentOverlayView?.isUserInteractionEnabled = showsControls
             let isRestoring = PiPPlaybackManager.shared.isRestoring
             logger.debug("[VideoPlayer] updateUIVC - hasPlayer: \(player != nil), isRestoring: \(isRestoring)")
             if controller.player !== player {
