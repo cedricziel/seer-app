@@ -82,5 +82,8 @@ struct SettingsView: View {
                 }
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 480, idealWidth: 560, minHeight: 480, idealHeight: 560)
+        #endif
     }
 }
