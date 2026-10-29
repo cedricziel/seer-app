@@ -107,13 +107,15 @@ struct OnboardingFlowView: View {
                 #if canImport(UIKit) && !os(tvOS)
                     if let code = viewModel.quickConnectCode {
                         UIPasteboard.general.string = code
+                        return true
                     }
                 #elseif os(macOS)
                     if let code = viewModel.quickConnectCode {
                         NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(code, forType: .string)
+                        return NSPasteboard.general.setString(code, forType: .string)
                     }
                 #endif
+                return false
             }
         )
     }

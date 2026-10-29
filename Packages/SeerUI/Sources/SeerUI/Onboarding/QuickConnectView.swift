@@ -12,7 +12,7 @@ public struct QuickConnectView: View {
     public let isPolling: Bool
     public let onUsePassword: () -> Void
     public let onCancel: () -> Void
-    public let onCopyCode: () -> Void
+    public let onCopyCode: () -> Bool
 
     public init(
         code: String?,
@@ -22,7 +22,7 @@ public struct QuickConnectView: View {
         onRetry: @escaping () -> Void = {},
         onUsePassword: @escaping () -> Void,
         onCancel: @escaping () -> Void,
-        onCopyCode: @escaping () -> Void
+        onCopyCode: @escaping () -> Bool
     ) {
         self.errorMessage = errorMessage
         self.onRetry = onRetry
@@ -85,8 +85,9 @@ public struct QuickConnectView: View {
 
             #if !os(tvOS)
                 Button {
-                    onCopyCode()
-                    copiedCode = code
+                    if onCopyCode() {
+                        copiedCode = code
+                    }
                 } label: {
                     Label(
                         copiedCode == code ? "Copied" : "Copy code",
@@ -181,6 +182,6 @@ private extension Color {
         isPolling: true,
         onUsePassword: {},
         onCancel: {},
-        onCopyCode: {}
+        onCopyCode: { true }
     )
 }
