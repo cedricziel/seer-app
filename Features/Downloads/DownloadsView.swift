@@ -9,6 +9,8 @@ struct DownloadsView: View {
 
     @EnvironmentObject private var appState: AppState
 
+    var onBrowseLibrary: (() -> Void)?
+
     @State private var downloadFeedback = DownloadActionFeedback()
     @State private var selectedDownload: DownloadPlaybackDestination?
 
@@ -193,11 +195,16 @@ struct DownloadsView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView(
-            "No Downloads",
-            systemImage: "arrow.down.circle",
-            description: Text("Downloaded media will appear here for offline viewing.")
-        )
+        ContentUnavailableView {
+            Label("No Downloads", systemImage: "arrow.down.circle")
+        } description: {
+            Text("Open a movie or episode in Library and choose Download to watch it offline.")
+        } actions: {
+            if let onBrowseLibrary {
+                Button("Browse Library", action: onBrowseLibrary)
+                    .buttonStyle(.borderedProminent)
+            }
+        }
     }
 
     private func deleteDownloads(at indexSet: IndexSet, from downloads: [Download], manager: DownloadManager) {

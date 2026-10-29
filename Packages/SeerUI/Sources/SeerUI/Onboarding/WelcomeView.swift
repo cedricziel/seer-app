@@ -23,11 +23,6 @@ public struct WelcomeView: View {
     public let onSelectSuggestion: (Suggestion) -> Void
     public let onManualEntry: () -> Void
 
-    #if os(iOS)
-        @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-        @Environment(\.verticalSizeClass) private var verticalSizeClass
-    #endif
-
     /// HIG: Increase Contrast adds a visible 1pt accent border to the
     /// secondary suggestion rows so the visual hierarchy stays legible
     /// without relying on opacity.
@@ -55,43 +50,33 @@ public struct WelcomeView: View {
         self.onManualEntry = onManualEntry
     }
 
-    /// Side-by-side hero + suggestions layout when there is wide horizontal
-    /// space (iPad regular width) or limited vertical space (iPhone
-    /// landscape). On tvOS the layout is always wide.
-    private var useHorizontalLayout: Bool {
-        #if os(iOS)
-            horizontalSizeClass == .regular || verticalSizeClass == .compact
-        #else
-            true
-        #endif
-    }
-
     public var body: some View {
-        Group {
-            if useHorizontalLayout {
-                horizontalBody
-            } else {
-                verticalBody
+        GeometryReader { geometry in
+            Group {
+                if geometry.size.width > geometry.size.height {
+                    horizontalBody
+                } else {
+                    verticalBody
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .background(Color.welcomeBackground)
         .defaultFocus($focusedID, defaultFocusID)
     }
 
     private var verticalBody: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 32) {
-                    hero
-                        .padding(.top, 48)
-                    suggestionList
-                }
-                .padding(.horizontal)
-                .frame(maxWidth: .infinity)
+        ScrollView {
+            VStack(spacing: 32) {
+                hero
+                suggestionList
+                footer
             }
-            footer
-                .padding()
+            .padding(24)
+            .frame(maxWidth: 560)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 48)
         }
-        .background(Color.welcomeBackground)
     }
 
     private var horizontalBody: some View {
@@ -130,7 +115,7 @@ public struct WelcomeView: View {
                 .foregroundStyle(.tint)
                 .accessibilityIgnoresInvertColors(true)
                 .accessibilityHidden(true)
-            Text("Welcome to Flowmark")
+            Text("Welcome to Seer")
                 .font(.largeTitle)
                 .fontWeight(.bold)
                 .multilineTextAlignment(.center)
@@ -247,12 +232,21 @@ public struct WelcomeView: View {
 
         if primarySuggestion == nil {
             Button(action: onManualEntry) { label }
+            #if os(tvOS)
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
+            #else
                 .buttonStyle(WelcomeProminentButtonStyle())
+            #endif
                 .focused($focusedID, equals: Self.manualEntryFocusID)
                 .accessibilityIdentifier(Self.manualEntryFocusID)
         } else {
             Button(action: onManualEntry) { label }
+            #if os(tvOS)
+                .buttonStyle(.bordered)
+            #else
                 .buttonStyle(WelcomePlainButtonStyle())
+            #endif
                 .focused($focusedID, equals: Self.manualEntryFocusID)
                 .accessibilityIdentifier(Self.manualEntryFocusID)
         }

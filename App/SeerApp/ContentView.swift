@@ -140,7 +140,7 @@ struct MainTabView: View {
             }
 
             Tab("Downloads", systemImage: "arrow.down.circle", value: .downloads) {
-                DownloadsView()
+                DownloadsView(onBrowseLibrary: { flowmarkRouter.selectedTab = .library })
             }
 
             Tab("Requests", systemImage: "list.bullet.clipboard", value: .requests) {

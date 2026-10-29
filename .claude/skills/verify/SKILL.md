@@ -184,3 +184,14 @@ For SwiftUI download alert presentation checks, run [scripts/download-feedback-t
 Archive validation tests also cover Fastlane running from its own directory.
 Manual Release Please dispatch builds the selected workflow revision and retains
 the archive library check before each TestFlight upload.
+
+For welcome composition and optional setup guidance changes, run
+`SeerUITests/WelcomeViewSnapshotTests`,
+`SeerUITests/JellyseerrConnectSheetSnapshotTests`, and
+`SeerUITestsTV/WelcomeViewTVSnapshotTests` through required CI or an isolated
+fixture with a build coordinator grant. Review portrait iPad and fresh-install
+tvOS renderings before updating baselines. The snapshot suite does not establish
+remote focus behavior. In an isolated app, verify empty Downloads offers Browse
+Library, which selects Library, and confirm the manual-entry action is readable
+both focused and unfocused on tvOS. These runtime checks remain required when
+only static checks are available.
