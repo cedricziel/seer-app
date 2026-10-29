@@ -12,7 +12,7 @@ final class QuickConnectViewSnapshotTests: XCTestCase {
             isPolling: true,
             onUsePassword: {},
             onCancel: {},
-            onCopyCode: {}
+            onCopyCode: { true }
         )
         assertSnapshot(
             of: view,
@@ -29,7 +29,7 @@ final class QuickConnectViewSnapshotTests: XCTestCase {
             onRetry: {},
             onUsePassword: {},
             onCancel: {},
-            onCopyCode: {}
+            onCopyCode: { true }
         )
         assertSnapshot(
             of: view,
@@ -46,7 +46,7 @@ final class QuickConnectViewSnapshotTests: XCTestCase {
             onRetry: {},
             onUsePassword: {},
             onCancel: {},
-            onCopyCode: {}
+            onCopyCode: { true }
         )
         assertSnapshot(
             of: view,
@@ -61,7 +61,7 @@ final class QuickConnectViewSnapshotTests: XCTestCase {
             isPolling: true,
             onUsePassword: {},
             onCancel: {},
-            onCopyCode: {}
+            onCopyCode: { true }
         )
         assertSnapshot(
             of: view,

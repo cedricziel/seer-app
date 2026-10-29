@@ -1,6 +1,9 @@
 import SeerCore
 import SeerUI
 import SwiftUI
+#if os(macOS)
+    import AppKit
+#endif
 
 /// Top-level coordinator for the streamlined onboarding flow. Switches
 /// between welcome / manual entry / Quick Connect / password sub-views
@@ -104,8 +107,15 @@ struct OnboardingFlowView: View {
                 #if canImport(UIKit) && !os(tvOS)
                     if let code = viewModel.quickConnectCode {
                         UIPasteboard.general.string = code
+                        return true
+                    }
+                #elseif os(macOS)
+                    if let code = viewModel.quickConnectCode {
+                        NSPasteboard.general.clearContents()
+                        return NSPasteboard.general.setString(code, forType: .string)
                     }
                 #endif
+                return false
             }
         )
     }

@@ -3,6 +3,8 @@ import SwiftUI
 /// Displays a Quick Connect code or recovery actions when a request fails.
 /// A nil code represents a request in progress; an error hides any unusable code.
 public struct QuickConnectView: View {
+    @State private var copiedCode: String?
+
     public let code: String?
     public let serverHost: String
     public let errorMessage: String?
@@ -10,7 +12,7 @@ public struct QuickConnectView: View {
     public let isPolling: Bool
     public let onUsePassword: () -> Void
     public let onCancel: () -> Void
-    public let onCopyCode: () -> Void
+    public let onCopyCode: () -> Bool
 
     public init(
         code: String?,
@@ -20,7 +22,7 @@ public struct QuickConnectView: View {
         onRetry: @escaping () -> Void = {},
         onUsePassword: @escaping () -> Void,
         onCancel: @escaping () -> Void,
-        onCopyCode: @escaping () -> Void
+        onCopyCode: @escaping () -> Bool
     ) {
         self.errorMessage = errorMessage
         self.onRetry = onRetry
@@ -81,14 +83,21 @@ public struct QuickConnectView: View {
                 .accessibilityLabel(code.map { String($0) }.joined(separator: ", "))
                 .accessibilityIdentifier("quickconnect.code")
 
-            Button {
-                onCopyCode()
-            } label: {
-                Label("Copy code", systemImage: "doc.on.doc")
+            #if !os(tvOS)
+                Button {
+                    if onCopyCode() {
+                        copiedCode = code
+                    }
+                } label: {
+                    Label(
+                        copiedCode == code ? "Copied" : "Copy code",
+                        systemImage: copiedCode == code ? "checkmark" : "doc.on.doc"
+                    )
                     .font(.subheadline)
-            }
-            .buttonStyle(.bordered)
-            .accessibilityIdentifier("quickconnect.copy")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("quickconnect.copy")
+            #endif
         }
         .padding(.vertical, 32)
         .frame(maxWidth: .infinity)
@@ -173,6 +182,6 @@ private extension Color {
         isPolling: true,
         onUsePassword: {},
         onCancel: {},
-        onCopyCode: {}
+        onCopyCode: { true }
     )
 }
