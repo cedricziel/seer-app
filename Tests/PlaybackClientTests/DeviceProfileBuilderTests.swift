@@ -39,13 +39,27 @@ final class DeviceProfileBuilderTests: XCTestCase {
         XCTAssertEqual(movProfile?.type, .video)
     }
 
-    func testDirectPlayProfiles_includesMKV() {
+    func testDirectPlayProfiles_excludesMKV() {
         let profile = DeviceProfileBuilder.buildAppleDeviceProfile()
         let mkvProfile = profile.directPlayProfiles.first {
             $0.container == "mkv"
         }
-        XCTAssertNotNil(mkvProfile)
-        XCTAssertEqual(mkvProfile?.type, .video)
+        XCTAssertNil(mkvProfile)
+    }
+
+    func testDirectPlayProfiles_onlyAdvertiseLocallyAcceptedVideoFormats() {
+        let profile = DeviceProfileBuilder.buildAppleDeviceProfile()
+        for video in profile.directPlayProfiles.filter({ $0.type == .video }) {
+            for container in (video.container ?? "").split(separator: ",") {
+                XCTAssertTrue(StreamURLBuilder.isContainerCompatible(String(container)))
+            }
+            for codec in (video.videoCodec ?? "").split(separator: ",") {
+                XCTAssertTrue(StreamURLBuilder.isVideoCodecCompatible(String(codec)))
+            }
+            for codec in (video.audioCodec ?? "").split(separator: ",") {
+                XCTAssertTrue(StreamURLBuilder.isAudioCodecCompatible(String(codec)))
+            }
+        }
     }
 
     func testDirectPlayProfiles_includesAudioOnlyProfile() {
