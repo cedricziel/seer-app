@@ -1,8 +1,17 @@
 #!/bin/bash
+set -uo pipefail
 if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
-claude plugin marketplace add cedricziel/claude-plugins >/dev/null 2>&1
-claude plugin install oss@cedricziel >/dev/null 2>&1
-exit 0
+if ! output="$(claude plugin marketplace add cedricziel/claude-plugins 2>&1)"; then
+  if ! grep -qi "already" <<<"$output"; then
+    echo "install-claude-plugins: marketplace add failed: $output" >&2
+    exit 1
+  fi
+fi
+
+if ! output="$(claude plugin install oss@cedricziel 2>&1)"; then
+  echo "install-claude-plugins: plugin install failed: $output" >&2
+  exit 1
+fi
