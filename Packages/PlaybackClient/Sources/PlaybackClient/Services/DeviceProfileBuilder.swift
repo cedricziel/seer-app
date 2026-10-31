@@ -26,19 +26,12 @@ public enum DeviceProfileBuilder {
             DirectPlayProfile(
                 container: "mp4,m4v",
                 audioCodec: "aac,ac3,eac3,alac,flac,mp3",
-                videoCodec: "h264,hevc,av1",
+                videoCodec: "h264,hevc",
                 type: .video
             ),
             // MOV container
             DirectPlayProfile(
                 container: "mov",
-                audioCodec: "aac,ac3,eac3,alac,flac,mp3",
-                videoCodec: "h264,hevc,av1",
-                type: .video
-            ),
-            // MKV container (AVPlayer has limited MKV support)
-            DirectPlayProfile(
-                container: "mkv",
                 audioCodec: "aac,ac3,eac3,alac,flac,mp3",
                 videoCodec: "h264,hevc",
                 type: .video

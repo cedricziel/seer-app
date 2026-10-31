@@ -123,14 +123,6 @@ public enum StreamURLBuilder {
             return (hlsURL, .hls)
         }
 
-        if mediaSource.supportsDirectPlay == true {
-            if !isCompatible {
-                print("📹 [StreamURL] ⚠️ Format incompatible, no transcoding. Trying DirectPlay anyway.")
-            }
-            print("📹 [StreamURL] Playback Method: DirectPlay (fallback)")
-            return (buildDirectPlayURL(mediaSourceId: mediaSource.id, serverURL: serverURL), .directPlay)
-        }
-
         print("📹 [StreamURL] ❌ No suitable playback method found for media source")
         return nil
     }

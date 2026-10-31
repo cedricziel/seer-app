@@ -239,7 +239,8 @@ public final class VideoPlayerViewModel {
             isBuffering = false
             return
         } catch {
-            errorMessage = error.localizedDescription
+            logPlaybackError(error, stage: "playback-info")
+            errorMessage = PlaybackFailureMessage.message(for: error)
             isBuffering = false
         }
     }
@@ -449,7 +450,6 @@ public final class VideoPlayerViewModel {
         case .directStream: "DirectStream"
         }
         print("🎬 [VideoPlayer] Stream type: \(streamTypeStr)")
-        print("🎬 [VideoPlayer] Stream URL: \(StreamURLBuilder.redactedDescription(of: info.url))")
 
         // All stream types now have auth in URL query params
         return AVPlayerItem(url: info.url)
@@ -563,24 +563,27 @@ public final class VideoPlayerViewModel {
 
     private func handlePlaybackFailure() {
         let playerError = player?.currentItem?.error
-        let errorDesc = playerError?.localizedDescription ?? "Playback failed"
-        print("🎬 [VideoPlayer] AVPlayerItem FAILED: \(errorDesc)")
-        logPlaybackError(playerError)
-        let streamTypeStr = streamInfo?.type.debugDescription ?? "Unknown"
-        errorMessage = "[\(streamTypeStr)] \(errorDesc)"
+        logPlaybackError(playerError, stage: "player-item")
+        if let event = player?.currentItem?.errorLog()?.events.last {
+            logger.error("Playback item resource failure: status=\(event.errorStatusCode)")
+        }
+        errorMessage = PlaybackFailureMessage.message(for: playerError)
         isBuffering = false
     }
 
-    /// Logs only safe error fields. `userInfo` can carry the failing stream
-    /// URL, which includes the access token, so it is never printed whole.
-    private func logPlaybackError(_ error: Error?) {
-        guard let nsError = error as? NSError else { return }
-        print("🎬 [VideoPlayer] Error domain: \(nsError.domain), code: \(nsError.code)")
-        if let failingURL = nsError.userInfo[NSURLErrorFailingURLErrorKey] as? URL {
-            print("🎬 [VideoPlayer] Failing URL: \(StreamURLBuilder.redactedDescription(of: failingURL))")
+    private func logPlaybackError(_ error: Error?, stage: String) {
+        var current = error as NSError?
+        for depth in 0 ..< 8 {
+            guard let failure = current else { break }
+            logger
+                .error(
+                    """
+                    Playback failure: stage=\(stage, privacy: .public), depth=\(depth), \
+                    domain=\(failure.domain, privacy: .public), code=\(failure.code)
+                    """
+                )
+            current = failure.userInfo[NSUnderlyingErrorKey] as? NSError
         }
-        guard let underlyingError = nsError.userInfo[NSUnderlyingErrorKey] as? NSError else { return }
-        print("🎬 [VideoPlayer] Underlying error: \(underlyingError.domain), code: \(underlyingError.code)")
     }
 
     private func scheduleControlsHide() {

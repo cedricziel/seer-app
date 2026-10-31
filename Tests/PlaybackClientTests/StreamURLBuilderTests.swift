@@ -294,7 +294,7 @@ final class StreamURLBuilderTests: XCTestCase {
         XCTAssertTrue(urlString.contains("audioCodec=aac"), "URL should specify aac audio codec")
     }
 
-    func testBuildStreamInfo_incompatibleFormat_noTranscodingSupport_fallsBackToDirectPlay() {
+    func testBuildStreamInfo_incompatibleFormat_noTranscodingSupport_returnsNil() {
         let mediaSource = createMediaSource(
             container: "mkv",
             videoCodec: "h264",
@@ -312,8 +312,7 @@ final class StreamURLBuilderTests: XCTestCase {
             deviceID: deviceID
         )
 
-        XCTAssertNotNil(streamInfo)
-        XCTAssertEqual(streamInfo?.type, .directPlay)
+        XCTAssertNil(streamInfo)
     }
 
     // MARK: - HLS URL Building Tests
