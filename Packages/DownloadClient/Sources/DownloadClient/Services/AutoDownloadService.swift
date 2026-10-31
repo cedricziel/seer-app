@@ -52,7 +52,8 @@ public actor AutoDownloadService {
         public static func registerBackgroundTask() {
             BGTaskScheduler.shared.register(
                 forTaskWithIdentifier: taskIdentifier,
-                using: nil
+                // Main queue: this @MainActor closure traps on any other queue.
+                using: .main
             ) { task in
                 guard let task = task as? BGProcessingTask else { return }
                 Task {
