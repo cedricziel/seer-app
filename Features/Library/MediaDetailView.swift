@@ -76,6 +76,10 @@ struct MediaDetailView: View {
                         contentSections
                     }
                     .padding()
+                    #if os(macOS)
+                        .frame(maxWidth: 960)
+                        .frame(maxWidth: .infinity)
+                    #endif
                 #endif
             }
         }

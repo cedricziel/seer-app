@@ -65,7 +65,7 @@ struct DownloadSettingsView: View {
                         HStack {
                             Text("Storage Limit")
                             Spacer()
-                            Text(maxStorageGB == 0 ? "Unlimited" : "\(Int(maxStorageGB)) GB")
+                            Text(storageLimitText)
                                 .foregroundStyle(.secondary)
                         }
                         #if os(tvOS)
@@ -75,7 +75,10 @@ struct DownloadSettingsView: View {
                                 }
                             }
                         #else
-                            Slider(value: $maxStorageGB, in: 0 ... 100, step: 5)
+                            Slider(value: $maxStorageGB, in: 0 ... 100, step: 5) {
+                                Text("Storage Limit")
+                            }
+                            .accessibilityValue(storageLimitText)
                         #endif
                     }
                 } header: {
@@ -138,6 +141,10 @@ struct DownloadSettingsView: View {
                     await downloadManager?.setWiFiOnlyEnabled(wifiOnlyDownloads)
                 }
         }
+    }
+
+    private var storageLimitText: String {
+        maxStorageGB == 0 ? "Unlimited" : "\(Int(maxStorageGB)) GB"
     }
 
     private func loadStorageInfo() async {
