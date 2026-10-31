@@ -59,10 +59,14 @@ final class SeerAppDelegate: NSObject {
         // MARK: - Background Task Registration
 
         private func registerBackgroundTasks() {
-            // Register auto-download background task
+            // Launch handlers must run on the main queue. These closures are
+            // formed inside a @MainActor type, so Swift 6 inserts a main-actor
+            // isolation check into them. With `using: nil` BGTaskScheduler calls
+            // them on a private background queue, that check traps, and the app
+            // crashes whenever iOS launches one of these tasks in the background.
             BGTaskScheduler.shared.register(
                 forTaskWithIdentifier: AutoDownloadService.taskIdentifier,
-                using: nil
+                using: .main
             ) { [weak self] task in
                 guard let processingTask = task as? BGProcessingTask else { return }
                 self?.handleAutoDownloadTask(processingTask)
@@ -71,7 +75,7 @@ final class SeerAppDelegate: NSObject {
             // Register request status polling background task
             BGTaskScheduler.shared.register(
                 forTaskWithIdentifier: Self.requestPollTaskIdentifier,
-                using: nil
+                using: .main
             ) { [weak self] task in
                 guard let processingTask = task as? BGProcessingTask else { return }
                 self?.handleRequestPollTask(processingTask)
@@ -89,8 +93,9 @@ final class SeerAppDelegate: NSObject {
                 task.setTaskCompleted(success: true)
             }
 
-            // Handle task expiration
-            task.expirationHandler = {
+            // The system calls the expiration handler on a queue of its choosing,
+            // so it must stay nonisolated (see `registerBackgroundTasks`).
+            task.expirationHandler = { @Sendable in
                 processingTask.cancel()
             }
         }
@@ -110,8 +115,9 @@ final class SeerAppDelegate: NSObject {
                 task.setTaskCompleted(success: true)
             }
 
-            // Handle task expiration
-            task.expirationHandler = {
+            // The system calls the expiration handler on a queue of its choosing,
+            // so it must stay nonisolated (see `registerBackgroundTasks`).
+            task.expirationHandler = { @Sendable in
                 processingTask.cancel()
             }
         }
