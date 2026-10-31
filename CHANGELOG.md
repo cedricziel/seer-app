@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.4](https://github.com/cedricziel/seer-app/compare/v0.8.3...v0.8.4) (2026-10-31)
+
+
+### Bug Fixes
+
+* **auth:** copy Quick Connect codes on native Mac ([#133](https://github.com/cedricziel/seer-app/issues/133)) ([c222c0d](https://github.com/cedricziel/seer-app/commit/c222c0d6b709965d8ed2a8065097315ab004f4b8))
+* **auth:** submit server entry from the keyboard ([#135](https://github.com/cedricziel/seer-app/issues/135)) ([a07748a](https://github.com/cedricziel/seer-app/commit/a07748ab6fb8d1f3edcae6f75e9dd739bd2dc570))
+* **background:** run BGTask launch handlers on the main queue ([#142](https://github.com/cedricziel/seer-app/issues/142)) ([9b53868](https://github.com/cedricziel/seer-app/commit/9b538682e5ce6afcdd80354448d4dbeed3f055d1))
+* **detail:** keep actions readable and announce control values ([#138](https://github.com/cedricziel/seer-app/issues/138)) ([81a6d5f](https://github.com/cedricziel/seer-app/commit/81a6d5f6a22fea8148119e637368415c0d7d5f85))
+* **library:** let browsing use the full content area ([#136](https://github.com/cedricziel/seer-app/issues/136)) ([ce37d6f](https://github.com/cedricziel/seer-app/commit/ce37d6fabfd8e8593d27a4cc698f37bf34c6af76))
+* **library:** restrict TV library roots to series ([#132](https://github.com/cedricziel/seer-app/issues/132)) ([5336116](https://github.com/cedricziel/seer-app/commit/53361169a071efaff315ff081806a0fff1426060))
+* **playback:** align capabilities and recover cleanly from errors ([#139](https://github.com/cedricziel/seer-app/issues/139)) ([7015132](https://github.com/cedricziel/seer-app/commit/701513206bd195d149b6f72a33f16b4aa0ffa177))
+* **settings:** size the native Mac settings sheet ([#131](https://github.com/cedricziel/seer-app/issues/131)) ([830e3bf](https://github.com/cedricziel/seer-app/commit/830e3bf2bf6d3bc99fbe2344c43afff40b7c48ea))
+
 ## [0.8.3](https://github.com/cedricziel/seer-app/compare/v0.8.2...v0.8.3) (2026-10-28)
 
 
