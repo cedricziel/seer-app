@@ -104,7 +104,9 @@ private actor TickCounter {
     }
 
     func waitForCount(_ target: Int) async {
-        if count >= target { return }
+        if count >= target {
+            return
+        }
         await withCheckedContinuation { continuation in
             continuations[target, default: []].append(continuation)
         }
@@ -127,7 +129,9 @@ private actor ManualRefreshClock: RefreshClock {
     }
 
     func waitForSleeper() async {
-        if !pending.isEmpty { return }
+        if !pending.isEmpty {
+            return
+        }
         await withCheckedContinuation { sleepWaiters.append($0) }
     }
 

@@ -18,7 +18,7 @@ renders on 2026-10-26.
   with `-jobs 2` per build. CI does not consume a local slot. Prefer CI over a
   redundant full local build; never stop another task's process. Use the designated
   build coordinator's grants; it may serialize work below this ceiling.
-- Use the pinned SwiftLint 0.63.2 and SwiftFormat 0.61.1 until the shared tooling
+- Use the pinned SwiftLint 0.63.2 and SwiftFormat 0.64.6 until the shared tooling
   entrypoints land. Tool upgrades and repository-wide formatting need separate PRs.
 
 ## Queue

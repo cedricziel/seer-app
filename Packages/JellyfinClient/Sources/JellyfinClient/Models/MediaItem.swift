@@ -515,10 +515,18 @@ public struct MediaItem: Identifiable, Codable, Sendable, Hashable {
         guard let rangeType = videoRangeType, !rangeType.isEmpty else { return nil }
         let normalized = rangeType.lowercased()
         guard normalized != "sdr", normalized != "unknown" else { return nil }
-        if normalized.contains("dovi") { return "Dolby Vision" }
-        if normalized == "hdr10plus" || normalized == "hdr10+" { return "HDR10+" }
-        if normalized == "hdr10" { return "HDR10" }
-        if normalized == "hlg" { return "HLG" }
+        if normalized.contains("dovi") {
+            return "Dolby Vision"
+        }
+        if normalized == "hdr10plus" || normalized == "hdr10+" {
+            return "HDR10+"
+        }
+        if normalized == "hdr10" {
+            return "HDR10"
+        }
+        if normalized == "hlg" {
+            return "HLG"
+        }
         return rangeType
     }
 

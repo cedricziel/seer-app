@@ -82,7 +82,9 @@ final class BonjourDiscoveryTests: XCTestCase {
     ) async throws {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if condition() { return }
+            if condition() {
+                return
+            }
             try await Task.sleep(for: .milliseconds(10))
         }
         XCTFail("Condition not met within \(timeout)s")

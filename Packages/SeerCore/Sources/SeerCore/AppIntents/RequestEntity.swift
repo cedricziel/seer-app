@@ -1,8 +1,8 @@
 import AppIntents
+import Foundation
 #if !os(tvOS)
     import CoreSpotlight
 #endif
-import Foundation
 
 /// AppEntity representing a Jellyseerr media request, sourced from the
 /// `CachedRequest` SwiftData store.

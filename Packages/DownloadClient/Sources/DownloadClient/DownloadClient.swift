@@ -8,20 +8,18 @@
 // - iOS storage management integration (visible in Settings)
 
 @_exported import Foundation
-
-// MARK: - Models
-
 @_exported import struct Foundation.Data
 @_exported import struct Foundation.Date
 @_exported import struct Foundation.URL
 @_exported import struct Foundation.UUID
+import SwiftData
+
+// MARK: - Models
 
 /// Re-export public types
 public typealias DownloadID = UUID
 
 // MARK: - SwiftData Container
-
-import SwiftData
 
 /// Create a model container for downloads (no CloudKit)
 public func createDownloadModelContainer() throws -> ModelContainer {

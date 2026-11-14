@@ -279,7 +279,9 @@ private final class QuickConnectSDKClients: @unchecked Sendable {
         deviceID: String
     ) -> JellyfinSDKTransport {
         lock.withLock {
-            if let client = clients[serverURL] { return client }
+            if let client = clients[serverURL] {
+                return client
+            }
             let client = JellyfinSDKTransport(
                 serverURL: serverURL,
                 deviceID: deviceID,

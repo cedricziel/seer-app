@@ -1,7 +1,4 @@
 import Foundation
-#if !os(tvOS)
-    import MetricKit
-#endif
 import OpenTelemetryApi
 import OpenTelemetryProtocolExporterCommon
 import OpenTelemetryProtocolExporterHttp
@@ -9,6 +6,9 @@ import OpenTelemetrySdk
 import OSLog
 import ResourceExtension
 import SignPostIntegration
+#if !os(tvOS)
+    import MetricKit
+#endif
 
 /// OpenTelemetry-based telemetry service that collects and reports performance metrics and crash data.
 /// Diagnostics preferences gate collection and export; users can opt out in Settings.
@@ -232,10 +232,8 @@ public final class TelemetryService: NSObject, @unchecked Sendable {
     public func onConsentChanged() {
         let consent = DiagnosticsConsent.shared
 
-        if consent.crashReportsEnabled || consent.performanceMetricsEnabled {
-            if !isInitialized {
-                initializeIfConsented()
-            }
+        if consent.crashReportsEnabled || consent.performanceMetricsEnabled, !isInitialized {
+            initializeIfConsented()
         }
         if consent.crashReportsEnabled, let otelLogger {
             CrashReportBridge.shared.initialize(logger: otelLogger)

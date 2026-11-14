@@ -360,7 +360,9 @@ public final class LibraryViewModel: ObservableObject {
     }
 
     private func sortCachedItems(_ items: inout [CachedMediaItem]) {
-        if isOffline, sortOption == .dateAdded { sortOption = .name }
+        if isOffline, sortOption == .dateAdded {
+            sortOption = .name
+        }
         switch sortOption {
         case .dateAdded: break
         case .name: items.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }

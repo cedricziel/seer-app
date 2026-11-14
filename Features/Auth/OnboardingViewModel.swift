@@ -257,7 +257,9 @@ final class OnboardingViewModel: ObservableObject {
         observeQuickConnect(session)
         TelemetryService.shared.recordOnboardingAuthMethod(.quickConnect)
         await session.start()
-        if quickConnectSession !== session { session.cancel() }
+        if quickConnectSession !== session {
+            session.cancel()
+        }
     }
 
     private func clearQuickConnect() {

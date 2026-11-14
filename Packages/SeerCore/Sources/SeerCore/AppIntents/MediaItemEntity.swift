@@ -1,8 +1,8 @@
 import AppIntents
+import Foundation
 #if !os(tvOS)
     import CoreSpotlight
 #endif
-import Foundation
 
 /// AppEntity representing a media item (movie, episode, series) that the
 /// user has cached locally via `OfflineSync`. Surfaced to Siri,

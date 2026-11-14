@@ -83,7 +83,9 @@ private actor SuspendedPoll {
     }
 
     func waitForFetch() async {
-        if continuation != nil { return }
+        if continuation != nil {
+            return
+        }
         await withCheckedContinuation { started = $0 }
     }
 

@@ -384,7 +384,9 @@ private final class DelayedRequestService: RequestService {
     private var pendingAction: CheckedContinuation<Void, Error>?
 
     func waitForAction() async {
-        if !actions.isEmpty { return }
+        if !actions.isEmpty {
+            return
+        }
         await withCheckedContinuation { actionWaiter = $0 }
     }
 

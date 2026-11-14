@@ -48,7 +48,9 @@ public struct WelcomeState: Sendable, Equatable {
     }
 
     public var hasSuggestions: Bool {
-        if case .suggestion = primary { return true }
+        if case .suggestion = primary {
+            return true
+        }
         return !secondary.isEmpty
     }
 }
