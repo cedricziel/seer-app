@@ -1,6 +1,6 @@
 {
   "apple/swift-collections": {
-    "version": "1.7.4",
+    "version": "1.7.5",
     "reason": "Requires Swift 6.4; retain Swift 6.2 support."
   },
   "pointfreeco/swift-custom-dump": {
