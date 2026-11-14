@@ -35,11 +35,17 @@ public final class RequestNotificationService {
 
         switch change {
         case .approved:
-            if prefs?.requestApprovedEnabled == false { return }
+            if prefs?.requestApprovedEnabled == false {
+                return
+            }
         case .available:
-            if prefs?.requestAvailableEnabled == false { return }
+            if prefs?.requestAvailableEnabled == false {
+                return
+            }
         case .declined:
-            if prefs?.requestDeclinedEnabled == false { return }
+            if prefs?.requestDeclinedEnabled == false {
+                return
+            }
         }
 
         // Request permission if needed

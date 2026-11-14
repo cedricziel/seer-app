@@ -72,7 +72,9 @@ public final class FlowmarkURLRouter: ObservableObject {
             }
             let serverValue = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "server" })?.value
-            if let serverValue, UUID(uuidString: serverValue) == nil { return .unknown(url) }
+            if let serverValue, UUID(uuidString: serverValue) == nil {
+                return .unknown(url)
+            }
             return .openMedia(id: id, serverID: serverValue.flatMap(UUID.init(uuidString:)))
         case "library":
             return .openLibrary
@@ -105,7 +107,9 @@ public final class FlowmarkURLRouter: ObservableObject {
         if resolutionServer?.routeID != route.id {
             guard let serverID = route.serverID ?? activeServerID else { return nil }
             resolutionServer = (route.id, serverID)
-            if serverID != activeServerID { return .switchServer(serverID) }
+            if serverID != activeServerID {
+                return .switchServer(serverID)
+            }
         }
         guard let serverID = resolutionServer?.serverID else { return nil }
         guard serverID == activeServerID else {

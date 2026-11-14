@@ -35,10 +35,8 @@ public struct DownloadForOfflineIntent: AppIntent {
 
     @MainActor
     public func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard let appState = AppIntentsContext.appState, appState.isAuthenticated else {
-            throw IntentError.needsConfiguration
-        }
-        guard let serverID = item.serverID,
+        guard let appState = AppIntentsContext.appState, appState.isAuthenticated,
+              let serverID = item.serverID,
               appState.configuration(for: serverID) != nil else {
             throw IntentError.needsConfiguration
         }

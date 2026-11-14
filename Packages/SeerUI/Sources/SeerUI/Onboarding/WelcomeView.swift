@@ -215,7 +215,9 @@ public struct WelcomeView: View {
     }
 
     private func borderWidth(emphasized: Bool) -> CGFloat {
-        if emphasized { return 2 }
+        if emphasized {
+            return 2
+        }
         return colorSchemeContrast == .increased ? 1 : 0
     }
 

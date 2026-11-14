@@ -7,11 +7,10 @@
 // - Configurable notification preferences
 
 @_exported import Foundation
+import SwiftData
 @_exported import UserNotifications
 
 // MARK: - SwiftData Container
-
-import SwiftData
 
 /// Create a model container for notifications (no CloudKit)
 public func createNotificationModelContainer() throws -> ModelContainer {

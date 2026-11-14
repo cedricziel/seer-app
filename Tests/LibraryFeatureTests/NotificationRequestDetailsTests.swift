@@ -105,7 +105,9 @@ private final class DelayedNotificationRequest {
     }
 
     func waitForStart() async {
-        if continuation != nil { return }
+        if continuation != nil {
+            return
+        }
         await withCheckedContinuation { startWaiter = $0 }
     }
 

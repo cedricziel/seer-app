@@ -179,7 +179,11 @@ private final class DiscoverRequestTrap: URLProtocol, @unchecked Sendable {
     static func waitForPending() async {
         let expectation = XCTestExpectation(description: "All five Discover requests reached isolated transport")
         state.withLock {
-            if $0.pending.count == 5 { expectation.fulfill() } else { $0.waiter = expectation }
+            if $0.pending.count == 5 {
+                expectation.fulfill()
+            } else {
+                $0.waiter = expectation
+            }
         }
         let result = await XCTWaiter.fulfillment(of: [expectation], timeout: 5)
         XCTAssertEqual(result, .completed)
@@ -199,10 +203,14 @@ private final class DiscoverRequestTrap: URLProtocol, @unchecked Sendable {
         let held = Self.state.withLock {
             guard $0.hold, request.value(forHTTPHeaderField: "X-Api-Key") == "first-test-key" else { return false }
             $0.pending.append(self)
-            if $0.pending.count == 5 { $0.waiter?.fulfill(); $0.waiter = nil }
+            if $0.pending.count == 5 {
+                $0.waiter?.fulfill(); $0.waiter = nil
+            }
             return true
         }
-        if held { return }
+        if held {
+            return
+        }
         let succeeds = Self.state.withLock {
             ($0.succeed || ($0.trendingOnly && request.url?.path.hasSuffix("/trending") == true))
                 && request.url?.path != $0.failedPath

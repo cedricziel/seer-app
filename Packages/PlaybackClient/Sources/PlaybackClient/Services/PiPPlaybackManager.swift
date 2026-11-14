@@ -358,11 +358,9 @@ public final class PiPPlaybackManager {
             if let season = item.parentIndexNumber, let episode = item.indexNumber {
                 nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = "Season \(season), Episode \(episode)"
             }
-        } else if item.type == .movie {
+        } else if item.type == .movie, let year = item.year {
             // For movies, use year as album
-            if let year = item.year {
-                nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = String(year)
-            }
+            nowPlayingInfo[MPMediaItemPropertyAlbumTitle] = String(year)
         }
 
         // Duration — prefer caller-supplied value, fall back to the item's runtime

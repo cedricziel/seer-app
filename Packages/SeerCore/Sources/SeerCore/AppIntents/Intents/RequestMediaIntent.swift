@@ -110,7 +110,9 @@ public struct RequestMediaIntent: AppIntent {
 
     @MainActor
     private func resolveServer(appState: AppState) async throws -> ServerEntity {
-        if let server { return server }
+        if let server {
+            return server
+        }
         guard let active = appState.activeServer else {
             throw IntentError.needsConfiguration
         }

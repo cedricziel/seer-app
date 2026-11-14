@@ -95,7 +95,9 @@ enum IntentSeams {
                             year: year,
                             mediaType: result.mediaType == .movie ? "Movie" : "Series"
                         ))
-                        if entities.count >= 20 { break }
+                        if entities.count >= 20 {
+                            break
+                        }
                     }
                     return entities
                 } catch {

@@ -45,7 +45,9 @@ final class QuickConnectSessionTests: XCTestCase {
         let task = Task { await session.start() }
 
         try await Self.waitFor(timeout: 2.0) {
-            if case .approved = session.state { return true }
+            if case .approved = session.state {
+                return true
+            }
             return false
         }
 
@@ -101,7 +103,9 @@ final class QuickConnectSessionTests: XCTestCase {
         let task = Task { await session.start() }
 
         try await Self.waitFor(timeout: 1.0) {
-            if case .pending = session.state { return true }
+            if case .pending = session.state {
+                return true
+            }
             return false
         }
 
@@ -155,7 +159,9 @@ final class QuickConnectSessionTests: XCTestCase {
     ) async throws {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            if condition() { return }
+            if condition() {
+                return
+            }
             try await Task.sleep(for: .milliseconds(10))
         }
         XCTFail("Condition not met within \(timeout)s")
@@ -231,7 +237,9 @@ final class ScriptedTransport: QuickConnectTransport {
         case let .scripted(result):
             return try result.get()
         case let .fallback(value):
-            if let value { return value }
+            if let value {
+                return value
+            }
             throw QuickConnectSession.QuickConnectError.invalidResponse
         }
     }

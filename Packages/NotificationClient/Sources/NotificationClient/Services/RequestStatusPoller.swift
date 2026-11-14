@@ -89,8 +89,7 @@ public actor RequestStatusPoller {
     /// Perform a single poll (can be called from background task)
     public func poll() async {
         do {
-            guard let response = try await fetchCurrentRequests() else { return }
-            guard !isStopped else { return }
+            guard let response = try await fetchCurrentRequests(), !isStopped else { return }
             let currentRequests = response.results
 
             // Get cached statuses for this server only; request IDs collide across servers
@@ -134,7 +133,9 @@ public actor RequestStatusPoller {
 
     private func fetchCurrentRequests() async throws -> RequestsResponse? {
         guard !isStopped else { return nil }
-        if let fetchRequests { return try await fetchRequests() }
+        if let fetchRequests {
+            return try await fetchRequests()
+        }
         guard let service = jellyseerrService else { return nil }
         return try await service.getRequests(take: 50, skip: 0, filter: .all, sort: .modified)
     }

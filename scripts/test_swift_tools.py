@@ -33,7 +33,7 @@ class SwiftToolsTests(unittest.TestCase):
         rows = [line.split() for line in (ROOT / 'scripts/swift-tools.lock').read_text().splitlines()
                 if line and not line.startswith('#')]
         self.assertEqual({row[1] for row in rows if row[0] == 'swiftlint'}, {'0.63.2'})
-        self.assertEqual({row[1] for row in rows if row[0] == 'swiftformat'}, {'0.61.1'})
+        self.assertEqual({row[1] for row in rows if row[0] == 'swiftformat'}, {'0.64.6'})
         self.assertEqual(len(rows), 6)
 
     def bootstrap_fixture(self, work, checksum_valid=True):

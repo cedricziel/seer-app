@@ -79,7 +79,9 @@ final class SDKStubServer: @unchecked Sendable {
         var buffer = [UInt8](repeating: 0, count: 4096)
         while true {
             let count = stream.read(&buffer, maxLength: buffer.count)
-            if count <= 0 { return data }
+            if count <= 0 {
+                return data
+            }
             data.append(contentsOf: buffer.prefix(count))
         }
     }

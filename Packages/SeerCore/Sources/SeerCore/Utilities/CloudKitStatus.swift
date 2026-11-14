@@ -33,17 +33,17 @@ public class CloudKitStatus: ObservableObject {
     public var statusDescription: String {
         switch accountStatus {
         case .available:
-            return "Available"
+            "Available"
         case .noAccount:
-            return "No iCloud Account"
+            "No iCloud Account"
         case .restricted:
-            return "Restricted"
+            "Restricted"
         case .couldNotDetermine:
-            return "Unknown"
+            "Unknown"
         case .temporarilyUnavailable:
-            return "Temporarily Unavailable"
+            "Temporarily Unavailable"
         @unknown default:
-            return "Unknown Status"
+            "Unknown Status"
         }
     }
 
@@ -51,17 +51,17 @@ public class CloudKitStatus: ObservableObject {
     public var statusIcon: String {
         switch accountStatus {
         case .available:
-            return "checkmark.icloud.fill"
+            "checkmark.icloud.fill"
         case .noAccount:
-            return "xmark.icloud.fill"
+            "xmark.icloud.fill"
         case .restricted:
-            return "lock.icloud.fill"
+            "lock.icloud.fill"
         case .couldNotDetermine:
-            return "questionmark.icloud.fill"
+            "questionmark.icloud.fill"
         case .temporarilyUnavailable:
-            return "exclamationmark.icloud.fill"
+            "exclamationmark.icloud.fill"
         @unknown default:
-            return "icloud.slash.fill"
+            "icloud.slash.fill"
         }
     }
 

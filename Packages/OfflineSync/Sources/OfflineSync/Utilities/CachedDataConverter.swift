@@ -30,8 +30,12 @@ public struct CachedDataConverter {
     /// Converts cached user data to MediaItem.UserData
     public func convertToUserData(_ cached: CachedMediaItem) -> MediaItem.UserData? {
         var json: [String: Any] = [:]
-        if let ticks = cached.playbackPositionTicks { json["PlaybackPositionTicks"] = ticks }
-        if let count = cached.playCount { json["PlayCount"] = count }
+        if let ticks = cached.playbackPositionTicks {
+            json["PlaybackPositionTicks"] = ticks
+        }
+        if let count = cached.playCount {
+            json["PlayCount"] = count
+        }
         json["IsFavorite"] = cached.isFavorite
         json["Played"] = cached.isPlayed
         if let date = cached.lastPlayedDate {
@@ -72,10 +76,18 @@ public struct CachedDataConverter {
         lastPlayedDate: Date?
     ) -> MediaItem.UserData? {
         var json: [String: Any] = [:]
-        if let ticks = playbackPositionTicks { json["PlaybackPositionTicks"] = ticks }
-        if let count = playCount { json["PlayCount"] = count }
-        if let fav = isFavorite { json["IsFavorite"] = fav }
-        if let played { json["Played"] = played }
+        if let ticks = playbackPositionTicks {
+            json["PlaybackPositionTicks"] = ticks
+        }
+        if let count = playCount {
+            json["PlayCount"] = count
+        }
+        if let fav = isFavorite {
+            json["IsFavorite"] = fav
+        }
+        if let played {
+            json["Played"] = played
+        }
         if let date = lastPlayedDate {
             let formatter = ISO8601DateFormatter()
             json["LastPlayedDate"] = formatter.string(from: date)

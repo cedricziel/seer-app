@@ -74,13 +74,10 @@ public actor DownloadQueue {
         // Notify listeners of network change
         await onNetworkStatusChanged?(connected, wifi)
 
-        // Process queue if network became available and WiFi conditions are met
-        if connected, !isPaused {
-            // If WiFi-only is enabled and we just got WiFi, process queue
-            // If WiFi-only is disabled, always process when connected
-            if !wifiOnlyEnabled || wifi {
-                await processQueue()
-            }
+        // Process queue if network became available and WiFi conditions are met:
+        // with WiFi-only enabled we need WiFi, otherwise any connection will do.
+        if connected, !isPaused, !wifiOnlyEnabled || wifi {
+            await processQueue()
         }
     }
 

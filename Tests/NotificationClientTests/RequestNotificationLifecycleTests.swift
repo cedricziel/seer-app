@@ -33,7 +33,9 @@ final class RequestNotificationLifecycleTests: XCTestCase {
             var checks = 0
             center.onAuthorizationCheck = {
                 checks += 1
-                if checks == 2 { service.retire() }
+                if checks == 2 {
+                    service.retire()
+                }
             }
 
             await service.notifyRequestStatusChanged(.approved(requestID: 7, title: "Movie"), serverID: "A")
@@ -49,7 +51,9 @@ final class RequestNotificationLifecycleTests: XCTestCase {
             var checks = 0
             center.onAuthorizationCheck = {
                 checks += 1
-                if checks == 2 { sessionActive = false }
+                if checks == 2 {
+                    sessionActive = false
+                }
             }
 
             await service.notifyRequestStatusChanged(.approved(requestID: 7, title: "Movie"), serverID: "A")

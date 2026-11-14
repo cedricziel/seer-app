@@ -649,8 +649,7 @@ public final class VideoPlayerViewModel {
     }
 
     private func reportPlaybackStart() {
-        guard !isPlayingOffline else { return }
-        guard let state = playbackState, let service = playbackService else { return }
+        guard !isPlayingOffline, let state = playbackState, let service = playbackService else { return }
         Task {
             try? await service.reportPlaybackStart(state: state)
         }

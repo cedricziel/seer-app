@@ -189,8 +189,8 @@ final class SeriesDetailViewModel {
     }
 
     private func loadEpisodesIfNeeded(for seasonId: String) async {
-        guard episodesBySeason[seasonId] == nil else { return }
-        guard let season = seasons.first(where: { $0.id == seasonId }) else { return }
+        guard episodesBySeason[seasonId] == nil,
+              let season = seasons.first(where: { $0.id == seasonId }) else { return }
         await loadEpisodes(for: season)
     }
 

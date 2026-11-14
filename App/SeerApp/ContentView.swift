@@ -45,8 +45,8 @@ struct ContentView: View {
         .task(id: resolutionContext) {
             guard let server = appState.activeServer else { return }
             let context = resolutionContext
-            guard let serverURL = await appState.resolveJellyfinURL(for: server.id) else { return }
-            guard !Task.isCancelled, context == resolutionContext else { return }
+            guard let serverURL = await appState.resolveJellyfinURL(for: server.id), !Task.isCancelled,
+                  context == resolutionContext else { return }
             resolvedServerURL = serverURL
             resolvedContext = context
         }
@@ -101,7 +101,9 @@ struct ContentView: View {
             }
         }
         .onChange(of: onboardingManager.showWhatsNew) { _, presented in
-            if presented { whatsNewPresentationActive = true }
+            if presented {
+                whatsNewPresentationActive = true
+            }
         }
         .onAppear {
             if appState.isAuthenticated {
@@ -111,7 +113,9 @@ struct ContentView: View {
         }
         .onChange(of: appState.isAuthenticated) { _, authenticated in
             checkedAuthentication = nil
-            if authenticated { onboardingManager.checkAndShowWhatsNew() }
+            if authenticated {
+                onboardingManager.checkAndShowWhatsNew()
+            }
             checkedAuthentication = authenticated
         }
     }

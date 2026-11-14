@@ -48,7 +48,9 @@ public struct ServerEntityQuery: EntityStringQuery {
         )
         let rows = (try? context.fetch(descriptor)) ?? []
         return rows.sorted { lhs, rhs in
-            if lhs.isActive != rhs.isActive { return lhs.isActive }
+            if lhs.isActive != rhs.isActive {
+                return lhs.isActive
+            }
             return false
         }
     }
